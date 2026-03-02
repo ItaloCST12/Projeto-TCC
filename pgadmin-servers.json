@@ -1,0 +1,1 @@
+{"Servers":{"1":{"Name":"PostgreSQL Local","Group":"Servers","Host":"postgres","Port":5432,"MaintenanceDB":"meta","Username":"postgres","SSLMode":"prefer"}}}

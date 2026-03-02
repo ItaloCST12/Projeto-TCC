@@ -9,52 +9,90 @@ datasource db {
 }
 
 model Usuario {
-  nome      String?
-  id        Int        @id @default(autoincrement())
-  email     String     @unique
-  password  String
-  role      String     @default("USER")
-  enderecos Endereco[]
-  pedidos   Pedido[]
+  nome                 String?
+  id                   Int                   @id @default(autoincrement())
+  email                String                @unique
+  telefone             String?
+  password             String
+  role                 String                @default("USER")
+  enderecos            Endereco[]
+  pedidos              Pedido[]
+  atendimentoMensagens AtendimentoMensagem[]
+  resetTokens          PasswordResetToken[]
+}
+
+model PasswordResetToken {
+  id        Int       @id @default(autoincrement())
+  usuarioId Int
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  usuario   Usuario   @relation(fields: [usuarioId], references: [id])
+
+  @@index([usuarioId, expiresAt])
 }
 
 model Endereco {
-  id        Int     @id @default(autoincrement())
+  id        Int      @id @default(autoincrement())
   usuarioId Int
   rua       String
   numero    String?
   cidade    String
   cep       String
-  usuario   Usuario @relation(fields: [usuarioId], references: [id])
+  usuario   Usuario  @relation(fields: [usuarioId], references: [id])
+  pedidos   Pedido[]
 }
 
 model Produto {
-  id          Int          @id @default(autoincrement())
-  nome        String
-  disponivel  Boolean      @default(true)
-  pedidos     Pedido[]
-  itemPedidos ItemPedido[]
+  id                  Int          @id @default(autoincrement())
+  nome                String
+  preco               Decimal      @default(0) @db.Decimal(10, 2)
+  precoAbacaxiGrande  Decimal?     @db.Decimal(10, 2)
+  precoAbacaxiMedio   Decimal?     @db.Decimal(10, 2)
+  precoAbacaxiPequeno Decimal?     @db.Decimal(10, 2)
+  disponivel          Boolean      @default(true)
+  excluido            Boolean      @default(false)
+  imagemUrl           String?
+  pedidos             Pedido[]
+  itemPedidos         ItemPedido[]
 }
 
 model Pedido {
   id             Int          @id @default(autoincrement())
+  createdAt      DateTime     @default(now())
   usuarioId      Int
   produtoId      Int
+  enderecoId     Int?
   quantidade     Int
   unidade        String
   tipoEntrega    String
   formaPagamento String       @default("PIX")
+  valorTotal     Decimal      @default(0) @db.Decimal(10, 2)
   status         String       @default("PENDENTE")
   usuario        Usuario      @relation(fields: [usuarioId], references: [id])
   produto        Produto      @relation(fields: [produtoId], references: [id])
+  endereco       Endereco?    @relation(fields: [enderecoId], references: [id])
   items          ItemPedido[]
 }
 
 model ItemPedido {
-  id         Int     @id @default(autoincrement())
-  pedidoId   Int
-  produtoId  Int
-  quantidade Int
-  pedido     Pedido  @relation(fields: [pedidoId], references: [id])
-  produto    Produto @relation(fields: [produtoId], references: [id])
+  id             Int     @id @default(autoincrement())
+  pedidoId       Int
+  produtoId      Int
+  quantidade     Int
+  unidade        String  @default("unidade")
+  valorUnitario  Decimal @default(0) @db.Decimal(10, 2)
+  valorTotalItem Decimal @default(0) @db.Decimal(10, 2)
+  pedido         Pedido  @relation(fields: [pedidoId], references: [id])
+  produto        Produto @relation(fields: [produtoId], references: [id])
+}
+
+model AtendimentoMensagem {
+  id        Int      @id @default(autoincrement())
+  usuarioId Int
+  autor     String
+  texto     String
+  createdAt DateTime @default(now())
+  usuario   Usuario  @relation(fields: [usuarioId], references: [id])
 }

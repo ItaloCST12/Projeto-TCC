@@ -1,0 +1,16 @@
+-- AlterTable
+ALTER TABLE "Produto"
+ADD COLUMN "preco" DECIMAL
+(10,2) NOT NULL DEFAULT 0;
+
+-- AlterTable
+ALTER TABLE "Pedido"
+ADD COLUMN "valorTotal" DECIMAL
+(10,2) NOT NULL DEFAULT 0;
+
+-- AlterTable
+ALTER TABLE "ItemPedido"
+ADD COLUMN "valorUnitario" DECIMAL
+(10,2) NOT NULL DEFAULT 0,
+ADD COLUMN "valorTotalItem" DECIMAL
+(10,2) NOT NULL DEFAULT 0;

@@ -1,0 +1,57 @@
+import heroFarm from "@/assets/hero-farm.jpg";
+
+const HeroSection = () => {
+  return (
+    <section
+      id="inicio"
+      className="relative min-h-[90vh] flex items-center justify-center overflow-hidden"
+    >
+      {/* Background image */}
+      <img
+        src={heroFarm}
+        alt="Vista aérea da Fazenda Bispo com plantação de cítricos"
+        className="absolute inset-0 w-full h-full object-cover"
+        loading="eager"
+      />
+      {/* Overlay */}
+      <div
+        className="absolute inset-0 hero-overlay"
+        style={{ background: "linear-gradient(180deg, rgba(0, 0, 0, 0.46) 0%, rgba(0, 0, 0, 0.28) 100%)" }}
+      />
+
+      <div className="relative z-10 container mx-auto px-4 text-center">
+        <h1
+          className="font-display text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-extrabold !text-white mb-6 animate-fade-in-up"
+        >
+          Do campo à sua mesa,<br />
+          <span className="!text-white">fresquinho e natural</span>
+        </h1>
+        <p
+          className="max-w-2xl mx-auto text-lg sm:text-xl text-primary-foreground/90 mb-8 animate-fade-in-up"
+          style={{ animationDelay: "0.2s" }}
+        >
+         Há mais de 20 anos, cultivamos frutas com dedicação familiar na Fazenda Bispo. Encomende laranjas, tangerinas, limões e abacaxis colhidos frescos, selecionados por tamanho e nutridos. Qualidade do campo para sua família, com o compromisso desde 2002.
+        </p>
+        <div
+          className="flex flex-col sm:flex-row gap-4 justify-center animate-fade-in-up"
+          style={{ animationDelay: "0.4s" }}
+        >
+          <a
+            href="#produtos"
+            className="inline-flex items-center justify-center px-8 py-3 rounded-lg bg-secondary text-secondary-foreground font-bold text-lg hover:opacity-90 transition-opacity"
+          >
+            Ver Produtos
+          </a>
+          <a
+            href="#contato"
+            className="inline-flex items-center justify-center px-8 py-3 rounded-lg border-2 border-primary-foreground/50 text-primary-foreground font-bold text-lg hover:bg-primary-foreground/10 transition-colors"
+          >
+            Entrar em Contato
+          </a>
+        </div>
+      </div>
+    </section>
+  );
+};
+
+export default HeroSection;

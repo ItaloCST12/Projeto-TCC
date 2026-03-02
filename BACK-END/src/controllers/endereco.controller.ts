@@ -15,10 +15,10 @@ export const criarEndereco = async (
     }
 
     const { rua, numero, cidade, cep } = req.body;
-    if (!rua || !cidade || !cep) {
+    if (!rua || !cidade) {
       res
         .status(400)
-        .json({ error: "Campos obrigatórios: rua, cidade e cep" });
+        .json({ error: "Campos obrigatórios: rua e cidade" });
       return;
     }
 
@@ -51,5 +51,93 @@ export const listarEnderecosUsuario = async (
     res.json(enderecos);
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
+  }
+};
+
+export const listarTodosEnderecos = async (
+  _req: Request,
+  res: Response,
+): Promise<void> => {
+  try {
+    const enderecos = await enderecoService.listarTodosEnderecos();
+    res.json(enderecos);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+};
+
+export const atualizarEnderecoUsuario = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  try {
+    const usuarioId = req.usuario?.usuarioId;
+    if (!usuarioId) {
+      res.status(401).json({ error: "Usuário não autenticado" });
+      return;
+    }
+
+    const idParam = req.params.id;
+    if (!idParam) {
+      res.status(400).json({ error: "ID do endereço não fornecido" });
+      return;
+    }
+
+    const enderecoId = parseInt(idParam, 10);
+    if (isNaN(enderecoId)) {
+      res.status(400).json({ error: "ID do endereço inválido" });
+      return;
+    }
+
+    const { rua, numero, cidade, cep } = req.body;
+
+    const endereco = await enderecoService.atualizarEnderecoUsuario(
+      usuarioId,
+      enderecoId,
+      {
+        rua,
+        numero,
+        cidade,
+        cep,
+      },
+    );
+
+    res.json(endereco);
+  } catch (error) {
+    res.status(400).json({ error: (error as Error).message });
+  }
+};
+
+export const excluirEnderecoUsuario = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  try {
+    const usuarioId = req.usuario?.usuarioId;
+    if (!usuarioId) {
+      res.status(401).json({ error: "Usuário não autenticado" });
+      return;
+    }
+
+    const idParam = req.params.id;
+    if (!idParam) {
+      res.status(400).json({ error: "ID do endereço não fornecido" });
+      return;
+    }
+
+    const enderecoId = parseInt(idParam, 10);
+    if (isNaN(enderecoId)) {
+      res.status(400).json({ error: "ID do endereço inválido" });
+      return;
+    }
+
+    const endereco = await enderecoService.excluirEnderecoUsuario(
+      usuarioId,
+      enderecoId,
+    );
+
+    res.json(endereco);
+  } catch (error) {
+    res.status(400).json({ error: (error as Error).message });
   }
 };

@@ -3,8 +3,11 @@
   "private": true,
   "scripts": {
     "dev": "npm --prefix BACK-END run dev",
+    "dev:front": "npm --prefix FRONT-END run dev",
     "start": "npm --prefix BACK-END run start",
     "typecheck": "npm --prefix BACK-END run typecheck",
-    "build": "npm --prefix BACK-END run build"
+    "build:front": "npm --prefix FRONT-END run build",
+    "build:back": "npm --prefix BACK-END run build",
+    "build": "npm run build:front && npm run build:back"
   }
 }

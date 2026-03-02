@@ -1,0 +1,292 @@
+@import url('https://fonts.googleapis.com/css2?family=Raleway:wght@500;600;700;800&family=Lato:wght@300;400;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 45 100% 98%;
+    --foreground: 136 28% 14%;
+
+    --card: 45 100% 97%;
+    --card-foreground: 136 28% 14%;
+
+    --popover: 45 100% 98%;
+    --popover-foreground: 136 28% 14%;
+
+    --primary: 136 53% 43%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 129 42% 51%;
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 45 70% 94%;
+    --muted-foreground: 136 14% 34%;
+
+    --accent: 45 98% 49%;
+    --accent-foreground: 136 28% 14%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 136 22% 82%;
+    --input: 136 22% 82%;
+    --ring: 136 53% 43%;
+
+    --radius: 0.75rem;
+
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+
+    --font-display: 'Raleway', sans-serif;
+    --font-body: 'Lato', sans-serif;
+
+    --gradient-hero: linear-gradient(180deg, hsla(136, 53%, 43%, 0.66) 0%, hsla(129, 42%, 51%, 0.36) 100%);
+    --shadow-card: 0 4px 24px -4px hsla(136, 53%, 43%, 0.14);
+    --shadow-card-hover: 0 8px 32px -4px hsla(136, 53%, 43%, 0.24);
+  }
+
+  .dark {
+    --background: 136 24% 9%;
+    --foreground: 45 100% 96%;
+    --card: 136 22% 12%;
+    --card-foreground: 45 100% 96%;
+    --popover: 136 22% 12%;
+    --popover-foreground: 45 100% 96%;
+    --primary: 129 42% 51%;
+    --primary-foreground: 136 24% 9%;
+    --secondary: 136 53% 43%;
+    --secondary-foreground: 45 100% 96%;
+    --muted: 136 16% 18%;
+    --muted-foreground: 45 36% 72%;
+    --accent: 45 98% 49%;
+    --accent-foreground: 136 24% 9%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 136 18% 22%;
+    --input: 136 18% 22%;
+    --ring: 129 42% 51%;
+    --sidebar-background: 136 24% 9%;
+    --sidebar-foreground: 45 100% 96%;
+    --sidebar-primary: 129 42% 51%;
+    --sidebar-primary-foreground: 136 24% 9%;
+    --sidebar-accent: 136 16% 18%;
+    --sidebar-accent-foreground: 45 100% 96%;
+    --sidebar-border: 136 18% 22%;
+    --sidebar-ring: 129 42% 51%;
+  }
+
+  .high-contrast {
+    --background: 0 0% 0%;
+    --foreground: 0 0% 100%;
+
+    --card: 0 0% 6%;
+    --card-foreground: 0 0% 100%;
+
+    --popover: 0 0% 6%;
+    --popover-foreground: 0 0% 100%;
+
+    --primary: 56 100% 50%;
+    --primary-foreground: 0 0% 0%;
+
+    --secondary: 190 100% 50%;
+    --secondary-foreground: 0 0% 0%;
+
+    --muted: 0 0% 15%;
+    --muted-foreground: 0 0% 90%;
+
+    --accent: 56 100% 50%;
+    --accent-foreground: 0 0% 0%;
+
+    --destructive: 0 100% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 0 0% 100%;
+    --input: 0 0% 100%;
+    --ring: 56 100% 50%;
+
+    --sidebar-background: 0 0% 0%;
+    --sidebar-foreground: 0 0% 100%;
+    --sidebar-primary: 56 100% 50%;
+    --sidebar-primary-foreground: 0 0% 0%;
+    --sidebar-accent: 0 0% 15%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 0 0% 100%;
+    --sidebar-ring: 56 100% 50%;
+  }
+
+  .high-contrast body {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+  }
+
+  .high-contrast a {
+    color: hsl(var(--primary));
+    text-decoration: underline;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 3px;
+    font-weight: 700;
+  }
+
+  .high-contrast a:hover,
+  .high-contrast a:active {
+    color: hsl(var(--accent));
+    background-color: hsl(var(--muted));
+  }
+
+  .high-contrast button,
+  .high-contrast [role="button"],
+  .high-contrast input,
+  .high-contrast select,
+  .high-contrast textarea,
+  .high-contrast [class*="border"] {
+    border-color: hsl(var(--border)) !important;
+    border-width: 2px !important;
+  }
+
+  .high-contrast button,
+  .high-contrast [role="button"] {
+    color: hsl(var(--foreground));
+    background-color: hsl(var(--card));
+  }
+
+  .high-contrast button:hover,
+  .high-contrast [role="button"]:hover,
+  .high-contrast button:active,
+  .high-contrast [role="button"]:active {
+    background-color: hsl(var(--muted));
+    color: hsl(var(--foreground));
+  }
+
+  .high-contrast .bg-primary,
+  .high-contrast [class*="bg-primary"] {
+    background-color: hsl(var(--primary)) !important;
+    color: hsl(var(--primary-foreground)) !important;
+  }
+
+  .high-contrast .bg-secondary,
+  .high-contrast [class*="bg-secondary"] {
+    background-color: hsl(var(--secondary)) !important;
+    color: hsl(var(--secondary-foreground)) !important;
+  }
+
+  .high-contrast input::placeholder,
+  .high-contrast textarea::placeholder {
+    color: hsl(var(--foreground)) !important;
+    opacity: 0.9 !important;
+  }
+
+  .high-contrast [class*="opacity-"],
+  .high-contrast [style*="opacity:"] {
+    opacity: 1 !important;
+  }
+
+  .high-contrast .hero-overlay {
+    background: linear-gradient(180deg, rgba(0, 0, 0, 0.85) 0%, rgba(0, 0, 0, 0.9) 100%) !important;
+  }
+
+  .high-contrast #inicio img {
+    filter: brightness(0.35) contrast(1.25) grayscale(0.2);
+  }
+
+  .high-contrast #inicio h1,
+  .high-contrast #inicio p {
+    color: #ffffff !important;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.9);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-body);
+  }
+
+  a {
+    text-decoration-thickness: 1.5px;
+    text-underline-offset: 2px;
+  }
+
+  a:hover,
+  a:active {
+    text-decoration: underline;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-display);
+  }
+
+  html,
+  body,
+  #root,
+  #root *,
+  #root *::before,
+  #root *::after {
+    cursor: default !important;
+    user-select: none !important;
+    -webkit-user-select: none !important;
+    -ms-user-select: none !important;
+    -webkit-touch-callout: none !important;
+    caret-color: transparent !important;
+  }
+
+  a,
+  a *,
+  button,
+  button *,
+  summary,
+  summary *,
+  select,
+  option,
+  [role="button"],
+  [role="button"] *,
+  input[type="checkbox"],
+  input[type="radio"],
+  input[type="range"],
+  input[type="submit"],
+  input[type="reset"],
+  input[type="button"],
+  label[for] {
+    cursor: pointer !important;
+  }
+
+  #root input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="submit"]):not([type="reset"]):not([type="button"]),
+  #root textarea,
+  #root [contenteditable="true"],
+  #root [role="textbox"] {
+    cursor: text !important;
+    user-select: text !important;
+    -webkit-user-select: text !important;
+    -ms-user-select: text !important;
+    caret-color: auto !important;
+  }
+
+  :where(a, button, input, select, textarea, [role="button"]):focus-visible {
+    outline: 3px solid hsl(var(--ring)) !important;
+    outline-offset: 2px;
+  }
+
+  .high-contrast *:focus-visible {
+    outline: 3px solid hsl(var(--ring)) !important;
+    outline-offset: 2px;
+  }
+}
+
+@layer utilities {
+  .text-gradient {
+    @apply bg-clip-text text-transparent;
+    background-image: linear-gradient(135deg, hsl(136 53% 43%), hsl(45 98% 49%));
+  }
+}
+

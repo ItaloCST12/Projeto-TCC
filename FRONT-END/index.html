@@ -1,119 +1,21 @@
 <!doctype html>
-<html lang="pt-BR">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Sistema de Encomendas</title>
-    <style>
-      body { font-family: Arial, sans-serif; margin: 24px; background: #f7f7f7; }
-      .card { background: #fff; padding: 16px; border-radius: 8px; margin-bottom: 16px; }
-      h1, h2 { margin-top: 0; }
-      label { display: block; margin: 8px 0 4px; }
-      input, select, button { padding: 8px; width: 100%; box-sizing: border-box; }
-      button { margin-top: 12px; cursor: pointer; }
-      ul { padding-left: 20px; }
-      .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-      .muted { color: #666; font-size: 14px; }
-      .ok { color: #0a7d24; }
-      .err { color: #b00020; }
-      .hidden { display: none; }
-    </style>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>Fazenda Bispo</title>
+    <meta name="description" content="Fazenda Bispo - Projeto TCC" />
+    <meta name="author" content="Fazenda Bispo" />
+
+    <meta property="og:title" content="Fazenda Bispo" />
+    <meta property="og:description" content="Fazenda Bispo - Projeto TCC" />
+    <meta property="og:type" content="website" />
+   
   </head>
+
   <body>
-    <h1>Sistema de Encomendas</h1>
-
-    <div class="card" id="loginCard">
-      <h2>Login</h2>
-      <div class="row">
-        <div>
-          <label for="email">Email</label>
-          <input id="email" type="email" placeholder="admin@example.com" />
-        </div>
-        <div>
-          <label for="password">Senha</label>
-          <input id="password" type="password" placeholder="admin123" />
-        </div>
-      </div>
-      <button id="btnLogin">Entrar</button>
-      <p id="loginMsg" class="muted"></p>
-    </div>
-
-    <div class="card">
-      <h2>Produtos e disponibilidade</h2>
-      <button id="btnProdutos">Atualizar lista de produtos</button>
-      <ul id="produtosLista"></ul>
-    </div>
-
-    <div class="card">
-      <h2>Formas de pagamento</h2>
-      <button id="btnPagamentos">Carregar formas</button>
-      <ul id="pagamentosLista"></ul>
-    </div>
-
-    <div class="card hidden" id="pedidoCard">
-      <h2>Solicitar encomenda</h2>
-      <p class="muted">Disponível após login.</p>
-      <div class="row">
-        <div>
-          <label for="produtoId">ID do produto</label>
-          <input id="produtoId" type="number" min="1" />
-        </div>
-        <div>
-          <label for="quantidade">Quantidade</label>
-          <input id="quantidade" type="number" min="1" value="1" />
-        </div>
-      </div>
-
-      <div class="row">
-        <div>
-          <label for="unidade">Unidade</label>
-          <input id="unidade" type="text" value="un" />
-        </div>
-        <div>
-          <label for="tipoEntrega">Tipo de entrega</label>
-          <input id="tipoEntrega" type="text" value="retirada" />
-        </div>
-      </div>
-
-      <label for="formaPagamento">Forma de pagamento</label>
-      <select id="formaPagamento"></select>
-
-      <button id="btnPedido">Enviar encomenda</button>
-      <p id="pedidoMsg" class="muted"></p>
-    </div>
-
-    <div class="card hidden" id="enderecoCard">
-      <h2>Cadastrar endereço</h2>
-      <p class="muted">Disponível após login.</p>
-
-      <div class="row">
-        <div>
-          <label for="rua">Rua</label>
-          <input id="rua" type="text" placeholder="Rua das Flores" />
-        </div>
-        <div>
-          <label for="numero">Número</label>
-          <input id="numero" type="text" placeholder="123" />
-        </div>
-      </div>
-
-      <div class="row">
-        <div>
-          <label for="cidade">Cidade</label>
-          <input id="cidade" type="text" placeholder="São Paulo" />
-        </div>
-        <div>
-          <label for="cep">CEP</label>
-          <input id="cep" type="text" placeholder="00000-000" />
-        </div>
-      </div>
-
-      <button id="btnEndereco">Salvar endereço</button>
-      <button id="btnEnderecos">Atualizar meus endereços</button>
-      <p id="enderecoMsg" class="muted"></p>
-      <ul id="enderecosLista"></ul>
-    </div>
-
-    <script src="/app.js"></script>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
   </body>
-  </html>
+</html>

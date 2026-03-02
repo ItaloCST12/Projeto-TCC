@@ -1,7 +1,5 @@
 export const formasPagamentoDisponiveis = [
   "PIX",
-  "CARTAO_CREDITO",
-  "CARTAO_DEBITO",
   "DINHEIRO",
 ];
 

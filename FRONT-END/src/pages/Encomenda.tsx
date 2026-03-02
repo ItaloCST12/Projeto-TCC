@@ -1,0 +1,508 @@
+import { useEffect, useState } from "react";
+import { Navigate } from "react-router-dom";
+import abacaxiImg from "@/assets/abacaxi.jpg";
+import laranjaImg from "@/assets/laranja.jpg";
+import tangerinaImg from "@/assets/tangerina.jpg";
+import limaoImg from "@/assets/limao.jpg";
+import { apiRequest } from "@/lib/api";
+import { addToCart } from "@/lib/cart";
+import { getAuthUser, isAuthenticated } from "@/lib/auth";
+import Navbar from "@/components/Navbar";
+import PageShell from "@/components/PageShell";
+
+type Produto = {
+  id: number;
+  nome: string;
+  preco: number;
+  precoAbacaxiGrande?: number | null;
+  precoAbacaxiMedio?: number | null;
+  precoAbacaxiPequeno?: number | null;
+  disponivel: boolean;
+  imagemUrl?: string | null;
+};
+
+type ProdutoVisual = {
+  image: string;
+  description: string;
+  opcoesVenda: {
+    value: string;
+    label: string;
+    price: string;
+    unit: string;
+  }[];
+};
+
+const MAX_QUANTIDADE_POR_ITEM = 1000;
+
+const PRODUTOS_VISUAIS = new Map<string, ProdutoVisual>([
+  [
+    "abacaxi",
+    {
+      image: abacaxiImg,
+      description: "Doce e suculento, perfeito para sucos e sobremesas.",
+      opcoesVenda: [
+        { value: "kg (grande)", label: "Grande", price: "R$ 7,00", unit: "unidade" },
+        { value: "kg (médio)", label: "Médio", price: "R$ 5,00", unit: "unidade" },
+        { value: "kg (pequeno)", label: "Pequeno", price: "R$ 3,00", unit: "unidade" },
+      ],
+    },
+  ],
+  [
+    "laranja",
+    {
+      image: laranjaImg,
+      description: "Rica em vitamina C, ideal para suco natural.",
+      opcoesVenda: [
+        { value: "saca", label: "Saca", price: "R$ 50,00", unit: "saca" },
+      ],
+    },
+  ],
+  [
+    "tangerina",
+    {
+      image: tangerinaImg,
+      description: "Fácil de descascar, sabor adocicado e refrescante.",
+      opcoesVenda: [
+        { value: "kilo", label: "Kilo", price: "R$ 5,00", unit: "kilo" },
+      ],
+    },
+  ],
+  [
+    "limão",
+    {
+      image: limaoImg,
+      description: "Versátil na cozinha, aroma intenso e muito suco.",
+      opcoesVenda: [
+        { value: "saca", label: "Saca", price: "R$ 60,00", unit: "saca" },
+      ],
+    },
+  ],
+  [
+    "limao",
+    {
+      image: limaoImg,
+      description: "Versátil na cozinha, aroma intenso e muito suco.",
+      opcoesVenda: [
+        { value: "saca", label: "Saca", price: "R$ 60,00", unit: "saca" },
+      ],
+    },
+  ],
+]);
+
+const clampQuantidade = (quantidade: number) =>
+  Math.min(MAX_QUANTIDADE_POR_ITEM, Math.max(1, Math.floor(quantidade)));
+
+const API_BASE_URL = (import.meta.env.VITE_API_URL as string | undefined)?.trim() || "";
+
+const formatarMoeda = (valor: number) =>
+  new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(valor);
+
+const resolverImagemProduto = (imagemUrl: string | null | undefined, fallback: string) => {
+  if (!imagemUrl?.trim()) {
+    return fallback;
+  }
+
+  if (imagemUrl.startsWith("http://") || imagemUrl.startsWith("https://")) {
+    return imagemUrl;
+  }
+
+  if (!API_BASE_URL) {
+    return imagemUrl;
+  }
+
+  const normalizedBase = API_BASE_URL.endsWith("/")
+    ? API_BASE_URL.slice(0, -1)
+    : API_BASE_URL;
+  const normalizedPath = imagemUrl.startsWith("/") ? imagemUrl : `/${imagemUrl}`;
+
+  return `${normalizedBase}${normalizedPath}`;
+};
+
+const Encomenda = () => {
+  const authenticated = isAuthenticated();
+  const user = getAuthUser();
+
+  const [produtos, setProdutos] = useState<Produto[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const [animandoAdicaoPorProduto, setAnimandoAdicaoPorProduto] = useState<Record<number, boolean>>({});
+  const [quantidadePorProduto, setQuantidadePorProduto] = useState<Record<number, number>>({});
+  const [quantidadeEditandoPorProduto, setQuantidadeEditandoPorProduto] = useState<Record<number, string>>({});
+  const [unidadePorProduto, setUnidadePorProduto] = useState<Record<number, string>>({});
+
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      setError("");
+
+      try {
+        const produtosResponse = await apiRequest<Produto[]>("/produtos");
+        setProdutos(produtosResponse);
+      } catch (loadError) {
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : "Não foi possível carregar os dados da encomenda.",
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    void load();
+  }, []);
+
+  if (!authenticated) {
+    return <Navigate to="/login?redirect=/encomenda" replace />;
+  }
+
+  const hasProdutos = produtos.length > 0;
+
+  const getProdutoVisual = (nomeProduto: string): ProdutoVisual => {
+    const normalizedName = nomeProduto.trim().toLowerCase();
+    return (
+      PRODUTOS_VISUAIS.get(normalizedName) ?? {
+        image: abacaxiImg,
+        description: "Produto fresco vendido na fazenda.",
+        opcoesVenda: [{ value: "unidade", label: "Unidade", price: "Consulte", unit: "unidade" }],
+      }
+    );
+  };
+
+  const getQuantidadeSelecionada = (produtoId: number) => {
+    return clampQuantidade(quantidadePorProduto[produtoId] ?? 1);
+  };
+
+  const getQuantidadeExibidaNoInput = (produtoId: number) => {
+    const valorEditando = quantidadeEditandoPorProduto[produtoId];
+    if (valorEditando !== undefined) {
+      return valorEditando;
+    }
+
+    return String(getQuantidadeSelecionada(produtoId));
+  };
+
+  const getUnidadeSelecionada = (produtoId: number, defaultUnit: string) => {
+    return unidadePorProduto[produtoId] ?? defaultUnit;
+  };
+
+  const getOpcaoSelecionada = (produtoId: number, visual: ProdutoVisual) => {
+    const opcaoPadrao = visual.opcoesVenda[0];
+    if (!opcaoPadrao) {
+      return { value: "unidade", label: "Unidade", price: "Consulte", unit: "unidade" };
+    }
+
+    const unidadeSelecionada = getUnidadeSelecionada(produtoId, opcaoPadrao.value);
+    return (
+      visual.opcoesVenda.find((opcao) => opcao.value === unidadeSelecionada) ?? opcaoPadrao
+    );
+  };
+
+  const getPrecoPorOpcao = (produto: Produto, opcaoValue: string) => {
+    const nomeNormalizado = produto.nome.trim().toLowerCase();
+    const opcaoNormalizada = opcaoValue.trim().toLowerCase();
+
+    if (nomeNormalizado === "abacaxi") {
+      if (opcaoNormalizada.includes("grande")) {
+        return Number(produto.precoAbacaxiGrande ?? 7);
+      }
+      if (opcaoNormalizada.includes("medio") || opcaoNormalizada.includes("médio")) {
+        return Number(produto.precoAbacaxiMedio ?? 5);
+      }
+      if (opcaoNormalizada.includes("pequeno")) {
+        return Number(produto.precoAbacaxiPequeno ?? 3);
+      }
+    }
+
+    return Number(produto.preco) || 0;
+  };
+
+  const limparEdicaoQuantidade = (produtoId: number) => {
+    setQuantidadeEditandoPorProduto((current) => {
+      const next = { ...current };
+      delete next[produtoId];
+      return next;
+    });
+  };
+
+  const adicionarProdutoViaCard = (produto: Produto) => {
+    if (!produto.disponivel) {
+      setError(`${produto.nome} está indisponível no momento.`);
+      setSuccess("");
+      return;
+    }
+
+    const quantidadeSelecionada = getQuantidadeSelecionada(produto.id);
+    const visual = getProdutoVisual(produto.nome);
+    const opcaoSelecionada = getOpcaoSelecionada(produto.id, visual);
+    addToCart(produto.id, produto.nome, quantidadeSelecionada, opcaoSelecionada.value);
+
+    setAnimandoAdicaoPorProduto((current) => ({
+      ...current,
+      [produto.id]: true,
+    }));
+
+    window.setTimeout(() => {
+      setAnimandoAdicaoPorProduto((current) => ({
+        ...current,
+        [produto.id]: false,
+      }));
+    }, 550);
+
+    setSuccess(`${produto.nome} adicionado ao carrinho.`);
+    setError("");
+  };
+
+  return (
+    <div className="min-h-screen bg-background">
+      <Navbar />
+      <PageShell
+        title="Produtos"
+        subtitle={`${user?.nome ? `Olá, ${user.nome}.` : "Você está logado."} Escolha os produtos nos cards e adicione ao carrinho.`}
+        containerClassName="max-w-6xl"
+      >
+        <div className="bg-card border border-border rounded-xl p-6 mb-6">
+          {loading ? (
+            <p className="text-muted-foreground">Carregando produtos...</p>
+          ) : (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="font-display text-xl font-semibold text-foreground">Produtos</h2>
+              </div>
+
+              {!hasProdutos ? (
+                <p className="text-sm text-muted-foreground">
+                  Cadastre produtos no back-end para habilitar encomendas.
+                </p>
+              ) : (
+                <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                  {produtos.map((produto) => {
+                    const visual = getProdutoVisual(produto.nome);
+                    const imagemCard = resolverImagemProduto(produto.imagemUrl, visual.image);
+                    const isAbacaxi = produto.nome.trim().toLowerCase() === "abacaxi";
+                    const quantidadeSelecionada = getQuantidadeSelecionada(produto.id);
+                    const opcaoPadrao = visual.opcoesVenda[0];
+                    const unidadeSelecionada = getUnidadeSelecionada(
+                      produto.id,
+                      opcaoPadrao?.value ?? "unidade",
+                    );
+                    const opcaoSelecionada = getOpcaoSelecionada(produto.id, visual);
+                    const precoOpcaoSelecionada = getPrecoPorOpcao(
+                      produto,
+                      opcaoSelecionada.value,
+                    );
+
+                    return (
+                      <div
+                        key={produto.id}
+                        className="bg-card rounded-xl overflow-hidden shadow-card hover:shadow-card-hover hover:-translate-y-1 transition-all duration-300 group border border-border"
+                      >
+                        <div className="aspect-square overflow-hidden bg-background">
+                          <img
+                            src={imagemCard}
+                            alt={produto.nome}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                            loading="lazy"
+                          />
+                        </div>
+
+                        <div className="p-4 space-y-3">
+                          <div>
+                            <h3 className="font-display text-lg font-semibold text-foreground">
+                              {produto.nome}
+                            </h3>
+                            <p className="text-muted-foreground text-base">{visual.description}</p>
+                            {!produto.disponivel && (
+                              <p className="text-sm font-semibold text-destructive mt-1">Indisponível</p>
+                            )}
+                            <p className="text-primary font-bold mt-1">
+                              {formatarMoeda(precoOpcaoSelecionada)}
+                              <span className="text-sm text-muted-foreground font-medium"> / {opcaoSelecionada.unit}</span>
+                            </p>
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium text-foreground mb-1">
+                              {isAbacaxi ? "Tamanho do abacaxi" : visual.opcoesVenda.length > 1 ? "Categoria" : "Forma de venda"}
+                            </label>
+                            {isAbacaxi ? (
+                              <div className="grid grid-cols-3 gap-2">
+                                {visual.opcoesVenda.map((opcao) => {
+                                  const ativa = unidadeSelecionada === opcao.value;
+                                  return (
+                                    <button
+                                      key={`${produto.id}-${opcao.value}`}
+                                      type="button"
+                                      disabled={!produto.disponivel}
+                                      onClick={() =>
+                                        setUnidadePorProduto((current) => ({
+                                          ...current,
+                                          [produto.id]: opcao.value,
+                                        }))
+                                      }
+                                      className={`rounded-lg border px-2 py-2 text-sm transition-colors ${
+                                        ativa
+                                          ? "border-primary bg-primary/10 text-primary font-semibold"
+                                          : "border-border text-foreground hover:bg-muted"
+                                      } disabled:opacity-50`}
+                                    >
+                                      {opcao.label}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            ) : visual.opcoesVenda.length > 1 ? (
+                              <select
+                                value={unidadeSelecionada}
+                                disabled={!produto.disponivel}
+                                onChange={(event) =>
+                                  setUnidadePorProduto((current) => ({
+                                    ...current,
+                                    [produto.id]: event.target.value,
+                                  }))
+                                }
+                                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-foreground disabled:opacity-50"
+                              >
+                                {visual.opcoesVenda.map((opcao) => (
+                                  <option key={`${produto.id}-${opcao.value}`} value={opcao.value}>
+                                    {opcao.label} — {formatarMoeda(getPrecoPorOpcao(produto, opcao.value))} / {opcao.unit}
+                                  </option>
+                                ))}
+                              </select>
+                            ) : (
+                              <p className="w-full rounded-lg border border-border bg-muted/40 px-3 py-2 text-foreground text-sm">
+                                {opcaoSelecionada.label} — {formatarMoeda(precoOpcaoSelecionada)} / {opcaoSelecionada.unit}
+                              </p>
+                            )}
+                            {isAbacaxi && (
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Selecionado: {opcaoSelecionada.label} ({formatarMoeda(precoOpcaoSelecionada)} por unidade)
+                              </p>
+                            )}
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium text-foreground mb-1">
+                              {isAbacaxi ? "Quantidade de abacaxis" : "Quantidade"}
+                            </label>
+                            <p className="text-xs text-muted-foreground mb-1">
+                              {isAbacaxi
+                                ? "Depois de escolher o tamanho, ajuste quantos abacaxis você quer."
+                                : `Informe em ${opcaoSelecionada.unit}.`}
+                            </p>
+                            <div className="flex items-center rounded-lg border border-border overflow-hidden">
+                              <button
+                                type="button"
+                                disabled={!produto.disponivel}
+                                onClick={() => {
+                                  limparEdicaoQuantidade(produto.id);
+                                  setQuantidadePorProduto((current) => ({
+                                    ...current,
+                                    [produto.id]: clampQuantidade(quantidadeSelecionada - 1),
+                                  }));
+                                }}
+                                className="px-3 py-2 text-foreground hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                -
+                              </button>
+                              <input
+                                type="text"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
+                                disabled={!produto.disponivel}
+                                value={getQuantidadeExibidaNoInput(produto.id)}
+                                onChange={(event) => {
+                                  const valorSomenteNumeros = event.target.value.replace(/\D/g, "");
+                                  const valorDigitado =
+                                    valorSomenteNumeros === ""
+                                      ? ""
+                                      : String(clampQuantidade(Number(valorSomenteNumeros)));
+
+                                  setQuantidadeEditandoPorProduto((current) => ({
+                                    ...current,
+                                    [produto.id]: valorDigitado,
+                                  }));
+
+                                  if (valorDigitado === "") {
+                                    return;
+                                  }
+
+                                  const novoValor = Number(valorDigitado);
+                                  if (!Number.isFinite(novoValor) || novoValor < 1) {
+                                    return;
+                                  }
+
+                                  setQuantidadePorProduto((current) => ({
+                                    ...current,
+                                    [produto.id]: clampQuantidade(novoValor),
+                                  }));
+                                }}
+                                onBlur={(event) => {
+                                  const valorDigitado = event.target.value;
+                                  const novoValor = Number(valorDigitado);
+                                  const valorFinal =
+                                    valorDigitado === "" || !Number.isFinite(novoValor) || novoValor < 1
+                                      ? 1
+                                      : clampQuantidade(novoValor);
+
+                                  setQuantidadePorProduto((current) => ({
+                                    ...current,
+                                    [produto.id]: valorFinal,
+                                  }));
+
+                                  limparEdicaoQuantidade(produto.id);
+                                }}
+                                className="w-full bg-background px-3 py-2 text-center text-foreground disabled:opacity-50"
+                              />
+                              <button
+                                type="button"
+                                disabled={!produto.disponivel}
+                                onClick={() => {
+                                  limparEdicaoQuantidade(produto.id);
+                                  setQuantidadePorProduto((current) => ({
+                                    ...current,
+                                    [produto.id]: clampQuantidade(quantidadeSelecionada + 1),
+                                  }));
+                                }}
+                                className="px-3 py-2 text-foreground hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                +
+                              </button>
+                            </div>
+                          </div>
+
+                          <button
+                            type="button"
+                            disabled={!produto.disponivel}
+                            onClick={() => adicionarProdutoViaCard(produto)}
+                            className={`w-full inline-flex items-center justify-center px-4 py-2 rounded-lg text-base font-semibold transition-all ${
+                              produto.disponivel
+                                ? `bg-primary text-primary-foreground hover:opacity-90 ${animandoAdicaoPorProduto[produto.id] ? "animate-pulse scale-[0.98]" : ""}`
+                                : "bg-muted text-muted-foreground cursor-not-allowed"
+                            }`}
+                          >
+                            {produto.disponivel
+                              ? animandoAdicaoPorProduto[produto.id]
+                                ? "Adicionado ✓"
+                                : "Adicionar ao carrinho"
+                              : "Indisponível"}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {error && <p className="text-sm text-destructive">{error}</p>}
+              {success && <p className="text-sm text-primary">{success}</p>}
+            </div>
+          )}
+        </div>
+      </PageShell>
+    </div>
+  );
+};
+
+export default Encomenda;
