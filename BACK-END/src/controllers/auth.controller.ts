@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import * as AuthService from "../services/auth.service";
+import * as AuthService from "../models/auth.service";
 import bcrypt from "bcryptjs";
 
 export const login = async (request: Request, response: Response) => {

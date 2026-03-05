@@ -1,4 +1,4 @@
-import { EnderecoService } from "../services/endereco.service";
+import { EnderecoService } from "../models/endereco.service";
 import { Request, Response } from "express";
 
 const enderecoService = new EnderecoService();

@@ -7,7 +7,7 @@ import http from "http";
 import net from "net";
 import routes from "./routes";
 import { initAtendimentoSocket } from "./socket/atendimento.socket";
-import { iniciarConciliacaoPixAutomatica } from "./services/pagamento.service";
+import { iniciarConciliacaoPixAutomatica } from "./models/pagamento.service";
 
 const envPaths = [
   path.resolve(process.cwd(), "..", ".env"),

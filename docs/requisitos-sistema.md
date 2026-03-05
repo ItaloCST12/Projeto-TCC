@@ -133,6 +133,7 @@ flowchart TD
 	F --> G[Fim sem acesso ao painel]
 	E -- Sim --> H[Abrir Painel Administrativo]
 	end
+	
 
 	subgraph PRODUTOS[2) Gestão de produtos]
 	H --> I[Listar produtos]
@@ -182,4 +183,117 @@ flowchart TD
 
 	H --> AJ[Encerrar sessão administrativa]
 	AJ --> AK[Fim do fluxo do administrador]
+```
+
+## Modelo Entidade-Relacionamento (MER)
+
+```mermaid
+erDiagram
+	USUARIO {
+		int id PK
+		string nome
+		string email UK
+		string telefone
+		string password
+		string role
+	}
+
+	PASSWORD_RESET_TOKEN {
+		int id PK
+		int usuarioId FK
+		string tokenHash UK
+		datetime expiresAt
+		datetime usedAt
+		datetime createdAt
+	}
+
+	ENDERECO {
+		int id PK
+		int usuarioId FK
+		string rua
+		string numero
+		string cidade
+		string cep
+	}
+
+	PRODUTO {
+		int id PK
+		string nome
+		decimal preco
+		decimal precoAbacaxiGrande
+		decimal precoAbacaxiMedio
+		decimal precoAbacaxiPequeno
+		boolean disponivel
+		boolean excluido
+		string imagemUrl
+	}
+
+	PEDIDO {
+		int id PK
+		datetime createdAt
+		int usuarioId FK
+		int produtoId FK
+		int enderecoId FK
+		int quantidade
+		string unidade
+		string tipoEntrega
+		string formaPagamento
+		decimal valorTotal
+		string status
+	}
+
+	ITEM_PEDIDO {
+		int id PK
+		int pedidoId FK
+		int produtoId FK
+		int quantidade
+		string unidade
+		decimal valorUnitario
+		decimal valorTotalItem
+	}
+
+	PAGAMENTO_PIX {
+		int id PK
+		int pedidoId FK
+		string provider
+		string providerTransactionId UK
+		string status
+		string qrCode
+		string qrCodeBase64
+		string ticketUrl
+		datetime expiresAt
+		decimal valor
+		json rawPayload
+		datetime createdAt
+		datetime updatedAt
+	}
+
+	PAGAMENTO_PIX_EVENTO {
+		int id PK
+		int pagamentoPixId FK
+		string tipo
+		boolean sucesso
+		string mensagem
+		json payload
+		datetime createdAt
+	}
+
+	ATENDIMENTO_MENSAGEM {
+		int id PK
+		int usuarioId FK
+		string autor
+		string texto
+		datetime createdAt
+	}
+
+	USUARIO ||--o{ ENDERECO : possui
+	USUARIO ||--o{ PEDIDO : realiza
+	USUARIO ||--o{ PASSWORD_RESET_TOKEN : gera
+	USUARIO ||--o{ ATENDIMENTO_MENSAGEM : envia
+	ENDERECO ||--o{ PEDIDO : entrega
+	PRODUTO ||--o{ PEDIDO : item_principal
+	PEDIDO ||--o{ ITEM_PEDIDO : contem
+	PRODUTO ||--o{ ITEM_PEDIDO : compoe
+	PEDIDO ||--|| PAGAMENTO_PIX : pagamento
+	PAGAMENTO_PIX ||--o{ PAGAMENTO_PIX_EVENTO : auditoria
 ```

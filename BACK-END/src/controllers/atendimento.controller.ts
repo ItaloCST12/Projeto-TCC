@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import * as AtendimentoService from "../services/atendimento.service";
+import * as AtendimentoService from "../models/atendimento.service";
 import {
   emitConversaLimpada,
   emitMensagemNova,
