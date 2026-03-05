@@ -30,7 +30,7 @@ const HeroSection = () => {
           className="max-w-2xl mx-auto text-lg sm:text-xl text-primary-foreground/90 mb-8 animate-fade-in-up"
           style={{ animationDelay: "0.2s" }}
         >
-         Há mais de 20 anos, cultivamos frutas com dedicação familiar na Fazenda Bispo. Encomende laranjas, tangerinas, limões e abacaxis colhidos frescos, selecionados por tamanho e nutridos. Qualidade do campo para sua família, com o compromisso desde 2002.
+         Há mais de 20 anos, a Fazenda Bispo leva frutas frescas e selecionadas direto do campo para sua família. Encomende laranjas, tangerinas, limões e abacaxis com qualidade e confiança desde 2002.
         </p>
         <div
           className="flex flex-col sm:flex-row gap-4 justify-center animate-fade-in-up"

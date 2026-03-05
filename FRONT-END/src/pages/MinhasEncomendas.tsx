@@ -112,6 +112,7 @@ const MinhasEncomendas = () => {
 
   useEffect(() => {
     void carregarPedidos(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const aplicarFiltroData = async (event: React.FormEvent<HTMLFormElement>) => {

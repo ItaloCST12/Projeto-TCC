@@ -4,12 +4,14 @@ import path from "path";
 import dotenv from "dotenv";
 import cors from "cors";
 import http from "http";
+import net from "net";
 import routes from "./routes";
 import { initAtendimentoSocket } from "./socket/atendimento.socket";
+import { iniciarConciliacaoPixAutomatica } from "./services/pagamento.service";
 
 const envPaths = [
-  path.resolve(process.cwd(), ".env"),
   path.resolve(process.cwd(), "..", ".env"),
+  path.resolve(process.cwd(), ".env"),
 ];
 
 for (const envPath of envPaths) {
@@ -20,7 +22,8 @@ for (const envPath of envPaths) {
 }
 
 const app = express();
-const PORT = process.env.PORT || 3333;
+const portaInicial = Number.parseInt((process.env.PORT || "3333").trim(), 10);
+const PORT = Number.isFinite(portaInicial) && portaInicial > 0 ? portaInicial : 3333;
 const fallbackStaticDir = path.resolve(process.cwd(), "public");
 const staticCandidates = [
   fallbackStaticDir,
@@ -67,7 +70,45 @@ app.get(/.*/, (req, res, next) => {
 const server = http.createServer(app);
 
 initAtendimentoSocket(server);
+const pararConciliacaoPix = iniciarConciliacaoPixAutomatica();
 
-server.listen(PORT, () => {
-  console.log(`Server is running on http://localhost:${PORT}`);
+server.on("close", () => {
+  pararConciliacaoPix();
 });
+
+const obterPortaDisponivel = (portaInicialTeste: number) =>
+  new Promise<number>((resolve, reject) => {
+    const testar = (portaTeste: number) => {
+      const servidorTeste = net.createServer();
+
+      servidorTeste.once("error", (error: NodeJS.ErrnoException) => {
+        if (error.code === "EADDRINUSE") {
+          testar(portaTeste + 1);
+          return;
+        }
+
+        reject(error);
+      });
+
+      servidorTeste.once("listening", () => {
+        servidorTeste.close(() => resolve(portaTeste));
+      });
+
+      servidorTeste.listen(portaTeste);
+    };
+
+    testar(portaInicialTeste);
+  });
+
+const iniciarServidor = async () => {
+  const portaDisponivel = await obterPortaDisponivel(PORT);
+  if (portaDisponivel !== PORT) {
+    console.warn(`[SERVER] Porta ${PORT} em uso. Subindo na porta ${portaDisponivel}.`);
+  }
+
+  server.listen(portaDisponivel, () => {
+    console.log(`Server is running on http://localhost:${portaDisponivel}`);
+  });
+};
+
+void iniciarServidor();

@@ -12,6 +12,8 @@ type FiltroPedidos = {
 };
 
 type FiltroVendas = {
+  page: number;
+  pageSize: number;
   dataInicio?: Date;
   dataFim?: Date;
 };
@@ -416,6 +418,16 @@ export class PedidoService {
         skip,
         take: pageSize,
         include: {
+          items: {
+            include: {
+              produto: {
+                select: {
+                  id: true,
+                  nome: true,
+                },
+              },
+            },
+          },
           produto: true,
           endereco: true,
           usuario: {
@@ -441,7 +453,8 @@ export class PedidoService {
   }
 
   async getControleVendas(filtros: FiltroVendas) {
-    const { dataInicio, dataFim } = filtros;
+    const { page, pageSize, dataInicio, dataFim } = filtros;
+    const skip = (page - 1) * pageSize;
 
     const createdAt: Prisma.DateTimeFilter = {};
     if (dataInicio) {
@@ -456,37 +469,48 @@ export class PedidoService {
       ...(Object.keys(createdAt).length > 0 ? { createdAt } : {}),
     };
 
-    const pedidos = await prisma.pedido.findMany({
-      where,
-      orderBy: { createdAt: "desc" },
-      include: {
-        items: {
-          include: {
-            produto: {
-              select: {
-                id: true,
-                nome: true,
-                preco: true,
+    const [totalVendas, agregadoValorTotal, pedidos] = await Promise.all([
+      prisma.pedido.count({ where }),
+      prisma.pedido.aggregate({
+        where,
+        _sum: {
+          valorTotal: true,
+        },
+      }),
+      prisma.pedido.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: pageSize,
+        include: {
+          items: {
+            include: {
+              produto: {
+                select: {
+                  id: true,
+                  nome: true,
+                  preco: true,
+                },
               },
             },
           },
-        },
-        produto: {
-          select: {
-            id: true,
-            nome: true,
-            preco: true,
+          produto: {
+            select: {
+              id: true,
+              nome: true,
+              preco: true,
+            },
+          },
+          usuario: {
+            select: {
+              id: true,
+              nome: true,
+              email: true,
+            },
           },
         },
-        usuario: {
-          select: {
-            id: true,
-            nome: true,
-            email: true,
-          },
-        },
-      },
-    });
+      }),
+    ]);
 
     const pedidosComValores = pedidos.map((pedido) => {
       const itemsComValores = pedido.items.map((item) => {
@@ -540,14 +564,16 @@ export class PedidoService {
       };
     });
 
-    const totalVendas = pedidosComValores.length;
-    const valorTotalArrecadado = pedidosComValores.reduce(
-      (total, pedido) => total + Number(pedido.valorTotal),
-      0,
-    );
+    const valorTotalArrecadado = Number(agregadoValorTotal._sum.valorTotal) || 0;
 
     return {
       data: pedidosComValores,
+      pagination: {
+        page,
+        pageSize,
+        total: totalVendas,
+        totalPages: Math.max(1, Math.ceil(totalVendas / pageSize)),
+      },
       resumo: {
         totalVendas,
         valorTotalArrecadado,

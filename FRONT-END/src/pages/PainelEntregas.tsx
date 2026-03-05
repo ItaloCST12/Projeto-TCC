@@ -18,6 +18,12 @@ type PedidoAdmin = {
   tipoEntrega: string;
   formaPagamento: string;
   produto?: { nome: string };
+  items?: {
+    id: number;
+    quantidade: number;
+    unidade: string;
+    produto?: { nome: string };
+  }[];
   usuario?: { nome?: string | null; email: string };
 };
 
@@ -80,6 +86,12 @@ type VendaControle = {
 
 type RespostaControleVendas = {
   data: VendaControle[];
+  pagination: {
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+  };
   resumo: {
     totalVendas: number;
     valorTotalArrecadado: number;
@@ -108,6 +120,44 @@ const formatarMoeda = (valor: number | string) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(
     Number(valor) || 0,
   );
+
+const obterItensPedido = (pedido: PedidoAdmin) => {
+  if (pedido.items && pedido.items.length > 0) {
+    return pedido.items;
+  }
+
+  if (pedido.produto?.nome) {
+    return [
+      {
+        id: -pedido.id,
+        quantidade: pedido.quantidade,
+        unidade: pedido.unidade,
+        produto: { nome: pedido.produto.nome },
+      },
+    ];
+  }
+
+  return [];
+};
+
+const resumirItensPedido = (pedido: PedidoAdmin) => {
+  const itens = obterItensPedido(pedido);
+  if (itens.length === 0) {
+    return "-";
+  }
+
+  const primeiroItem = itens[0];
+  const nomePrimeiroItem = primeiroItem?.produto?.nome ?? "Produto";
+
+  if (itens.length === 1) {
+    return nomePrimeiroItem;
+  }
+
+  return `${nomePrimeiroItem} +${itens.length - 1}`;
+};
+
+const totalQuantidadePedido = (pedido: PedidoAdmin) =>
+  obterItensPedido(pedido).reduce((total, item) => total + (Number(item.quantidade) || 0), 0);
 
 const formatarPeriodoVendas = (
   periodo: "last_month" | "last_3_months" | "last_6_months" | "last_year" | "custom",
@@ -182,6 +232,9 @@ const PainelEntregas = () => {
   const [errorVendas, setErrorVendas] = useState("");
   const [vendas, setVendas] = useState<VendaControle[]>([]);
   const [resumoVendas, setResumoVendas] = useState({ totalVendas: 0, valorTotalArrecadado: 0 });
+  const [paginaVendas, setPaginaVendas] = useState(1);
+  const [totalPaginasVendas, setTotalPaginasVendas] = useState(1);
+  const [exportandoVendasPdf, setExportandoVendasPdf] = useState(false);
   const [periodoVendas, setPeriodoVendas] = useState<
     "last_month" | "last_3_months" | "last_6_months" | "last_year" | "custom"
   >("last_month");
@@ -235,21 +288,27 @@ const PainelEntregas = () => {
     }
   };
 
-  const loadControleVendas = async () => {
+  const montarParamsControleVendas = (page: number) => {
+    const params = new URLSearchParams({ periodo: periodoVendas, page: String(page) });
+
+    if (periodoVendas === "custom") {
+      if (!dataInicioVendas || !dataFimVendas) {
+        throw new Error("Informe data inicial e final para o período personalizado");
+      }
+
+      params.set("dataInicio", dataInicioVendas);
+      params.set("dataFim", dataFimVendas);
+    }
+
+    return params;
+  };
+
+  const loadControleVendas = async (page = paginaVendas) => {
     setLoadingVendas(true);
     setErrorVendas("");
 
     try {
-      const params = new URLSearchParams({ periodo: periodoVendas });
-
-      if (periodoVendas === "custom") {
-        if (!dataInicioVendas || !dataFimVendas) {
-          throw new Error("Informe data inicial e final para o período personalizado");
-        }
-
-        params.set("dataInicio", dataInicioVendas);
-        params.set("dataFim", dataFimVendas);
-      }
+      const params = montarParamsControleVendas(page);
 
       const response = await apiRequest<RespostaControleVendas>(
         `/pedidos/controle-vendas?${params.toString()}`,
@@ -257,6 +316,8 @@ const PainelEntregas = () => {
 
       setVendas(response.data);
       setResumoVendas(response.resumo);
+      setPaginaVendas(response.pagination.page);
+      setTotalPaginasVendas(response.pagination.totalPages);
     } catch (loadError) {
       setErrorVendas(
         loadError instanceof Error
@@ -316,6 +377,7 @@ const PainelEntregas = () => {
     void loadPedidos(1);
     void loadProdutos();
     void loadUsuarios();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const aplicarFiltroPedidos = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -388,6 +450,21 @@ const PainelEntregas = () => {
     });
   }, [usuarios, buscaUsuario]);
 
+  const opcoesFrutaEntrega = useMemo(() => {
+    const nomes = new Set<string>();
+
+    pedidos.forEach((pedido) => {
+      obterItensPedido(pedido).forEach((item) => {
+        const nome = (item.produto?.nome ?? "").trim();
+        if (nome && nome.toLowerCase() !== "abacate") {
+          nomes.add(nome);
+        }
+      });
+    });
+
+    return Array.from(nomes).sort((a, b) => a.localeCompare(b, "pt-BR"));
+  }, [pedidos]);
+
   const pedidosFiltradosPorFruta = useMemo(() => {
     const termo = buscaFrutaEntrega.trim().toLowerCase();
 
@@ -396,7 +473,9 @@ const PainelEntregas = () => {
     }
 
     return pedidos.filter((pedido) =>
-      (pedido.produto?.nome ?? "").toLowerCase().includes(termo),
+      obterItensPedido(pedido).some((item) =>
+        (item.produto?.nome ?? "").trim().toLowerCase() === termo,
+      ),
     );
   }, [pedidos, buscaFrutaEntrega]);
 
@@ -586,7 +665,7 @@ const PainelEntregas = () => {
 
   const excluirProduto = async (produto: ProdutoAdmin) => {
     const confirmou = window.confirm(
-      `Deseja excluir o produto \"${produto.nome}\"? Esta ação não pode ser desfeita.`,
+      `Deseja excluir o produto "${produto.nome}"? Esta ação não pode ser desfeita.`,
     );
 
     if (!confirmou) {
@@ -614,55 +693,85 @@ const PainelEntregas = () => {
     }
   };
 
-  const exportarVendasPdf = () => {
-    const doc = new jsPDF();
-    const periodoLabel = formatarPeriodoVendas(
-      periodoVendas,
-      dataInicioVendas,
-      dataFimVendas,
-    );
-    const dataGeracao = new Intl.DateTimeFormat("pt-BR", {
-      dateStyle: "short",
-      timeStyle: "short",
-    }).format(new Date());
+  const exportarVendasPdf = async () => {
+    setExportandoVendasPdf(true);
+    setErrorVendas("");
 
-    doc.setFontSize(16);
-    doc.text("Relatório de Controle de Vendas", 14, 16);
+    try {
+      const primeiraResposta = await apiRequest<RespostaControleVendas>(
+        `/pedidos/controle-vendas?${montarParamsControleVendas(1).toString()}`,
+      );
 
-    doc.setFontSize(11);
-    doc.text(`Período: ${periodoLabel}`, 14, 24);
-    doc.text(`Total de vendas: ${resumoVendas.totalVendas}`, 14, 30);
-    doc.text(`Valor total arrecadado: ${formatarMoeda(resumoVendas.valorTotalArrecadado)}`, 14, 36);
-    doc.text(`Gerado em: ${dataGeracao}`, 14, 42);
+      const todasAsVendas: VendaControle[] = [...primeiraResposta.data];
 
-    autoTable(doc, {
-      startY: 48,
-      head: [["Pedido", "Data", "Cliente", "Produtos", "Forma de pagamento", "Valor total"]],
-      body: vendas.map((venda) => {
-        const produtosTexto =
-          venda.items && venda.items.length > 0
-            ? venda.items
-                .map(
-                  (item) =>
-                    `${item.produto?.nome ?? "Produto"} (${item.quantidade} ${item.unidade}) - ${formatarMoeda(item.valorTotalItem)}`,
-                )
-                .join("; ")
-            : `${venda.produto?.nome ?? "Produto"} - ${formatarMoeda(venda.valorTotal)}`;
+      for (let pagina = 2; pagina <= primeiraResposta.pagination.totalPages; pagina += 1) {
+        const respostaPagina = await apiRequest<RespostaControleVendas>(
+          `/pedidos/controle-vendas?${montarParamsControleVendas(pagina).toString()}`,
+        );
+        todasAsVendas.push(...respostaPagina.data);
+      }
 
-        return [
-          `#${venda.id}`,
-          formatarData(resolverDataVenda(venda)),
-          venda.usuario?.nome || venda.usuario?.email || "-",
-          produtosTexto,
-          venda.formaPagamento,
-          formatarMoeda(venda.valorTotal),
-        ];
-      }),
-      styles: { fontSize: 9, cellPadding: 2 },
-      headStyles: { fillColor: [46, 125, 50] },
-    });
+      const doc = new jsPDF();
+      const periodoLabel = formatarPeriodoVendas(
+        periodoVendas,
+        dataInicioVendas,
+        dataFimVendas,
+      );
+      const dataGeracao = new Intl.DateTimeFormat("pt-BR", {
+        dateStyle: "short",
+        timeStyle: "short",
+      }).format(new Date());
 
-    doc.save("controle-vendas.pdf");
+      doc.setFontSize(16);
+      doc.text("Relatório de Controle de Vendas", 14, 16);
+
+      doc.setFontSize(11);
+      doc.text(`Período: ${periodoLabel}`, 14, 24);
+      doc.text(`Total de vendas: ${primeiraResposta.resumo.totalVendas}`, 14, 30);
+      doc.text(
+        `Valor total arrecadado: ${formatarMoeda(primeiraResposta.resumo.valorTotalArrecadado)}`,
+        14,
+        36,
+      );
+      doc.text(`Gerado em: ${dataGeracao}`, 14, 42);
+
+      autoTable(doc, {
+        startY: 48,
+        head: [["Pedido", "Data", "Cliente", "Produtos", "Forma de pagamento", "Valor total"]],
+        body: todasAsVendas.map((venda) => {
+          const produtosTexto =
+            venda.items && venda.items.length > 0
+              ? venda.items
+                  .map(
+                    (item) =>
+                      `${item.produto?.nome ?? "Produto"} (${item.quantidade} ${item.unidade}) - ${formatarMoeda(item.valorTotalItem)}`,
+                  )
+                  .join("; ")
+              : `${venda.produto?.nome ?? "Produto"} - ${formatarMoeda(venda.valorTotal)}`;
+
+          return [
+            `#${venda.id}`,
+            formatarData(resolverDataVenda(venda)),
+            venda.usuario?.nome || venda.usuario?.email || "-",
+            produtosTexto,
+            venda.formaPagamento,
+            formatarMoeda(venda.valorTotal),
+          ];
+        }),
+        styles: { fontSize: 9, cellPadding: 2 },
+        headStyles: { fillColor: [46, 125, 50] },
+      });
+
+      doc.save("controle-vendas.pdf");
+    } catch (exportError) {
+      setErrorVendas(
+        exportError instanceof Error
+          ? exportError.message
+          : "Não foi possível exportar o PDF de vendas.",
+      );
+    } finally {
+      setExportandoVendasPdf(false);
+    }
   };
 
   if (!authenticated) {
@@ -717,7 +826,8 @@ const PainelEntregas = () => {
             type="button"
             onClick={() => {
               setAbaAtiva("vendas");
-              void loadControleVendas();
+              setPaginaVendas(1);
+              void loadControleVendas(1);
             }}
             className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors flex-1 min-w-[160px] ${
               abaAtiva === "vendas"
@@ -778,13 +888,18 @@ const PainelEntregas = () => {
             </form>
 
             <div className="mb-4">
-              <input
-                type="text"
+              <select
                 value={buscaFrutaEntrega}
                 onChange={(event) => setBuscaFrutaEntrega(event.target.value)}
                 className="w-full rounded-lg border border-border bg-background px-3 py-2 text-foreground"
-                placeholder="Buscar encomenda pelo nome da fruta"
-              />
+              >
+                <option value="">Todas as frutas</option>
+                {opcoesFrutaEntrega.map((fruta) => (
+                  <option key={fruta} value={fruta}>
+                    {fruta}
+                  </option>
+                ))}
+              </select>
             </div>
 
             {loadingPedidos ? (
@@ -802,7 +917,7 @@ const PainelEntregas = () => {
                           <th className="py-2 pr-2">Pedido</th>
                           <th className="py-2 pr-2">Cliente</th>
                           <th className="py-2 pr-2">Produto</th>
-                          <th className="py-2 pr-2">Qtd</th>
+                          <th className="py-2 pr-2">Qtd total</th>
                           <th className="py-2 pr-2">Entrega</th>
                           <th className="py-2 pr-2">Pagamento</th>
                           <th className="py-2 pr-2">Data</th>
@@ -815,8 +930,21 @@ const PainelEntregas = () => {
                           <tr key={pedido.id} className="border-b border-border/70">
                             <td className="py-2 pr-2">#{pedido.id}</td>
                             <td className="py-2 pr-2">{pedido.usuario?.nome || pedido.usuario?.email || "-"}</td>
-                            <td className="py-2 pr-2">{pedido.produto?.nome || "-"}</td>
-                            <td className="py-2 pr-2">{pedido.quantidade} {pedido.unidade}</td>
+                            <td className="py-2 pr-2">
+                              <details>
+                                <summary className="cursor-pointer select-none text-foreground">
+                                  {resumirItensPedido(pedido)}
+                                </summary>
+                                <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
+                                  {obterItensPedido(pedido).map((item) => (
+                                    <li key={item.id}>
+                                      {(item.produto?.nome ?? "Produto")} — {item.quantidade} {item.unidade}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </details>
+                            </td>
+                            <td className="py-2 pr-2">{totalQuantidadePedido(pedido)}</td>
                             <td className="py-2 pr-2">{pedido.tipoEntrega}</td>
                             <td className="py-2 pr-2">{pedido.formaPagamento}</td>
                             <td className="py-2 pr-2">{formatarData(resolverDataPedido(pedido))}</td>
@@ -873,7 +1001,10 @@ const PainelEntregas = () => {
             <div className="grid md:grid-cols-[220px_1fr_auto] gap-2 mb-4">
               <select
                 value={periodoVendas}
-                onChange={(event) => setPeriodoVendas(event.target.value as typeof periodoVendas)}
+                onChange={(event) => {
+                  setPeriodoVendas(event.target.value as typeof periodoVendas);
+                  setPaginaVendas(1);
+                }}
                 className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
               >
                 <option value="last_month">Último mês</option>
@@ -890,7 +1021,10 @@ const PainelEntregas = () => {
                     <input
                       type="date"
                       value={dataInicioVendas}
-                      onChange={(event) => setDataInicioVendas(event.target.value)}
+                      onChange={(event) => {
+                        setDataInicioVendas(event.target.value);
+                        setPaginaVendas(1);
+                      }}
                       className="w-full bg-transparent text-sm text-foreground outline-none"
                       aria-label="Data inicial"
                     />
@@ -900,7 +1034,10 @@ const PainelEntregas = () => {
                     <input
                       type="date"
                       value={dataFimVendas}
-                      onChange={(event) => setDataFimVendas(event.target.value)}
+                      onChange={(event) => {
+                        setDataFimVendas(event.target.value);
+                        setPaginaVendas(1);
+                      }}
                       className="w-full bg-transparent text-sm text-foreground outline-none"
                       aria-label="Data final"
                     />
@@ -914,7 +1051,7 @@ const PainelEntregas = () => {
 
               <button
                 type="button"
-                onClick={() => void loadControleVendas()}
+                onClick={() => void loadControleVendas(1)}
                 className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 w-full md:w-auto"
               >
                 Atualizar
@@ -935,11 +1072,13 @@ const PainelEntregas = () => {
             <div className="mb-4">
               <button
                 type="button"
-                onClick={exportarVendasPdf}
-                disabled={vendas.length === 0}
+                onClick={() => {
+                  void exportarVendasPdf();
+                }}
+                disabled={loadingVendas || exportandoVendasPdf || resumoVendas.totalVendas === 0}
                 className="inline-flex items-center justify-center px-4 py-2 rounded-lg border border-border text-sm font-semibold text-foreground hover:bg-muted disabled:opacity-50 w-full sm:w-auto"
               >
-                Exportar PDF
+                {exportandoVendasPdf ? "Exportando..." : "Exportar PDF"}
               </button>
             </div>
 
@@ -950,49 +1089,75 @@ const PainelEntregas = () => {
             ) : vendas.length === 0 ? (
               <p className="text-muted-foreground">Nenhuma venda concluída no período selecionado.</p>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-border text-left">
-                      <th className="py-2 pr-2">Pedido</th>
-                      <th className="py-2 pr-2">Data</th>
-                      <th className="py-2 pr-2">Cliente</th>
-                      <th className="py-2 pr-2">Produtos</th>
-                      <th className="py-2 pr-2">Valor dos produtos</th>
-                      <th className="py-2 pr-2">Pagamento</th>
-                      <th className="py-2 pr-2">Total do pedido</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {vendas.map((venda) => (
-                      <tr key={venda.id} className="border-b border-border/70">
-                        <td className="py-2 pr-2">#{venda.id}</td>
-                        <td className="py-2 pr-2">{formatarData(resolverDataVenda(venda))}</td>
-                        <td className="py-2 pr-2">{venda.usuario?.nome || venda.usuario?.email || "-"}</td>
-                        <td className="py-2 pr-2">
-                          {venda.items && venda.items.length > 0
-                            ? venda.items
-                                .map(
-                                  (item) =>
-                                    `${item.produto?.nome ?? "Produto"} (${item.quantidade} ${item.unidade})`,
-                                )
-                                .join(", ")
-                            : venda.produto?.nome || "-"}
-                        </td>
-                        <td className="py-2 pr-2">
-                          {venda.items && venda.items.length > 0
-                            ? venda.items
-                                .map((item) => `${item.produto?.nome ?? "Produto"}: ${formatarMoeda(item.valorTotalItem)}`)
-                                .join(" • ")
-                            : formatarMoeda(venda.valorTotal)}
-                        </td>
-                        <td className="py-2 pr-2">{venda.formaPagamento}</td>
-                        <td className="py-2 pr-2">{formatarMoeda(venda.valorTotal)}</td>
+              <>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-border text-left">
+                        <th className="py-2 pr-2">Pedido</th>
+                        <th className="py-2 pr-2">Data</th>
+                        <th className="py-2 pr-2">Cliente</th>
+                        <th className="py-2 pr-2">Produtos</th>
+                        <th className="py-2 pr-2">Valor dos produtos</th>
+                        <th className="py-2 pr-2">Pagamento</th>
+                        <th className="py-2 pr-2">Total do pedido</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {vendas.map((venda) => (
+                        <tr key={venda.id} className="border-b border-border/70">
+                          <td className="py-2 pr-2">#{venda.id}</td>
+                          <td className="py-2 pr-2">{formatarData(resolverDataVenda(venda))}</td>
+                          <td className="py-2 pr-2">{venda.usuario?.nome || venda.usuario?.email || "-"}</td>
+                          <td className="py-2 pr-2">
+                            {venda.items && venda.items.length > 0
+                              ? venda.items
+                                  .map(
+                                    (item) =>
+                                      `${item.produto?.nome ?? "Produto"} (${item.quantidade} ${item.unidade})`,
+                                  )
+                                  .join(", ")
+                              : venda.produto?.nome || "-"}
+                          </td>
+                          <td className="py-2 pr-2">
+                            {venda.items && venda.items.length > 0
+                              ? venda.items
+                                  .map((item) => `${item.produto?.nome ?? "Produto"}: ${formatarMoeda(item.valorTotalItem)}`)
+                                  .join(" • ")
+                              : formatarMoeda(venda.valorTotal)}
+                          </td>
+                          <td className="py-2 pr-2">{venda.formaPagamento}</td>
+                          <td className="py-2 pr-2">{formatarMoeda(venda.valorTotal)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {totalPaginasVendas > 1 && (
+                  <div className="mt-4 flex flex-wrap items-center justify-between sm:justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => void loadControleVendas(paginaVendas - 1)}
+                      disabled={paginaVendas <= 1}
+                      className="inline-flex items-center px-3 py-2 rounded-lg border border-border text-sm font-semibold text-foreground hover:bg-muted disabled:opacity-50"
+                    >
+                      Anterior
+                    </button>
+                    <span className="text-sm text-muted-foreground">
+                      Página {paginaVendas} de {totalPaginasVendas}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => void loadControleVendas(paginaVendas + 1)}
+                      disabled={paginaVendas >= totalPaginasVendas}
+                      className="inline-flex items-center px-3 py-2 rounded-lg border border-border text-sm font-semibold text-foreground hover:bg-muted disabled:opacity-50"
+                    >
+                      Próxima
+                    </button>
+                  </div>
+                )}
+              </>
             )}
           </section>
         ) : abaAtiva === "produtos" ? (

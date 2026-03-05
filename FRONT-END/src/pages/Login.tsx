@@ -146,6 +146,11 @@ const Login = () => {
   };
 
   const handleSenhaChange = (valor: string) => {
+    if (mode === "login") {
+      setSenha(valor);
+      return;
+    }
+
     const senhaAlfanumerica = valor.replace(/[^a-zA-Z0-9]/g, "").slice(0, 8);
     setSenha(senhaAlfanumerica);
   };
@@ -210,7 +215,7 @@ const Login = () => {
                     : "text-muted-foreground"
                 }`}
               >
-                Login
+                Entrar
               </button>
               <button
                 type="button"
@@ -294,10 +299,10 @@ const Login = () => {
                     value={senha}
                     onChange={(event) => handleSenhaChange(event.target.value)}
                     className="w-full rounded-lg border border-border bg-background px-3 py-2 pr-10 text-foreground outline-none focus:ring-2 focus:ring-primary"
-                    placeholder="Até 8 caracteres"
+                    placeholder={mode === "register" ? "Até 8 caracteres" : "Digite sua senha"}
                     inputMode="text"
-                    pattern="[A-Za-z0-9]*"
-                    maxLength={8}
+                    pattern={mode === "register" ? "[A-Za-z0-9]*" : undefined}
+                    maxLength={mode === "register" ? 8 : undefined}
                     required
                   />
                   <button
@@ -310,7 +315,9 @@ const Login = () => {
                     {mostrarSenha ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">A senha deve ter até 8 caracteres.</p>
+                {mode === "register" && (
+                  <p className="text-xs text-muted-foreground mt-1">A senha deve ter até 8 caracteres.</p>
+                )}
                 {mode === "login" && (
                   <div className="mt-2 text-right">
                     <button

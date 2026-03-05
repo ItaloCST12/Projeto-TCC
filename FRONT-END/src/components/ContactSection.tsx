@@ -15,7 +15,7 @@ const ContactSection = () => {
 
         <div className="grid md:grid-cols-3 gap-8 max-w-3xl mx-auto">
           <a
-            href="https://wa.me/5500000000000"
+            href="https://wa.me/5596991583439?text=Ol%C3%A1%21%20Gostaria%20de%20fazer%20um%20pedido."
             target="_blank"
             rel="noopener noreferrer"
             className="flex flex-col items-center bg-card rounded-xl p-8 shadow-card hover:shadow-card-hover transition-shadow duration-300 group"
@@ -24,7 +24,7 @@ const ContactSection = () => {
               <Phone className="h-7 w-7 text-primary" />
             </div>
             <h3 className="font-display text-lg font-semibold text-foreground mb-1">WhatsApp</h3>
-            <p className="text-muted-foreground text-sm">(00) 00000-0000</p>
+            <p className="text-muted-foreground text-sm">(96) 99158-3439</p>
           </a>
 
           <a

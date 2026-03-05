@@ -61,6 +61,15 @@ const broadcastParaAtendimento = (
 export const initAtendimentoSocket = (server: HttpServer) => {
   wss = new WebSocketServer({ server, path: "/atendimentos/ws" });
 
+  wss.on("error", (error: NodeJS.ErrnoException) => {
+    if (error.code === "EADDRINUSE") {
+      console.warn("[WS] Conflito de porta detectado. Aguardando nova tentativa de inicialização do servidor.");
+      return;
+    }
+
+    console.error("[WS] Erro no WebSocket server", error);
+  });
+
   wss.on("connection", (socket: WebSocket, req: IncomingMessage) => {
     const token = parseToken(req.url);
     if (!token) {

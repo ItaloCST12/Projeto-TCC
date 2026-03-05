@@ -59,21 +59,56 @@ model Produto {
 }
 
 model Pedido {
-  id             Int          @id @default(autoincrement())
-  createdAt      DateTime     @default(now())
+  id             Int           @id @default(autoincrement())
+  createdAt      DateTime      @default(now())
   usuarioId      Int
   produtoId      Int
   enderecoId     Int?
   quantidade     Int
   unidade        String
   tipoEntrega    String
-  formaPagamento String       @default("PIX")
-  valorTotal     Decimal      @default(0) @db.Decimal(10, 2)
-  status         String       @default("PENDENTE")
-  usuario        Usuario      @relation(fields: [usuarioId], references: [id])
-  produto        Produto      @relation(fields: [produtoId], references: [id])
-  endereco       Endereco?    @relation(fields: [enderecoId], references: [id])
+  formaPagamento String        @default("PIX")
+  valorTotal     Decimal       @default(0) @db.Decimal(10, 2)
+  status         String        @default("PENDENTE")
+  usuario        Usuario       @relation(fields: [usuarioId], references: [id])
+  produto        Produto       @relation(fields: [produtoId], references: [id])
+  endereco       Endereco?     @relation(fields: [enderecoId], references: [id])
   items          ItemPedido[]
+  pagamentoPix   PagamentoPix?
+}
+
+model PagamentoPix {
+  id                    Int                  @id @default(autoincrement())
+  pedidoId              Int                  @unique
+  provider              String               @default("MERCADO_PAGO")
+  providerTransactionId String?              @unique
+  status                String               @default("PENDENTE")
+  qrCode                String?
+  qrCodeBase64          String?
+  ticketUrl             String?
+  expiresAt             DateTime?
+  valor                 Decimal              @default(0) @db.Decimal(10, 2)
+  rawPayload            Json?
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+  pedido                Pedido               @relation(fields: [pedidoId], references: [id])
+  eventos               PagamentoPixEvento[]
+
+  @@index([status])
+}
+
+model PagamentoPixEvento {
+  id             Int           @id @default(autoincrement())
+  pagamentoPixId Int?
+  tipo           String
+  sucesso        Boolean       @default(true)
+  mensagem       String?
+  payload        Json?
+  createdAt      DateTime      @default(now())
+  pagamentoPix   PagamentoPix? @relation(fields: [pagamentoPixId], references: [id])
+
+  @@index([pagamentoPixId, tipo])
+  @@index([createdAt])
 }
 
 model ItemPedido {

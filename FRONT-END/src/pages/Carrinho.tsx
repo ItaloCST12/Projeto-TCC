@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
 import { apiRequest } from "@/lib/api";
 import { getAuthUser, isAuthenticated } from "@/lib/auth";
@@ -44,6 +44,11 @@ type FormasPagamentoResponse = {
   formas: string[];
 };
 
+type PedidoCriadoResponse = {
+  id: number;
+  formaPagamento: string;
+};
+
 const MAX_QUANTIDADE_POR_ITEM = 1000;
 
 const PRECO_PADRAO_PRODUTO: Record<string, number> = {
@@ -59,6 +64,7 @@ const formatarMoeda = (valor: number) =>
     style: "currency",
     currency: "BRL",
   }).format(valor);
+
 
 const resolverPrecoFallbackPorNomeUnidade = (nomeProduto?: string, unidade?: string) => {
   const nomeNormalizado = (nomeProduto || "").trim().toLowerCase();
@@ -111,6 +117,7 @@ const Carrinho = () => {
   const [cep, setCep] = useState("");
   const [loadingCep, setLoadingCep] = useState(false);
   const [cepError, setCepError] = useState("");
+  const [ajudaCepAtiva, setAjudaCepAtiva] = useState(false);
   const [savingEndereco, setSavingEndereco] = useState(false);
   const [deletingEnderecoId, setDeletingEnderecoId] = useState<number | null>(null);
   const [enderecoParaExcluir, setEnderecoParaExcluir] = useState<Endereco | null>(null);
@@ -129,7 +136,7 @@ const Carrinho = () => {
     [produtosCatalogo],
   );
 
-  const resolverPrecoUnitarioItem = (item: CartItem) => {
+  const resolverPrecoUnitarioItem = useCallback((item: CartItem) => {
     const produto = produtosPorId.get(item.produtoId);
 
     const nomeNormalizado = (produto?.nome || "").trim().toLowerCase();
@@ -164,7 +171,7 @@ const Carrinho = () => {
     }
 
     return resolverPrecoFallbackPorNomeUnidade(item.nome, item.unidade);
-  };
+  }, [produtosPorId]);
 
   const valorTotalCarrinho = useMemo(
     () =>
@@ -172,7 +179,7 @@ const Carrinho = () => {
         (total, item) => total + resolverPrecoUnitarioItem(item) * item.quantidade,
         0,
       ),
-    [cartItems, produtosPorId],
+    [cartItems, resolverPrecoUnitarioItem],
   );
 
   const enderecoLabel = (endereco: Endereco) => {
@@ -295,7 +302,7 @@ const Carrinho = () => {
     setSubmitting(true);
 
     try {
-      await apiRequest("/pedidos", {
+      const pedidoCriado = await apiRequest<PedidoCriadoResponse>("/pedidos", {
         method: "POST",
         body: {
           produtoId: itemPrincipal.produtoId,
@@ -314,7 +321,9 @@ const Carrinho = () => {
 
       clearCart();
       setCartItems([]);
-      setSuccess("Encomenda finalizada com sucesso!");
+      setSuccess(
+        `Encomenda finalizada com sucesso! Pedido #${pedidoCriado.id} criado com forma de pagamento ${pedidoCriado.formaPagamento}.`,
+      );
     } catch (submitError) {
       setError(
         submitError instanceof Error
@@ -327,6 +336,7 @@ const Carrinho = () => {
   };
 
   const buscarEnderecoPorCep = async (cepDigitado: string) => {
+    setAjudaCepAtiva(false);
     const apenasNumeros = cepDigitado.replace(/\D/g, "");
 
     if (apenasNumeros.length !== 8) {
@@ -395,6 +405,10 @@ const Carrinho = () => {
   };
 
   const atualizarCepEConsultar = (valorCep: string) => {
+    if (ajudaCepAtiva) {
+      setAjudaCepAtiva(false);
+    }
+
     const cepFormatado = formatarCep(valorCep);
     setCep(cepFormatado);
 
@@ -417,6 +431,7 @@ const Carrinho = () => {
     setNumero("");
     setCidade("");
     setCep("");
+    setAjudaCepAtiva(false);
     setCepError("");
     setEnderecoFormError("");
     setEnderecoFormSuccess("");
@@ -757,21 +772,43 @@ const Carrinho = () => {
           )}
 
           <div className="grid sm:grid-cols-2 gap-3">
-            <input
-              type="text"
-              value={cep}
-              onChange={(event) => atualizarCepEConsultar(event.target.value)}
-              onBlur={(event) => {
-                const cepDigitado = event.currentTarget.value;
-                if (cepDigitado.replace(/\D/g, "").length === 8) {
-                  void buscarEnderecoPorCep(cepDigitado);
-                }
-              }}
-              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-foreground"
-              placeholder="CEP"
-              inputMode="numeric"
-              maxLength={9}
-            />
+            <div className="space-y-2">
+              <input
+                type="text"
+                value={cep}
+                onChange={(event) => atualizarCepEConsultar(event.target.value)}
+                onBlur={(event) => {
+                  const cepDigitado = event.currentTarget.value;
+                  if (cepDigitado.replace(/\D/g, "").length === 8) {
+                    void buscarEnderecoPorCep(cepDigitado);
+                  }
+                }}
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-foreground"
+                placeholder="CEP"
+                inputMode="numeric"
+                maxLength={9}
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  setAjudaCepAtiva(true);
+                  setCep("");
+                  setCepError("");
+                  setLoadingCep(false);
+                  window.open(
+                    "https://buscacepinter.correios.com.br/app/endereco/index.php",
+                    "_blank",
+                    "noopener,noreferrer",
+                  );
+                }}
+                className="inline-flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground"
+              >
+                <span className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-border text-[10px] font-semibold leading-none">
+                  ?
+                </span>
+                Não sei meu CEP
+              </button>
+            </div>
             <input
               type="text"
               value={numero}
@@ -829,6 +866,11 @@ const Carrinho = () => {
           </div>
 
           {loadingCep && <p className="text-sm text-muted-foreground mt-3">Buscando CEP...</p>}
+          {ajudaCepAtiva && (
+            <p className="text-sm text-muted-foreground mt-3">
+              Sem problemas. Você pode preencher rua e cidade manualmente para cadastrar o endereço.
+            </p>
+          )}
           {cepError && <p className="text-sm text-destructive mt-3">{cepError}</p>}
           {enderecoFormError && <p className="text-sm text-destructive mt-2">{enderecoFormError}</p>}
           {enderecoFormSuccess && <p className="text-sm text-primary mt-2">{enderecoFormSuccess}</p>}

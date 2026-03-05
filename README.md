@@ -138,3 +138,16 @@ As rotas de endereço exigem autenticação JWT (`Authorization: Bearer <token>`
 
 - O projeto está padronizado para PostgreSQL.
 - Arquivos e configurações legadas de SQLite foram removidos.
+
+## Pagamentos
+
+O sistema mantém apenas a escolha da forma de pagamento no pedido, sem integração com gateway externo.
+
+### Rota disponível
+
+- `GET /pagamentos/formas` (lista as formas aceitas no checkout)
+
+### Checklist de validação
+
+1. Criar pedido com `formaPagamento` selecionada no checkout.
+2. Confirmar que o pedido é criado e preserva a forma de pagamento escolhida.

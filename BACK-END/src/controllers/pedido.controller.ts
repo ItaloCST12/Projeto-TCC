@@ -159,6 +159,7 @@ export const getTodosPedidos = async (req: Request, res: Response) => {
 
 export const getControleVendas = async (req: Request, res: Response) => {
   try {
+    const page = parsePagina(req.query.page);
     const periodo = String(req.query.periodo ?? "last_month");
 
     let dataInicio: Date | undefined;
@@ -186,6 +187,8 @@ export const getControleVendas = async (req: Request, res: Response) => {
     }
 
     const vendas = await pedidoService.getControleVendas({
+      page,
+      pageSize: 15,
       ...(dataInicio ? { dataInicio } : {}),
       ...(dataFim ? { dataFim } : {}),
     });

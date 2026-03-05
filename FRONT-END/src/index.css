@@ -241,23 +241,23 @@
     caret-color: transparent !important;
   }
 
-  a,
-  a *,
-  button,
-  button *,
-  summary,
-  summary *,
-  select,
-  option,
-  [role="button"],
-  [role="button"] *,
-  input[type="checkbox"],
-  input[type="radio"],
-  input[type="range"],
-  input[type="submit"],
-  input[type="reset"],
-  input[type="button"],
-  label[for] {
+  #root a,
+  #root a *,
+  #root button,
+  #root button *,
+  #root summary,
+  #root summary *,
+  #root select,
+  #root option,
+  #root [role="button"],
+  #root [role="button"] *,
+  #root input[type="checkbox"],
+  #root input[type="radio"],
+  #root input[type="range"],
+  #root input[type="submit"],
+  #root input[type="reset"],
+  #root input[type="button"],
+  #root label[for] {
     cursor: pointer !important;
   }
 
@@ -280,6 +280,15 @@
   .high-contrast *:focus-visible {
     outline: 3px solid hsl(var(--ring)) !important;
     outline-offset: 2px;
+  }
+
+  #root a,
+  #root a *,
+  #root button,
+  #root button *,
+  #root [role="button"],
+  #root [role="button"] * {
+    cursor: pointer !important;
   }
 }
 

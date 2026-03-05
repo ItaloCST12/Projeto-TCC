@@ -14,7 +14,7 @@ const features = [
   {
     icon: Heart,
     title: "Herança Familiar",
-    description: "Tudo teve início com a aquisição de um terreno coberto por vegetação densa e improdutivo, onde o proprietário Adaílson desbravou acessos e plantou as primeiras laranjeiras. Hoje, comemoramos 20 anos de expansão contínua, transmitindo valores de perseverança e dedicação às gerações futuras",
+    description: "Iniciada há 20 anos por Adaílson em um terreno improdutivo, a fazenda começou com o plantio das primeiras laranjeiras. Hoje celebramos nossa trajetória de perseverança e dedicação às próximas gerações.",
   },
 ];
 

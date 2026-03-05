@@ -38,7 +38,7 @@ const Navbar = () => {
         { label: "Atendimento", to: "/chat" },
         ...(isAdmin ? [{ label: "Painel", to: "/painel-entregas" }] : []),
       ]
-    : [{ label: "Login", to: "/login" }];
+    : [{ label: "Entrar", to: "/login" }];
 
   const ctaTo = loggedIn ? "/encomenda" : "/login?redirect=/encomenda";
   const profileLink = isAdmin ? "/painel-entregas" : "/perfil";
