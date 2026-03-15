@@ -3,7 +3,7 @@ services:
     name: projeto-tcc
     runtime: node
     plan: free
-    buildCommand: npm install --include=dev --prefix FRONT-END && npm install --prefix BACK-END && npm run build:front
+    buildCommand: npm install --include=dev --prefix FRONT-END && npm install --prefix BACK-END && npm run build:front && cd BACK-END && npx prisma migrate deploy
     startCommand: npm --prefix BACK-END run start
     envVars:
       - key: NODE_VERSION
