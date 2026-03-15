@@ -3,7 +3,7 @@ services:
     name: projeto-tcc
     runtime: node
     plan: free
-    buildCommand: npm install --include=dev --prefix FRONT-END && npm install --prefix BACK-END && npm run build:front && cd BACK-END && npx prisma migrate deploy && node scripts/create-admin.js admin@example.com admin123 Administrador
+    buildCommand: npm install --include=dev --prefix FRONT-END && npm install --prefix BACK-END && npm run build:front && cd BACK-END && npx prisma migrate deploy && node scripts/create-admin.js admin@example.com admin123 Administrador && node scripts/seed-produtos.js
     startCommand: npm --prefix BACK-END run start
     envVars:
       - key: NODE_VERSION
