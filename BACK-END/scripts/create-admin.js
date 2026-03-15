@@ -33,6 +33,7 @@ async function main() {
         data: {
           nome,
           email,
+          telefone: "(00) 00000-0000",
           password: hashedPassword,
           role: "ADMIN",
         },
