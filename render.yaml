@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: projeto-tcc
+    runtime: node
+    plan: free
+    buildCommand: npm install --prefix FRONT-END && npm install --prefix BACK-END && npm run build:front
+    startCommand: npm --prefix BACK-END run start
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "10000"
