@@ -151,18 +151,15 @@ const Login = () => {
       return;
     }
 
-    const senhaAlfanumerica = valor.replace(/[^a-zA-Z0-9]/g, "").slice(0, 8);
-    setSenha(senhaAlfanumerica);
+    setSenha(valor.slice(0, 128));
   };
 
   const handleNovaSenhaChange = (valor: string) => {
-    const senhaAlfanumerica = valor.replace(/[^a-zA-Z0-9]/g, "").slice(0, 8);
-    setNovaSenha(senhaAlfanumerica);
+    setNovaSenha(valor.slice(0, 128));
   };
 
   const handleConfirmarNovaSenhaChange = (valor: string) => {
-    const senhaAlfanumerica = valor.replace(/[^a-zA-Z0-9]/g, "").slice(0, 8);
-    setConfirmarNovaSenha(senhaAlfanumerica);
+    setConfirmarNovaSenha(valor.slice(0, 128));
   };
 
   const formatarTelefone = (valor: string) => {
@@ -299,10 +296,10 @@ const Login = () => {
                     value={senha}
                     onChange={(event) => handleSenhaChange(event.target.value)}
                     className="w-full rounded-lg border border-border bg-background px-3 py-2 pr-10 text-foreground outline-none focus:ring-2 focus:ring-primary"
-                    placeholder={mode === "register" ? "Até 8 caracteres" : "Digite sua senha"}
+                    placeholder={mode === "register" ? "Mínimo 8 caracteres" : "Digite sua senha"}
                     inputMode="text"
-                    pattern={mode === "register" ? "[A-Za-z0-9]*" : undefined}
-                    maxLength={mode === "register" ? 8 : undefined}
+                    maxLength={128}
+                    minLength={mode === "register" ? 8 : undefined}
                     required
                   />
                   <button
@@ -316,7 +313,7 @@ const Login = () => {
                   </button>
                 </div>
                 {mode === "register" && (
-                  <p className="text-xs text-muted-foreground mt-1">A senha deve ter até 8 caracteres.</p>
+                  <p className="text-xs text-muted-foreground mt-1">A senha deve ter no mínimo 8 caracteres.</p>
                 )}
                 {mode === "login" && (
                   <div className="mt-2 text-right">
@@ -374,10 +371,10 @@ const Login = () => {
                             value={novaSenha}
                             onChange={(event) => handleNovaSenhaChange(event.target.value)}
                             className="w-full rounded-lg border border-border bg-background px-3 py-2 pr-10 text-foreground outline-none focus:ring-2 focus:ring-primary"
-                            placeholder="Até 8 caracteres"
+                            placeholder="Mínimo 8 caracteres"
                             inputMode="text"
-                            pattern="[A-Za-z0-9]*"
-                            maxLength={8}
+                            maxLength={128}
+                            minLength={8}
                             required
                           />
                           <button
@@ -404,11 +401,11 @@ const Login = () => {
                           className="w-full rounded-lg border border-border bg-background px-3 py-2 text-foreground outline-none focus:ring-2 focus:ring-primary"
                           placeholder="Repita a nova senha"
                           inputMode="text"
-                          pattern="[A-Za-z0-9]*"
-                          maxLength={8}
+                          maxLength={128}
+                          minLength={8}
                           required
                         />
-                        <p className="text-xs text-muted-foreground mt-1">A senha deve ter até 8 caracteres.</p>
+                        <p className="text-xs text-muted-foreground mt-1">A senha deve ter no mínimo 8 caracteres.</p>
                       </div>
                     </>
                   )}

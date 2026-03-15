@@ -3,6 +3,7 @@ import fs from "fs";
 import path from "path";
 import dotenv from "dotenv";
 import cors from "cors";
+import helmet from "helmet";
 import http from "http";
 import net from "net";
 import routes from "./routes";
@@ -26,13 +27,30 @@ const portaInicial = Number.parseInt((process.env.PORT || "3333").trim(), 10);
 const PORT = Number.isFinite(portaInicial) && portaInicial > 0 ? portaInicial : 3333;
 const fallbackStaticDir = path.resolve(process.cwd(), "public");
 const staticCandidates = [
-  fallbackStaticDir,
-  path.resolve(process.cwd(), "FRONT-END"),
+  path.resolve(process.cwd(), "public"),
+  path.resolve(process.cwd(), "BACK-END", "public"),
+  path.resolve(process.cwd(), "..", "BACK-END", "public"),
   path.resolve(process.cwd(), "..", "public"),
+  path.resolve(process.cwd(), "FRONT-END"),
   path.resolve(process.cwd(), "..", "FRONT-END"),
 ];
 
+const isBuildIndex = (dir: string) => {
+  const indexPath = path.join(dir, "index.html");
+  if (!fs.existsSync(indexPath)) {
+    return false;
+  }
+
+  const indexContent = fs.readFileSync(indexPath, "utf-8");
+  // Build output references /assets/*.js; dev index references /src/main.tsx.
+  const referencesSrcEntry = indexContent.includes("/src/main.tsx");
+  const referencesAssets = indexContent.includes("/assets/");
+  return !referencesSrcEntry && referencesAssets;
+};
+
+const buildDir = staticCandidates.find((dir) => isBuildIndex(dir));
 const staticDir =
+  buildDir ??
   staticCandidates.find((dir) => fs.existsSync(path.join(dir, "index.html"))) ??
   fallbackStaticDir;
 const apiPrefixes = [
@@ -45,6 +63,7 @@ const apiPrefixes = [
   "/atendimentos",
 ];
 
+app.use(helmet());
 app.use(express.json());
 app.use(
   cors({

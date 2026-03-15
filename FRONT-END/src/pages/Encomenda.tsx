@@ -97,6 +97,51 @@ const API_BASE_URL = (import.meta.env.VITE_API_URL as string | undefined)?.trim(
 const formatarMoeda = (valor: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(valor);
 
+const normalizarTexto = (valor: string) =>
+  valor
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+
+const parsePreco = (valor: number | string | null | undefined, fallback = 0) => {
+  if (typeof valor === "number") {
+    return Number.isFinite(valor) ? valor : fallback;
+  }
+
+  if (typeof valor === "string") {
+    const texto = valor.trim();
+    if (!texto) {
+      return fallback;
+    }
+
+    const normalizado = texto.replace(/\./g, "").replace(",", ".");
+    const convertido = Number(normalizado);
+    return Number.isFinite(convertido) ? convertido : fallback;
+  }
+
+  return fallback;
+};
+
+const parsePrecoPositivo = (
+  valor: number | string | null | undefined,
+  fallback: number,
+) => {
+  const preco = parsePreco(valor, fallback);
+  return preco > 0 ? preco : fallback;
+};
+
+const resolverChaveVisualProduto = (nomeProduto: string) => {
+  const nome = normalizarTexto(nomeProduto);
+
+  if (nome.includes("abacaxi")) return "abacaxi";
+  if (nome.includes("laranja")) return "laranja";
+  if (nome.includes("tangerina")) return "tangerina";
+  if (nome.includes("limao")) return "limao";
+
+  return nome;
+};
+
 const resolverImagemProduto = (imagemUrl: string | null | undefined, fallback: string) => {
   if (!imagemUrl?.trim()) {
     return fallback;
@@ -160,7 +205,7 @@ const Encomenda = () => {
   const hasProdutos = produtos.length > 0;
 
   const getProdutoVisual = (nomeProduto: string): ProdutoVisual => {
-    const normalizedName = nomeProduto.trim().toLowerCase();
+    const normalizedName = resolverChaveVisualProduto(nomeProduto);
     return (
       PRODUTOS_VISUAIS.get(normalizedName) ?? {
         image: abacaxiImg,
@@ -200,22 +245,24 @@ const Encomenda = () => {
   };
 
   const getPrecoPorOpcao = (produto: Produto, opcaoValue: string) => {
-    const nomeNormalizado = produto.nome.trim().toLowerCase();
-    const opcaoNormalizada = opcaoValue.trim().toLowerCase();
+    const nomeNormalizado = normalizarTexto(produto.nome);
+    const opcaoNormalizada = normalizarTexto(opcaoValue);
 
-    if (nomeNormalizado === "abacaxi") {
+    if (nomeNormalizado.includes("abacaxi")) {
       if (opcaoNormalizada.includes("grande")) {
-        return Number(produto.precoAbacaxiGrande ?? 7);
+        return parsePrecoPositivo(produto.precoAbacaxiGrande, 7);
       }
       if (opcaoNormalizada.includes("medio") || opcaoNormalizada.includes("médio")) {
-        return Number(produto.precoAbacaxiMedio ?? 5);
+        return parsePrecoPositivo(produto.precoAbacaxiMedio, 5);
       }
       if (opcaoNormalizada.includes("pequeno")) {
-        return Number(produto.precoAbacaxiPequeno ?? 3);
+        return parsePrecoPositivo(produto.precoAbacaxiPequeno, 3);
       }
+
+      return parsePrecoPositivo(produto.preco, 5);
     }
 
-    return Number(produto.preco) || 0;
+    return parsePreco(produto.preco, 0);
   };
 
   const limparEdicaoQuantidade = (produtoId: number) => {
@@ -280,7 +327,7 @@ const Encomenda = () => {
                   {produtos.map((produto) => {
                     const visual = getProdutoVisual(produto.nome);
                     const imagemCard = resolverImagemProduto(produto.imagemUrl, visual.image);
-                    const isAbacaxi = produto.nome.trim().toLowerCase() === "abacaxi";
+                    const isAbacaxi = normalizarTexto(produto.nome).includes("abacaxi");
                     const quantidadeSelecionada = getQuantidadeSelecionada(produto.id);
                     const opcaoPadrao = visual.opcoesVenda[0];
                     const unidadeSelecionada = getUnidadeSelecionada(

@@ -9,7 +9,8 @@
     "start": "tsx src/app.ts",
     "prisma:generate": "prisma generate",
     "postinstall": "npm run prisma:generate",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "keywords": [],
   "author": "",
@@ -27,6 +28,8 @@
     "cors": "^2.8.5",
     "dotenv": "^17.2.1",
     "express": "^5.1.0",
+    "express-rate-limit": "^8.3.1",
+    "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.2",
     "multer": "^2.1.0",
     "nodemailer": "^8.0.1",
@@ -36,7 +39,10 @@
     "ws": "^8.19.0"
   },
   "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
     "@types/cors": "^2.8.19",
-    "@types/ws": "^8.18.1"
+    "@types/helmet": "^0.0.48",
+    "@types/ws": "^8.18.1",
+    "vitest": "^4.0.18"
   }
 }

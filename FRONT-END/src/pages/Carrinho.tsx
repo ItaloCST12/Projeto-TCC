@@ -65,12 +65,71 @@ const formatarMoeda = (valor: number) =>
     currency: "BRL",
   }).format(valor);
 
+const parsePreco = (valor: number | string | null | undefined, fallback = 0) => {
+  if (typeof valor === "number") {
+    return Number.isFinite(valor) ? valor : fallback;
+  }
+
+  if (typeof valor === "string") {
+    const texto = valor.trim();
+    if (!texto) {
+      return fallback;
+    }
+
+    const normalizado = texto.replace(/\./g, "").replace(",", ".");
+    const convertido = Number(normalizado);
+    return Number.isFinite(convertido) ? convertido : fallback;
+  }
+
+  return fallback;
+};
+
+const normalizarTexto = (valor: string) =>
+  valor
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+
+const isNomeAbacaxi = (nomeProduto?: string) =>
+  normalizarTexto(nomeProduto || "").includes("abacaxi");
+
+const formatarNomeProduto = (nome: string) =>
+  nome
+    .trim()
+    .split(/\s+/)
+    .map((parte) => parte.charAt(0).toUpperCase() + parte.slice(1).toLowerCase())
+    .join(" ");
+
+const formatarUnidadeItem = (unidade: string, nomeProduto: string) => {
+  const unidadeNormalizada = normalizarTexto(unidade);
+
+  if (isNomeAbacaxi(nomeProduto)) {
+    if (unidadeNormalizada.includes("grande")) {
+      return "Grande";
+    }
+    if (unidadeNormalizada.includes("medio")) {
+      return "Medio";
+    }
+    if (unidadeNormalizada.includes("pequeno")) {
+      return "Pequeno";
+    }
+    return "Unidade";
+  }
+
+  return unidade
+    .trim()
+    .split(/\s+/)
+    .map((parte) => parte.charAt(0).toUpperCase() + parte.slice(1).toLowerCase())
+    .join(" ");
+};
+
 
 const resolverPrecoFallbackPorNomeUnidade = (nomeProduto?: string, unidade?: string) => {
-  const nomeNormalizado = (nomeProduto || "").trim().toLowerCase();
-  const unidadeNormalizada = (unidade || "").trim().toLowerCase();
+  const nomeNormalizado = normalizarTexto(nomeProduto || "");
+  const unidadeNormalizada = normalizarTexto(unidade || "");
 
-  if (nomeNormalizado === "abacaxi") {
+  if (nomeNormalizado.includes("abacaxi")) {
     if (unidadeNormalizada.includes("grande")) {
       return 7;
     }
@@ -84,14 +143,9 @@ const resolverPrecoFallbackPorNomeUnidade = (nomeProduto?: string, unidade?: str
 };
 
 type ViaCepResponse = {
-  erro?: boolean;
-  logradouro?: string;
-  localidade?: string;
-};
-
-type BrasilApiCepResponse = {
-  street?: string;
-  city?: string;
+  cep: string;
+  rua: string;
+  cidade: string;
 };
 
 const Carrinho = () => {
@@ -125,6 +179,7 @@ const Carrinho = () => {
   const [enderecoFormSuccess, setEnderecoFormSuccess] = useState("");
   const [editingEnderecoId, setEditingEnderecoId] = useState<number | null>(null);
   const ultimoCepBuscadoRef = useRef("");
+  const cepLookupTimeoutRef = useRef<number | null>(null);
 
   const totalItens = useMemo(
     () => cartItems.reduce((total, item) => total + item.quantidade, 0),
@@ -139,33 +194,40 @@ const Carrinho = () => {
   const resolverPrecoUnitarioItem = useCallback((item: CartItem) => {
     const produto = produtosPorId.get(item.produtoId);
 
-    const nomeNormalizado = (produto?.nome || "").trim().toLowerCase();
-    const unidadeNormalizada = (item.unidade || "").trim().toLowerCase();
+    const nomeNormalizado = normalizarTexto(produto?.nome || item.nome || "");
+    const unidadeNormalizada = normalizarTexto(item.unidade || "");
 
-    if (nomeNormalizado === "abacaxi") {
+    if (nomeNormalizado.includes("abacaxi")) {
       if (unidadeNormalizada.includes("grande")) {
-        const precoGrande = Number(produto?.precoAbacaxiGrande);
-        if (Number.isFinite(precoGrande) && precoGrande >= 0) {
+        const precoGrande = parsePreco(produto?.precoAbacaxiGrande, -1);
+        if (precoGrande > 0) {
           return precoGrande;
         }
       }
 
       if (unidadeNormalizada.includes("medio") || unidadeNormalizada.includes("médio")) {
-        const precoMedio = Number(produto?.precoAbacaxiMedio);
-        if (Number.isFinite(precoMedio) && precoMedio >= 0) {
+        const precoMedio = parsePreco(produto?.precoAbacaxiMedio, -1);
+        if (precoMedio > 0) {
           return precoMedio;
         }
       }
 
       if (unidadeNormalizada.includes("pequeno")) {
-        const precoPequeno = Number(produto?.precoAbacaxiPequeno);
-        if (Number.isFinite(precoPequeno) && precoPequeno >= 0) {
+        const precoPequeno = parsePreco(produto?.precoAbacaxiPequeno, -1);
+        if (precoPequeno > 0) {
           return precoPequeno;
         }
       }
+
+      const precoAbacaxiPadrao = parsePreco(produto?.preco, -1);
+      if (precoAbacaxiPadrao > 0) {
+        return precoAbacaxiPadrao;
+      }
+
+      return resolverPrecoFallbackPorNomeUnidade(produto?.nome || item.nome, item.unidade);
     }
 
-    const precoBanco = Number(produto?.preco) || 0;
+    const precoBanco = parsePreco(produto?.preco, 0);
     if (precoBanco > 0) {
       return precoBanco;
     }
@@ -173,13 +235,26 @@ const Carrinho = () => {
     return resolverPrecoFallbackPorNomeUnidade(item.nome, item.unidade);
   }, [produtosPorId]);
 
+  const getPrecoUnitarioSeguro = useCallback(
+    (item: CartItem) => {
+      const preco = resolverPrecoUnitarioItem(item);
+      return Number.isFinite(preco) && preco >= 0 ? preco : 0;
+    },
+    [resolverPrecoUnitarioItem],
+  );
+
+  const getSubtotalItem = useCallback(
+    (item: CartItem) => getPrecoUnitarioSeguro(item) * item.quantidade,
+    [getPrecoUnitarioSeguro],
+  );
+
   const valorTotalCarrinho = useMemo(
     () =>
       cartItems.reduce(
-        (total, item) => total + resolverPrecoUnitarioItem(item) * item.quantidade,
+        (total, item) => total + getSubtotalItem(item),
         0,
       ),
-    [cartItems, resolverPrecoUnitarioItem],
+    [cartItems, getSubtotalItem],
   );
 
   const enderecoLabel = (endereco: Endereco) => {
@@ -335,6 +410,13 @@ const Carrinho = () => {
     }
   };
 
+  const cancelarBuscaCepPendente = () => {
+    if (cepLookupTimeoutRef.current !== null) {
+      window.clearTimeout(cepLookupTimeoutRef.current);
+      cepLookupTimeoutRef.current = null;
+    }
+  };
+
   const buscarEnderecoPorCep = async (cepDigitado: string) => {
     setAjudaCepAtiva(false);
     const apenasNumeros = cepDigitado.replace(/\D/g, "");
@@ -344,37 +426,21 @@ const Carrinho = () => {
       return;
     }
 
+    cancelarBuscaCepPendente();
+
     setLoadingCep(true);
     setCepError("");
     ultimoCepBuscadoRef.current = apenasNumeros;
 
     try {
-      let ruaEncontrada = "";
-      let cidadeEncontrada = "";
+      const dataViaCep = await apiRequest<ViaCepResponse>(`/enderecos/cep/${apenasNumeros}`);
 
-      try {
-        const responseViaCep = await fetch(`https://viacep.com.br/ws/${apenasNumeros}/json/`);
-        if (responseViaCep.ok) {
-          const dataViaCep = (await responseViaCep.json()) as ViaCepResponse;
-
-          if (!dataViaCep.erro) {
-            ruaEncontrada = dataViaCep.logradouro?.trim() ?? "";
-            cidadeEncontrada = dataViaCep.localidade?.trim() ?? "";
-          }
-        }
-      } catch {
-        ruaEncontrada = "";
-        cidadeEncontrada = "";
+      if (ultimoCepBuscadoRef.current !== apenasNumeros) {
+        return;
       }
 
-      if (!ruaEncontrada && !cidadeEncontrada) {
-        const responseBrasilApi = await fetch(`https://brasilapi.com.br/api/cep/v1/${apenasNumeros}`);
-        if (responseBrasilApi.ok) {
-          const dataBrasilApi = (await responseBrasilApi.json()) as BrasilApiCepResponse;
-          ruaEncontrada = dataBrasilApi.street?.trim() ?? "";
-          cidadeEncontrada = dataBrasilApi.city?.trim() ?? "";
-        }
-      }
+      const ruaEncontrada = dataViaCep.rua?.trim() ?? "";
+      const cidadeEncontrada = dataViaCep.cidade?.trim() ?? "";
 
       if (!ruaEncontrada && !cidadeEncontrada) {
         setCepError("CEP não encontrado. Verifique e tente novamente.");
@@ -388,8 +454,12 @@ const Carrinho = () => {
       if (cidadeEncontrada) {
         setCidade(cidadeEncontrada);
       }
-    } catch {
-      setCepError("Falha ao buscar CEP. Tente novamente.");
+    } catch (lookupError) {
+      setCepError(
+        lookupError instanceof Error
+          ? lookupError.message
+          : "Falha ao buscar CEP. Tente novamente.",
+      );
     } finally {
       setLoadingCep(false);
     }
@@ -422,11 +492,18 @@ const Carrinho = () => {
     }
 
     if (apenasNumeros.length === 8 && ultimoCepBuscadoRef.current !== apenasNumeros) {
-      void buscarEnderecoPorCep(cepFormatado);
+      if (cepLookupTimeoutRef.current !== null) {
+        window.clearTimeout(cepLookupTimeoutRef.current);
+      }
+
+      cepLookupTimeoutRef.current = window.setTimeout(() => {
+        void buscarEnderecoPorCep(cepFormatado);
+      }, 350);
     }
   };
 
   const limparFormularioEndereco = () => {
+    cancelarBuscaCepPendente();
     setRua("");
     setNumero("");
     setCidade("");
@@ -437,6 +514,12 @@ const Carrinho = () => {
     setEnderecoFormSuccess("");
     setEditingEnderecoId(null);
   };
+
+  useEffect(() => {
+    return () => {
+      cancelarBuscaCepPendente();
+    };
+  }, []);
 
   const iniciarEdicaoEndereco = (endereco: Endereco) => {
     setEditingEnderecoId(endereco.id);
@@ -593,9 +676,14 @@ const Carrinho = () => {
                       className="rounded-lg border border-border bg-background p-3 flex flex-wrap items-center justify-between gap-2"
                     >
                       <div>
-                        <span className="text-sm text-foreground font-medium">{item.nome} ({item.unidade})</span>
+                        <span className="text-sm text-foreground font-medium">
+                          {formatarNomeProduto(item.nome)} ({formatarUnidadeItem(item.unidade, item.nome)})
+                        </span>
                         <p className="text-xs text-muted-foreground mt-1">
-                          Subtotal: {formatarMoeda(resolverPrecoUnitarioItem(item) * item.quantidade)}
+                          Valor unitário: {formatarMoeda(getPrecoUnitarioSeguro(item))}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Subtotal: {formatarMoeda(getSubtotalItem(item))}
                         </p>
                       </div>
                       <div className="flex items-center gap-2">
@@ -791,6 +879,7 @@ const Carrinho = () => {
               <button
                 type="button"
                 onClick={() => {
+                  cancelarBuscaCepPendente();
                   setAjudaCepAtiva(true);
                   setCep("");
                   setCepError("");

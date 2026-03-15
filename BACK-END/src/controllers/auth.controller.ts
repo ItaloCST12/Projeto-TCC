@@ -32,8 +32,12 @@ export const register = async (req: Request, res: Response) => {
       return res.status(400).json({ error: "Senha é obrigatória" });
     }
 
-    if (!/^[a-zA-Z0-9]{1,8}$/.test(String(senhaFinal))) {
-      return res.status(400).json({ error: "Senha deve ter até 8 caracteres alfanuméricos" });
+    if (String(senhaFinal).length < 8) {
+      return res.status(400).json({ error: "Senha deve ter no mínimo 8 caracteres" });
+    }
+
+    if (String(senhaFinal).length > 128) {
+      return res.status(400).json({ error: "Senha deve ter no máximo 128 caracteres" });
     }
 
     if (!telefone || String(telefone).trim() === "") {
@@ -99,8 +103,12 @@ export const forgotPassword = async (req: Request, res: Response) => {
       return res.status(400).json({ error: "Nova senha é obrigatória" });
     }
 
-    if (!/^[a-zA-Z0-9]{1,8}$/.test(String(senhaFinal))) {
-      return res.status(400).json({ error: "A nova senha deve ter até 8 caracteres alfanuméricos" });
+    if (String(senhaFinal).length < 8) {
+      return res.status(400).json({ error: "A nova senha deve ter no mínimo 8 caracteres" });
+    }
+
+    if (String(senhaFinal).length > 128) {
+      return res.status(400).json({ error: "A nova senha deve ter no máximo 128 caracteres" });
     }
 
     const senhaHash = await bcrypt.hash(senhaFinal, 10);
