@@ -435,6 +435,7 @@ export class PedidoService {
               id: true,
               nome: true,
               email: true,
+              telefone: true,
             },
           },
         },
@@ -586,6 +587,82 @@ export class PedidoService {
       where: { id },
       data: { status: "COMPLETADO" },
     });
+  }
+
+  async marcarPedidoProntoParaRetirada(id: number) {
+    const pedido = await prisma.pedido.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        status: true,
+        tipoEntrega: true,
+      },
+    });
+
+    if (!pedido) {
+      throw new Error("Pedido não encontrado");
+    }
+
+    if ((pedido.tipoEntrega || "").trim().toLowerCase() !== "retirada") {
+      throw new Error("Apenas pedidos de retirada podem ser marcados como prontos");
+    }
+
+    if (pedido.status === "COMPLETADO") {
+      throw new Error("Pedido já foi finalizado");
+    }
+
+    if (pedido.status === "CANCELADO") {
+      throw new Error("Não é possível alterar um pedido cancelado");
+    }
+
+    if (pedido.status === "PRONTO_PARA_RETIRADA") {
+      return pedido;
+    }
+
+    const pedidoAtualizado = await prisma.pedido.update({
+      where: { id },
+      data: { status: "PRONTO_PARA_RETIRADA" },
+    });
+
+    return pedidoAtualizado;
+  }
+
+  async marcarPedidoSaiuParaEntrega(id: number) {
+    const pedido = await prisma.pedido.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        status: true,
+        tipoEntrega: true,
+      },
+    });
+
+    if (!pedido) {
+      throw new Error("Pedido não encontrado");
+    }
+
+    if ((pedido.tipoEntrega || "").trim().toLowerCase() !== "entrega") {
+      throw new Error("Apenas pedidos de entrega em domicílio podem sair para entrega");
+    }
+
+    if (pedido.status === "COMPLETADO") {
+      throw new Error("Pedido já foi finalizado");
+    }
+
+    if (pedido.status === "CANCELADO") {
+      throw new Error("Não é possível alterar um pedido cancelado");
+    }
+
+    if (pedido.status === "SAIU_PARA_ENTREGA") {
+      return pedido;
+    }
+
+    const pedidoAtualizado = await prisma.pedido.update({
+      where: { id },
+      data: { status: "SAIU_PARA_ENTREGA" },
+    });
+
+    return pedidoAtualizado;
   }
 
   async cancelarPedidoUsuario(usuarioId: number, id: number) {

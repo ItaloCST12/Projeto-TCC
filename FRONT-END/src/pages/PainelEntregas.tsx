@@ -24,16 +24,22 @@ type PedidoAdmin = {
     unidade: string;
     produto?: { nome: string };
   }[];
-  usuario?: { nome?: string | null; email: string };
+  usuario?: { nome?: string | null; email: string; telefone?: string | null };
+  endereco?: {
+    rua: string;
+    numero?: string | null;
+    cidade: string;
+    cep: string;
+  } | null;
 };
 
 type ProdutoAdmin = {
   id: number;
   nome: string;
-  preco: number;
-  precoAbacaxiGrande?: number | null;
-  precoAbacaxiMedio?: number | null;
-  precoAbacaxiPequeno?: number | null;
+  preco: number | string | null;
+  precoAbacaxiGrande?: number | string | null;
+  precoAbacaxiMedio?: number | string | null;
+  precoAbacaxiPequeno?: number | string | null;
   disponivel: boolean;
   imagemUrl?: string | null;
 };
@@ -114,12 +120,84 @@ const formatarData = (valor?: string) => {
   }).format(parsed);
 };
 
+const ENDERECO_LOJA_RETIRADA = "R. Pastor Sozinho, 3071 - Provedor, Santana - AP, 68927-078";
+
 const resolverDataPedido = (pedido: PedidoAdmin) => pedido.createdAt ?? pedido.created_at;
 const resolverDataVenda = (venda: VendaControle) => venda.createdAt ?? venda.created_at;
+const normalizarTipoEntrega = (tipoEntrega?: string) => (tipoEntrega ?? "").trim().toLowerCase();
+const isRetirada = (pedido: PedidoAdmin) => normalizarTipoEntrega(pedido.tipoEntrega) === "retirada";
+const isEntregaDomicilio = (pedido: PedidoAdmin) => normalizarTipoEntrega(pedido.tipoEntrega) === "entrega";
+
+const formatarTipoEntrega = (tipoEntrega?: string) => {
+  const tipoNormalizado = normalizarTipoEntrega(tipoEntrega);
+
+  if (tipoNormalizado === "retirada") {
+    return "Retirada no local";
+  }
+
+  if (tipoNormalizado === "entrega") {
+    return "Entrega em domicílio";
+  }
+
+  return tipoEntrega || "-";
+};
+
+const formatarStatusPedido = (status?: string) => {
+  const statusNormalizado = (status ?? "").trim().toUpperCase();
+
+  if (statusNormalizado === "PENDENTE") {
+    return "Pendente";
+  }
+  if (statusNormalizado === "PRONTO_PARA_RETIRADA") {
+    return "Pronto para retirada";
+  }
+  if (statusNormalizado === "SAIU_PARA_ENTREGA") {
+    return "Saiu para entrega";
+  }
+  if (statusNormalizado === "COMPLETADO") {
+    return "Encomenda entregue";
+  }
+  if (statusNormalizado === "CANCELADO") {
+    return "Cancelado";
+  }
+
+  return status || "-";
+};
+
+const formatarEnderecoEntrega = (pedido: PedidoAdmin) => {
+  const endereco = pedido.endereco;
+
+  if (!endereco) {
+    return "Endereço não informado";
+  }
+
+  const numero = endereco.numero?.trim() ? `, ${endereco.numero.trim()}` : "";
+  return `${endereco.rua}${numero} - ${endereco.cidade} - CEP ${endereco.cep}`;
+};
+
 const formatarMoeda = (valor: number | string) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(
     Number(valor) || 0,
   );
+
+const parsePrecoParaExibicao = (valor: number | string | null | undefined, fallback = 0) => {
+  if (typeof valor === "number") {
+    return Number.isFinite(valor) ? valor : fallback;
+  }
+
+  if (typeof valor === "string") {
+    const texto = valor.trim();
+    if (!texto) {
+      return fallback;
+    }
+
+    const normalizado = texto.replace(/\./g, "").replace(",", ".");
+    const convertido = Number(normalizado);
+    return Number.isFinite(convertido) ? convertido : fallback;
+  }
+
+  return fallback;
+};
 
 const obterItensPedido = (pedido: PedidoAdmin) => {
   if (pedido.items && pedido.items.length > 0) {
@@ -138,22 +216,6 @@ const obterItensPedido = (pedido: PedidoAdmin) => {
   }
 
   return [];
-};
-
-const resumirItensPedido = (pedido: PedidoAdmin) => {
-  const itens = obterItensPedido(pedido);
-  if (itens.length === 0) {
-    return "-";
-  }
-
-  const primeiroItem = itens[0];
-  const nomePrimeiroItem = primeiroItem?.produto?.nome ?? "Produto";
-
-  if (itens.length === 1) {
-    return nomePrimeiroItem;
-  }
-
-  return `${nomePrimeiroItem} +${itens.length - 1}`;
 };
 
 const totalQuantidadePedido = (pedido: PedidoAdmin) =>
@@ -205,6 +267,8 @@ const PainelEntregas = () => {
   const [errorUsuarios, setErrorUsuarios] = useState("");
 
   const [updatingId, setUpdatingId] = useState<number | null>(null);
+  const [updatingRetiradaId, setUpdatingRetiradaId] = useState<number | null>(null);
+  const [updatingSaidaEntregaId, setUpdatingSaidaEntregaId] = useState<number | null>(null);
   const [updatingProdutoId, setUpdatingProdutoId] = useState<number | null>(null);
   const [abaAtiva, setAbaAtiva] = useState<"entregas" | "produtos" | "usuarios" | "vendas">("produtos");
 
@@ -227,7 +291,7 @@ const PainelEntregas = () => {
   const [totalPaginasPedidos, setTotalPaginasPedidos] = useState(1);
   const [totalPedidos, setTotalPedidos] = useState(0);
   const [dataFiltroPedidos, setDataFiltroPedidos] = useState("");
-  const [buscaFrutaEntrega, setBuscaFrutaEntrega] = useState("");
+  const [filtroTipoEntrega, setFiltroTipoEntrega] = useState<"todos" | "entrega" | "retirada">("todos");
   const [loadingVendas, setLoadingVendas] = useState(false);
   const [errorVendas, setErrorVendas] = useState("");
   const [vendas, setVendas] = useState<VendaControle[]>([]);
@@ -450,34 +514,27 @@ const PainelEntregas = () => {
     });
   }, [usuarios, buscaUsuario]);
 
-  const opcoesFrutaEntrega = useMemo(() => {
-    const nomes = new Set<string>();
-
-    pedidos.forEach((pedido) => {
-      obterItensPedido(pedido).forEach((item) => {
-        const nome = (item.produto?.nome ?? "").trim();
-        if (nome && nome.toLowerCase() !== "abacate") {
-          nomes.add(nome);
-        }
-      });
-    });
-
-    return Array.from(nomes).sort((a, b) => a.localeCompare(b, "pt-BR"));
-  }, [pedidos]);
-
-  const pedidosFiltradosPorFruta = useMemo(() => {
-    const termo = buscaFrutaEntrega.trim().toLowerCase();
-
-    if (!termo) {
-      return pedidos;
+  const pedidosFiltradosPorTipo = useMemo(() => {
+    if (filtroTipoEntrega === "entrega") {
+      return pedidos.filter((pedido) => isEntregaDomicilio(pedido));
     }
 
-    return pedidos.filter((pedido) =>
-      obterItensPedido(pedido).some((item) =>
-        (item.produto?.nome ?? "").trim().toLowerCase() === termo,
-      ),
-    );
-  }, [pedidos, buscaFrutaEntrega]);
+    if (filtroTipoEntrega === "retirada") {
+      return pedidos.filter((pedido) => isRetirada(pedido));
+    }
+
+    return pedidos;
+  }, [pedidos, filtroTipoEntrega]);
+
+  const pedidosEntregaDomicilio = useMemo(
+    () => pedidosFiltradosPorTipo.filter((pedido) => isEntregaDomicilio(pedido)),
+    [pedidosFiltradosPorTipo],
+  );
+
+  const pedidosRetirada = useMemo(
+    () => pedidosFiltradosPorTipo.filter((pedido) => isRetirada(pedido)),
+    [pedidosFiltradosPorTipo],
+  );
 
   const finalizarPedido = async (id: number) => {
     setUpdatingId(id);
@@ -493,6 +550,40 @@ const PainelEntregas = () => {
       );
     } finally {
       setUpdatingId(null);
+    }
+  };
+
+  const marcarPedidoProntoParaRetirada = async (id: number) => {
+    setUpdatingRetiradaId(id);
+    setErrorPedidos("");
+    try {
+      await apiRequest(`/pedidos/${id}/pronto-retirada`, { method: "PATCH" });
+      await loadPedidos(paginaPedidos);
+    } catch (updateError) {
+      setErrorPedidos(
+        updateError instanceof Error
+          ? updateError.message
+          : "Não foi possível marcar o pedido como pronto para retirada.",
+      );
+    } finally {
+      setUpdatingRetiradaId(null);
+    }
+  };
+
+  const marcarPedidoSaiuParaEntrega = async (id: number) => {
+    setUpdatingSaidaEntregaId(id);
+    setErrorPedidos("");
+    try {
+      await apiRequest(`/pedidos/${id}/saiu-entrega`, { method: "PATCH" });
+      await loadPedidos(paginaPedidos);
+    } catch (updateError) {
+      setErrorPedidos(
+        updateError instanceof Error
+          ? updateError.message
+          : "Não foi possível marcar o pedido como saiu para entrega.",
+      );
+    } finally {
+      setUpdatingSaidaEntregaId(null);
     }
   };
 
@@ -540,7 +631,10 @@ const PainelEntregas = () => {
   };
 
   const getPrecoEditado = (produto: ProdutoAdmin) => {
-    return precoEditadoPorProduto[produto.id] ?? String(Number(produto.preco).toFixed(2));
+    return (
+      precoEditadoPorProduto[produto.id] ??
+      String(parsePrecoParaExibicao(produto.preco, 0).toFixed(2))
+    );
   };
 
   const atualizarPrecoProduto = async (produto: ProdutoAdmin) => {
@@ -582,9 +676,9 @@ const PainelEntregas = () => {
 
   const getPrecosAbacaxiEditados = (produto: ProdutoAdmin) => {
     const fallback = {
-      grande: String(Number(produto.precoAbacaxiGrande ?? 7).toFixed(2)),
-      medio: String(Number(produto.precoAbacaxiMedio ?? 5).toFixed(2)),
-      pequeno: String(Number(produto.precoAbacaxiPequeno ?? 3).toFixed(2)),
+      grande: String(parsePrecoParaExibicao(produto.precoAbacaxiGrande, 7).toFixed(2)),
+      medio: String(parsePrecoParaExibicao(produto.precoAbacaxiMedio, 5).toFixed(2)),
+      pequeno: String(parsePrecoParaExibicao(produto.precoAbacaxiPequeno, 3).toFixed(2)),
     };
 
     return precoAbacaxiEditadoPorProduto[produto.id] ?? fallback;
@@ -889,16 +983,15 @@ const PainelEntregas = () => {
 
             <div className="mb-4">
               <select
-                value={buscaFrutaEntrega}
-                onChange={(event) => setBuscaFrutaEntrega(event.target.value)}
+                value={filtroTipoEntrega}
+                onChange={(event) =>
+                  setFiltroTipoEntrega(event.target.value as "todos" | "entrega" | "retirada")
+                }
                 className="w-full rounded-lg border border-border bg-background px-3 py-2 text-foreground"
               >
-                <option value="">Todas as frutas</option>
-                {opcoesFrutaEntrega.map((fruta) => (
-                  <option key={fruta} value={fruta}>
-                    {fruta}
-                  </option>
-                ))}
+                <option value="todos">Todos os pedidos</option>
+                <option value="entrega">Apenas entrega em domicílio</option>
+                <option value="retirada">Apenas retirada no local</option>
               </select>
             </div>
 
@@ -907,62 +1000,217 @@ const PainelEntregas = () => {
             ) : (
               <>
                 {errorPedidos && <p className="text-sm text-destructive mb-4">{errorPedidos}</p>}
-                {pedidosFiltradosPorFruta.length === 0 ? (
+                {pedidosFiltradosPorTipo.length === 0 ? (
                   <p className="text-muted-foreground">Nenhum pedido encontrado.</p>
                 ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-border text-left">
-                          <th className="py-2 pr-2">Pedido</th>
-                          <th className="py-2 pr-2">Cliente</th>
-                          <th className="py-2 pr-2">Produto</th>
-                          <th className="py-2 pr-2">Qtd total</th>
-                          <th className="py-2 pr-2">Entrega</th>
-                          <th className="py-2 pr-2">Pagamento</th>
-                          <th className="py-2 pr-2">Data</th>
-                          <th className="py-2 pr-2">Status</th>
-                          <th className="py-2">Ação</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {pedidosFiltradosPorFruta.map((pedido) => (
-                          <tr key={pedido.id} className="border-b border-border/70">
-                            <td className="py-2 pr-2">#{pedido.id}</td>
-                            <td className="py-2 pr-2">{pedido.usuario?.nome || pedido.usuario?.email || "-"}</td>
-                            <td className="py-2 pr-2">
-                              <details>
-                                <summary className="cursor-pointer select-none text-foreground">
-                                  {resumirItensPedido(pedido)}
-                                </summary>
-                                <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
+                  <div className="space-y-4">
+                    {(filtroTipoEntrega === "todos" || filtroTipoEntrega === "entrega") && (
+                    <div className="rounded-xl border border-border bg-background p-3 sm:p-4">
+                      <div className="flex items-center justify-between gap-2 mb-3">
+                        <h3 className="text-lg font-semibold text-foreground">Entrega em domicílio</h3>
+                        <span className="text-xs rounded-full border border-border px-2 py-1 text-muted-foreground">
+                          {pedidosEntregaDomicilio.length} pedidos
+                        </span>
+                      </div>
+
+                      {pedidosEntregaDomicilio.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">Nenhum pedido de entrega em domicílio.</p>
+                      ) : (
+                        <div className="space-y-3">
+                          {pedidosEntregaDomicilio.map((pedido) => (
+                            <article key={pedido.id} className="rounded-lg border border-border/80 p-3 sm:p-4">
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <p className="font-semibold text-foreground">Pedido #{pedido.id}</p>
+                                <span className="text-xs rounded-full bg-muted px-2 py-1 text-foreground">
+                                  {formatarStatusPedido(pedido.status)}
+                                </span>
+                              </div>
+
+                              <div className="mt-3 grid sm:grid-cols-2 gap-3 text-sm">
+                                <div>
+                                  <p className="text-xs text-muted-foreground">Cliente</p>
+                                  <p className="text-foreground font-medium">
+                                    {pedido.usuario?.nome || pedido.usuario?.email || "-"}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-xs text-muted-foreground">Telefone</p>
+                                  <p className="text-foreground">{pedido.usuario?.telefone || "-"}</p>
+                                </div>
+                                <div>
+                                  <p className="text-xs text-muted-foreground">Forma de pagamento</p>
+                                  <p className="text-foreground">{pedido.formaPagamento}</p>
+                                </div>
+                                <div>
+                                  <p className="text-xs text-muted-foreground">Data do pedido</p>
+                                  <p className="text-foreground">{formatarData(resolverDataPedido(pedido))}</p>
+                                </div>
+                              </div>
+
+                              <div className="mt-3">
+                                <p className="text-xs text-muted-foreground mb-1">Produtos encomendados</p>
+                                <ul className="space-y-1">
                                   {obterItensPedido(pedido).map((item) => (
-                                    <li key={item.id}>
-                                      {(item.produto?.nome ?? "Produto")} — {item.quantidade} {item.unidade}
+                                    <li key={item.id} className="flex items-center justify-between gap-2 text-sm">
+                                      <span className="text-foreground">{item.produto?.nome ?? "Produto"}</span>
+                                      <span className="text-muted-foreground">
+                                        {item.quantidade} {item.unidade}
+                                      </span>
                                     </li>
                                   ))}
                                 </ul>
-                              </details>
-                            </td>
-                            <td className="py-2 pr-2">{totalQuantidadePedido(pedido)}</td>
-                            <td className="py-2 pr-2">{pedido.tipoEntrega}</td>
-                            <td className="py-2 pr-2">{pedido.formaPagamento}</td>
-                            <td className="py-2 pr-2">{formatarData(resolverDataPedido(pedido))}</td>
-                            <td className="py-2 pr-2">{pedido.status}</td>
-                            <td className="py-2">
-                              <button
-                                type="button"
-                                disabled={pedido.status === "COMPLETADO" || updatingId === pedido.id}
-                                onClick={() => finalizarPedido(pedido.id)}
-                                className="inline-flex items-center px-3 py-1 rounded-md bg-primary text-primary-foreground disabled:opacity-50"
-                              >
-                                {updatingId === pedido.id ? "Finalizando..." : "Finalizar"}
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                              </div>
+
+                              <div className="mt-3 rounded-md bg-muted/70 p-2">
+                                <p className="text-xs text-muted-foreground">Endereço de entrega</p>
+                                <p className="text-sm text-foreground">{formatarEnderecoEntrega(pedido)}</p>
+                              </div>
+
+                              <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                                <p className="text-xs text-muted-foreground">
+                                  {formatarTipoEntrega(pedido.tipoEntrega)} • {totalQuantidadePedido(pedido)} item(ns)
+                                </p>
+                                <div className="flex w-full sm:w-auto gap-2">
+                                  <button
+                                    type="button"
+                                    disabled={
+                                      pedido.status === "SAIU_PARA_ENTREGA" ||
+                                      pedido.status === "COMPLETADO" ||
+                                      pedido.status === "CANCELADO" ||
+                                      updatingSaidaEntregaId === pedido.id
+                                    }
+                                    onClick={() => marcarPedidoSaiuParaEntrega(pedido.id)}
+                                    className="inline-flex items-center justify-center px-3 py-2 rounded-md border border-border text-foreground text-sm font-semibold disabled:opacity-50"
+                                  >
+                                    {updatingSaidaEntregaId === pedido.id
+                                      ? "Atualizando..."
+                                      : "Saiu para entrega"}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={
+                                      pedido.status !== "SAIU_PARA_ENTREGA" ||
+                                      pedido.status === "COMPLETADO" ||
+                                      pedido.status === "CANCELADO" ||
+                                      updatingId === pedido.id
+                                    }
+                                    onClick={() => finalizarPedido(pedido.id)}
+                                    className="inline-flex items-center justify-center px-3 py-2 rounded-md bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-50"
+                                  >
+                                    {updatingId === pedido.id ? "Finalizando..." : "Finalizar entrega"}
+                                  </button>
+                                </div>
+                              </div>
+                            </article>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    )}
+
+                    {(filtroTipoEntrega === "todos" || filtroTipoEntrega === "retirada") && (
+                    <div className="rounded-xl border border-border bg-background p-3 sm:p-4">
+                      <div className="flex items-center justify-between gap-2 mb-3">
+                        <h3 className="text-lg font-semibold text-foreground">Retirada no local</h3>
+                        <span className="text-xs rounded-full border border-border px-2 py-1 text-muted-foreground">
+                          {pedidosRetirada.length} pedidos
+                        </span>
+                      </div>
+
+                      {pedidosRetirada.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">Nenhum pedido para retirada.</p>
+                      ) : (
+                        <div className="space-y-3">
+                          {pedidosRetirada.map((pedido) => (
+                            <article key={pedido.id} className="rounded-lg border border-border/80 p-3 sm:p-4">
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <p className="font-semibold text-foreground">Pedido #{pedido.id}</p>
+                                <span className="text-xs rounded-full bg-muted px-2 py-1 text-foreground">
+                                  {formatarStatusPedido(pedido.status)}
+                                </span>
+                              </div>
+
+                              <div className="mt-3 grid sm:grid-cols-2 gap-3 text-sm">
+                                <div>
+                                  <p className="text-xs text-muted-foreground">Cliente</p>
+                                  <p className="text-foreground font-medium">
+                                    {pedido.usuario?.nome || pedido.usuario?.email || "-"}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-xs text-muted-foreground">Telefone</p>
+                                  <p className="text-foreground">{pedido.usuario?.telefone || "-"}</p>
+                                </div>
+                                <div>
+                                  <p className="text-xs text-muted-foreground">Forma de pagamento</p>
+                                  <p className="text-foreground">{pedido.formaPagamento}</p>
+                                </div>
+                                <div>
+                                  <p className="text-xs text-muted-foreground">Data do pedido</p>
+                                  <p className="text-foreground">{formatarData(resolverDataPedido(pedido))}</p>
+                                </div>
+                              </div>
+
+                              <div className="mt-3">
+                                <p className="text-xs text-muted-foreground mb-1">Produtos encomendados</p>
+                                <ul className="space-y-1">
+                                  {obterItensPedido(pedido).map((item) => (
+                                    <li key={item.id} className="flex items-center justify-between gap-2 text-sm">
+                                      <span className="text-foreground">{item.produto?.nome ?? "Produto"}</span>
+                                      <span className="text-muted-foreground">
+                                        {item.quantidade} {item.unidade}
+                                      </span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+
+                              <div className="mt-3 rounded-md bg-muted/70 p-2">
+                                <p className="text-xs text-muted-foreground">Local de retirada</p>
+                                <p className="text-sm text-foreground">{ENDERECO_LOJA_RETIRADA}</p>
+                              </div>
+
+                              <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                                <p className="text-xs text-muted-foreground">
+                                  {formatarTipoEntrega(pedido.tipoEntrega)} • {totalQuantidadePedido(pedido)} item(ns)
+                                </p>
+                                <div className="flex w-full sm:w-auto gap-2">
+                                  <button
+                                    type="button"
+                                    disabled={
+                                      pedido.status === "PRONTO_PARA_RETIRADA" ||
+                                      pedido.status === "COMPLETADO" ||
+                                      pedido.status === "CANCELADO" ||
+                                      updatingRetiradaId === pedido.id
+                                    }
+                                    onClick={() => marcarPedidoProntoParaRetirada(pedido.id)}
+                                    className="inline-flex items-center justify-center px-3 py-2 rounded-md bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-50"
+                                  >
+                                    {updatingRetiradaId === pedido.id
+                                      ? "Atualizando..."
+                                      : "Pronto para retirada"}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={
+                                      pedido.status !== "PRONTO_PARA_RETIRADA" ||
+                                      pedido.status === "COMPLETADO" ||
+                                      pedido.status === "CANCELADO" ||
+                                      updatingId === pedido.id
+                                    }
+                                    onClick={() => finalizarPedido(pedido.id)}
+                                    className="inline-flex items-center justify-center px-3 py-2 rounded-md border border-border text-foreground text-sm font-semibold disabled:opacity-50"
+                                  >
+                                    {updatingId === pedido.id ? "Finalizando..." : "Finalizar retirada"}
+                                  </button>
+                                </div>
+                              </div>
+                            </article>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    )}
                   </div>
                 )}
 
@@ -1294,6 +1542,9 @@ const PainelEntregas = () => {
                       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                         <div>
                           <p className="font-semibold text-foreground">{produto.nome}</p>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            Preço atual: {formatarMoeda(parsePrecoParaExibicao(produto.preco, 0))}
+                          </p>
                           <div className="mt-1 flex items-center gap-2">
                             <span className="text-xs text-muted-foreground">ID: {produto.id}</span>
                             <span

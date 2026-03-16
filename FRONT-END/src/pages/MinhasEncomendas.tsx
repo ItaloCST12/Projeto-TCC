@@ -48,6 +48,8 @@ type RespostaPaginada<T> = {
   };
 };
 
+const ENDERECO_LOJA_RETIRADA = "R. Pastor Sozinho, 3071 - Provedor, Santana - AP, 68927-078";
+
 const formatarData = (data?: string) => {
   if (!data) {
     return null;
@@ -65,6 +67,59 @@ const formatarData = (data?: string) => {
 };
 
 const resolverDataPedido = (pedido: Pedido) => pedido.createdAt ?? pedido.created_at;
+
+const normalizarTipoEntrega = (tipoEntrega?: string) => (tipoEntrega ?? "").trim().toLowerCase();
+
+const isRetirada = (pedido: Pedido) => normalizarTipoEntrega(pedido.tipoEntrega) === "retirada";
+
+const isProntoParaRetirada = (pedido: Pedido) =>
+  (pedido.status ?? "").trim().toUpperCase() === "PRONTO_PARA_RETIRADA";
+
+const isSaiuParaEntrega = (pedido: Pedido) =>
+  (pedido.status ?? "").trim().toUpperCase() === "SAIU_PARA_ENTREGA";
+
+const isConcluido = (pedido: Pedido) =>
+  (pedido.status ?? "").trim().toUpperCase() === "COMPLETADO";
+
+const formatarTipoEntrega = (tipoEntrega?: string) => {
+  const tipoNormalizado = normalizarTipoEntrega(tipoEntrega);
+
+  if (tipoNormalizado === "retirada") {
+    return "Retirada no local";
+  }
+
+  if (tipoNormalizado === "entrega") {
+    return "Entrega em domicílio";
+  }
+
+  return tipoEntrega || "-";
+};
+
+const formatarStatusPedido = (status?: string) => {
+  const statusNormalizado = (status ?? "").trim().toUpperCase();
+
+  if (statusNormalizado === "PENDENTE") {
+    return "Pendente";
+  }
+
+  if (statusNormalizado === "PRONTO_PARA_RETIRADA") {
+    return "Pronto para retirada";
+  }
+
+  if (statusNormalizado === "SAIU_PARA_ENTREGA") {
+    return "Saiu para entrega";
+  }
+
+  if (statusNormalizado === "COMPLETADO") {
+    return "Encomenda entregue";
+  }
+
+  if (statusNormalizado === "CANCELADO") {
+    return "Cancelado";
+  }
+
+  return status || "-";
+};
 
 const MinhasEncomendas = () => {
   const authenticated = isAuthenticated();
@@ -244,15 +299,21 @@ const MinhasEncomendas = () => {
             <ul className="space-y-3">
               {pedidos.map((pedido) => {
                 const dataFormatada = formatarData(resolverDataPedido(pedido));
-                const descricaoItens =
+                const itensPedido =
                   pedido.items && pedido.items.length > 0
                     ? pedido.items
-                        .map(
-                          (item) =>
-                            `${item.produto?.nome ?? "Produto"} (${item.quantidade} ${item.unidade ?? pedido.unidade})`,
-                        )
-                        .join(", ")
-                    : `${pedido.produto?.nome ?? "Produto"} (${pedido.quantidade} ${pedido.unidade})`;
+                    : [
+                        {
+                          id: -pedido.id,
+                          quantidade: pedido.quantidade,
+                          unidade: pedido.unidade,
+                          produto: { nome: pedido.produto?.nome ?? "Produto" },
+                        },
+                      ];
+                const totalItensPedido = itensPedido.reduce(
+                  (total, item) => total + (Number(item.quantidade) || 0),
+                  0,
+                );
 
                 return (
                   <li
@@ -264,17 +325,67 @@ const MinhasEncomendas = () => {
                         Pedido #{pedido.id}
                       </p>
                       <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-muted text-muted-foreground text-xs font-semibold">
-                        {pedido.status}
+                        {formatarStatusPedido(pedido.status)}
                       </span>
                     </div>
 
-                    <p className="text-sm text-foreground">{descricaoItens}</p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Entrega: {pedido.tipoEntrega} • Pagamento: {pedido.formaPagamento}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Data: {dataFormatada ?? "-"}
-                    </p>
+                    <div className="grid sm:grid-cols-2 gap-2 text-sm mb-3">
+                      <p className="text-muted-foreground">
+                        Entrega: <span className="text-foreground">{formatarTipoEntrega(pedido.tipoEntrega)}</span>
+                      </p>
+                      <p className="text-muted-foreground">
+                        Pagamento: <span className="text-foreground">{pedido.formaPagamento}</span>
+                      </p>
+                      <p className="text-muted-foreground">
+                        Data: <span className="text-foreground">{dataFormatada ?? "-"}</span>
+                      </p>
+                      <p className="text-muted-foreground">
+                        Itens: <span className="text-foreground">{totalItensPedido}</span>
+                      </p>
+                    </div>
+
+                    <div className="rounded-md border border-border/80 p-3">
+                      <p className="text-xs text-muted-foreground mb-2">Produtos encomendados</p>
+                      <ul className="space-y-1">
+                        {itensPedido.map((item) => (
+                          <li key={item.id} className="flex items-center justify-between gap-2 text-sm">
+                            <span className="text-foreground">{item.produto?.nome ?? "Produto"}</span>
+                            <span className="text-muted-foreground">
+                              {item.quantidade} {item.unidade ?? pedido.unidade}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    {isRetirada(pedido) && (
+                      <div className="mt-3 rounded-md bg-muted/70 p-3">
+                        <p className="text-xs text-muted-foreground">Local de retirada</p>
+                        <p className="text-sm text-foreground">{ENDERECO_LOJA_RETIRADA}</p>
+                      </div>
+                    )}
+
+                    {isRetirada(pedido) && isProntoParaRetirada(pedido) && !isConcluido(pedido) && (
+                      <div className="mt-3 rounded-md border border-emerald-300 bg-emerald-50 p-3">
+                        <p className="text-sm font-semibold text-emerald-800">
+                          Pedido pronto para retirada.
+                        </p>
+                        <p className="text-sm text-emerald-900 mt-1">
+                          Sua encomenda já está disponível. Dirija-se ao local de retirada para buscar o pedido.
+                        </p>
+                      </div>
+                    )}
+
+                    {isSaiuParaEntrega(pedido) && !isConcluido(pedido) && (
+                      <div className="mt-3 rounded-md border border-emerald-300 bg-emerald-50 p-3">
+                        <p className="text-sm font-semibold text-emerald-800">
+                          Pedido saiu para entrega.
+                        </p>
+                        <p className="text-sm text-emerald-900 mt-1">
+                          Sua encomenda está a caminho. Aguarde no endereço informado para recebimento.
+                        </p>
+                      </div>
+                    )}
 
                     {pedido.status !== "COMPLETADO" && pedido.status !== "CANCELADO" && (
                       <div className="mt-3">

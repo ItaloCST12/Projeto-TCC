@@ -1,5 +1,5 @@
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, Navigate } from "react-router-dom";
+import { Link, Navigate, useNavigate } from "react-router-dom";
 import { apiRequest } from "@/lib/api";
 import { getAuthUser, isAuthenticated } from "@/lib/auth";
 import {
@@ -151,6 +151,7 @@ type ViaCepResponse = {
 const Carrinho = () => {
   const authenticated = isAuthenticated();
   const user = getAuthUser();
+  const navigate = useNavigate();
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -399,6 +400,7 @@ const Carrinho = () => {
       setSuccess(
         `Encomenda finalizada com sucesso! Pedido #${pedidoCriado.id} criado com forma de pagamento ${pedidoCriado.formaPagamento}.`,
       );
+      navigate("/minhas-encomendas", { replace: true });
     } catch (submitError) {
       setError(
         submitError instanceof Error

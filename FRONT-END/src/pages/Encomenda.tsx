@@ -34,6 +34,14 @@ type ProdutoVisual = {
 
 const MAX_QUANTIDADE_POR_ITEM = 1000;
 
+const PRECO_PADRAO_PRODUTO: Record<string, number> = {
+  laranja: 50,
+  tangerina: 5,
+  limao: 60,
+  "limão": 60,
+  abacaxi: 5,
+};
+
 const PRODUTOS_VISUAIS = new Map<string, ProdutoVisual>([
   [
     "abacaxi",
@@ -115,7 +123,10 @@ const parsePreco = (valor: number | string | null | undefined, fallback = 0) => 
       return fallback;
     }
 
-    const normalizado = texto.replace(/\./g, "").replace(",", ".");
+    const temVirgula = texto.includes(",");
+    const normalizado = temVirgula
+      ? texto.replace(/\./g, "").replace(",", ".")
+      : texto;
     const convertido = Number(normalizado);
     return Number.isFinite(convertido) ? convertido : fallback;
   }
@@ -140,6 +151,11 @@ const resolverChaveVisualProduto = (nomeProduto: string) => {
   if (nome.includes("limao")) return "limao";
 
   return nome;
+};
+
+const resolverPrecoFallbackPorNome = (nomeProduto: string) => {
+  const nomeNormalizado = normalizarTexto(nomeProduto);
+  return PRECO_PADRAO_PRODUTO[nomeNormalizado] ?? 0;
 };
 
 const resolverImagemProduto = (imagemUrl: string | null | undefined, fallback: string) => {
@@ -262,7 +278,12 @@ const Encomenda = () => {
       return parsePrecoPositivo(produto.preco, 5);
     }
 
-    return parsePreco(produto.preco, 0);
+    const precoBanco = parsePreco(produto.preco, 0);
+    if (precoBanco > 0) {
+      return precoBanco;
+    }
+
+    return resolverPrecoFallbackPorNome(produto.nome);
   };
 
   const limparEdicaoQuantidade = (produtoId: number) => {

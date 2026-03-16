@@ -216,6 +216,40 @@ export const finalizarPedido = async (req: Request, res: Response) => {
   }
 };
 
+export const marcarPedidoProntoParaRetirada = async (req: Request, res: Response) => {
+  try {
+    const idParam = req.params.id;
+    if (!idParam) {
+      throw new Error("ID do pedido não fornecido");
+    }
+    const id = parseInt(idParam, 10);
+    if (isNaN(id)) {
+      throw new Error("ID inválido");
+    }
+    const pedido = await pedidoService.marcarPedidoProntoParaRetirada(id);
+    res.json(pedido);
+  } catch (error) {
+    res.status(400).json({ error: (error as Error).message });
+  }
+};
+
+export const marcarPedidoSaiuParaEntrega = async (req: Request, res: Response) => {
+  try {
+    const idParam = req.params.id;
+    if (!idParam) {
+      throw new Error("ID do pedido não fornecido");
+    }
+    const id = parseInt(idParam, 10);
+    if (isNaN(id)) {
+      throw new Error("ID inválido");
+    }
+    const pedido = await pedidoService.marcarPedidoSaiuParaEntrega(id);
+    res.json(pedido);
+  } catch (error) {
+    res.status(400).json({ error: (error as Error).message });
+  }
+};
+
 export const cancelarPedidoUsuario = async (req: Request, res: Response) => {
   try {
     const usuarioId = req.usuario?.usuarioId;

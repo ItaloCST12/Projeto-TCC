@@ -7,6 +7,8 @@ import {
   getControleVendas,
   getTodosPedidos,
   finalizarPedido,
+  marcarPedidoProntoParaRetirada,
+  marcarPedidoSaiuParaEntrega,
 } from "../controllers/pedido.controller";
 import { authMiddleware, adminMiddleware } from "../middleware/auth.middleware";
 
@@ -23,6 +25,18 @@ router.patch(
   authMiddleware,
   adminMiddleware,
   finalizarPedido,
+);
+router.patch(
+  "/:id/pronto-retirada",
+  authMiddleware,
+  adminMiddleware,
+  marcarPedidoProntoParaRetirada,
+);
+router.patch(
+  "/:id/saiu-entrega",
+  authMiddleware,
+  adminMiddleware,
+  marcarPedidoSaiuParaEntrega,
 );
 
 export default router;
