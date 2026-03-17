@@ -10,7 +10,7 @@ import {
   marcarPedidoProntoParaRetirada,
   marcarPedidoSaiuParaEntrega,
 } from "../controllers/pedido.controller";
-import { authMiddleware, adminMiddleware } from "../middleware/auth.middleware";
+import { authMiddleware, adminMiddleware } from "../middlewares/auth.middleware";
 
 const router = Router();
 

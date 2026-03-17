@@ -7,7 +7,7 @@ import {
   listarMinhasMensagens,
   responderComoSuporte,
 } from "../controllers/atendimento.controller";
-import { adminMiddleware, authMiddleware } from "../middleware/auth.middleware";
+import { adminMiddleware, authMiddleware } from "../middlewares/auth.middleware";
 
 const router = Router();
 

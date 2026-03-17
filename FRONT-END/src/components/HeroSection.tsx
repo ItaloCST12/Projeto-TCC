@@ -21,13 +21,13 @@ const HeroSection = () => {
 
       <div className="relative z-10 container mx-auto px-4 text-center">
         <h1
-          className="font-display text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-extrabold !text-white mb-6 animate-fade-in-up"
+          className="font-display text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-extrabold !text-white mb-6 animate-fade-in-up drop-shadow-[0_6px_18px_rgba(0,0,0,0.5)]"
         >
           Do campo à sua mesa,<br />
           <span className="!text-white">fresquinho e natural</span>
         </h1>
         <p
-          className="max-w-2xl mx-auto text-lg sm:text-xl text-primary-foreground/90 mb-8 animate-fade-in-up"
+          className="max-w-2xl mx-auto text-lg sm:text-xl text-primary-foreground mb-8 animate-fade-in-up drop-shadow-[0_3px_12px_rgba(0,0,0,0.45)]"
           style={{ animationDelay: "0.2s" }}
         >
          Há mais de 20 anos, a Fazenda Bispo leva frutas frescas e selecionadas direto do campo para sua família. Encomende laranjas, tangerinas, limões e abacaxis com qualidade e confiança desde 2002.
@@ -38,13 +38,13 @@ const HeroSection = () => {
         >
           <a
             href="#produtos"
-            className="inline-flex items-center justify-center px-8 py-3 rounded-lg bg-secondary text-secondary-foreground font-bold text-lg hover:opacity-90 transition-opacity"
+            className="inline-flex items-center justify-center px-8 py-3 rounded-lg bg-secondary text-secondary-foreground font-bold text-lg shadow-lg shadow-secondary/40 hover:-translate-y-[1px] hover:bg-secondary/95 transition-all"
           >
             Ver Produtos
           </a>
           <a
             href="#contato"
-            className="inline-flex items-center justify-center px-8 py-3 rounded-lg border-2 border-primary-foreground/50 text-primary-foreground font-bold text-lg hover:bg-primary-foreground/10 transition-colors"
+            className="inline-flex items-center justify-center px-8 py-3 rounded-lg border-2 border-accent text-white font-bold text-lg bg-black/15 hover:bg-accent/20 hover:-translate-y-[1px] transition-all"
           >
             Entrar em Contato
           </a>

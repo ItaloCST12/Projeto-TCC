@@ -1,5 +1,5 @@
 import { formasPagamentoDisponiveis } from "./pagamento.service";
-import prisma from "../prisma/client";
+import prisma from "../models/client";
 import { Prisma } from "@prisma/client";
 
 const MAX_QUANTIDADE_POR_ITEM = 1000;

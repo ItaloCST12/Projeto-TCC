@@ -51,7 +51,7 @@ const Navbar = () => {
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
-      <div className="container mx-auto h-20 px-4">
+      <div className="w-full h-20 px-4 lg:px-8">
         <div className="lg:hidden h-full flex items-center justify-between relative">
           <button
             className="text-foreground"
@@ -75,7 +75,7 @@ const Navbar = () => {
 
           <Link
             to={mobileCartTo}
-            className="relative inline-flex items-center justify-center h-9 w-9 rounded-lg border border-border bg-background text-foreground hover:bg-muted transition-colors"
+            className="relative inline-flex items-center justify-center h-9 w-9 rounded-lg border-2 border-primary/30 bg-background text-foreground hover:bg-accent/15 transition-colors"
             aria-label="Carrinho"
             title="Carrinho"
             onClick={() => setMobileOpen(false)}
@@ -89,7 +89,7 @@ const Navbar = () => {
           </Link>
         </div>
 
-        <div className="hidden lg:flex h-full items-center justify-between">
+        <div className="hidden lg:grid h-full grid-cols-[auto_1fr_auto] items-center gap-6">
           <a href="/#inicio" className="flex items-center gap-3 group">
             <img
               src={logoAbacaxi}
@@ -101,80 +101,76 @@ const Navbar = () => {
             </span>
           </a>
 
-          <div className="flex items-center gap-6">
-          <ul className="flex items-center gap-5">
-            {storeLinks.map((link) => (
-              <li key={link.href}>
+          <div className="flex items-center justify-center">
+            <div className="inline-flex items-center gap-2 rounded-xl border border-border bg-card/70 px-2 py-1">
+              {storeLinks.map((link) => (
                 <a
+                  key={link.href}
                   href={link.href}
-                  className="text-muted-foreground font-medium hover:text-primary transition-colors"
+                  className="inline-flex items-center px-3 py-1.5 rounded-md border border-transparent text-muted-foreground font-semibold hover:text-primary hover:border-primary/25 hover:bg-accent/10 transition-colors"
                 >
                   {link.label}
                 </a>
-              </li>
-            ))}
-          </ul>
+              ))}
 
-          <span className="h-5 w-px bg-border" />
+              <span className="h-5 w-px bg-border mx-1" />
 
-          <ul className="flex items-center gap-5">
-            {appLinks.map((link) => (
-              <li key={link.to}>
+              {appLinks.map((link) => (
                 <Link
+                  key={link.to}
                   to={link.to}
-                  className="text-muted-foreground font-medium hover:text-primary transition-colors"
+                  className="inline-flex items-center px-3 py-1.5 rounded-md border border-transparent text-muted-foreground font-semibold hover:text-primary hover:border-primary/25 hover:bg-accent/10 transition-colors"
                 >
                   {link.label}
                 </Link>
-              </li>
-            ))}
-          </ul>
+              ))}
 
-          {loggedIn && (
-            <Link
-              to="/carrinho"
-              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border text-foreground text-sm font-semibold hover:bg-muted transition-colors"
-            >
-              <ShoppingCart className="h-4 w-4" />
-              Carrinho
-              <span className="inline-flex items-center justify-center min-w-6 h-6 px-1 rounded-full bg-primary text-primary-foreground text-xs">
-                {cartTotalItems}
-              </span>
-            </Link>
-          )}
-        </div>
+              {loggedIn && (
+                <Link
+                  to="/carrinho"
+                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border-2 border-primary/30 text-foreground text-sm font-semibold hover:bg-accent/15 transition-colors"
+                >
+                  <ShoppingCart className="h-4 w-4" />
+                  Carrinho
+                  <span className="inline-flex items-center justify-center min-w-6 h-6 px-1 rounded-full bg-primary text-primary-foreground text-xs">
+                    {cartTotalItems}
+                  </span>
+                </Link>
+              )}
+            </div>
+          </div>
 
-        <div className="hidden lg:flex items-center gap-2">
-          <AccessibilityControls />
+          <div className="hidden lg:flex items-center gap-2 justify-end">
+            <AccessibilityControls />
 
-          {loggedIn ? (
-            <>
+            {loggedIn ? (
+              <>
+                <Link
+                  to={profileLink}
+                  aria-label="Abrir perfil"
+                  title="Perfil"
+                  className="inline-flex items-center justify-center h-8 w-9 rounded-lg border-2 border-primary/25 bg-background text-foreground hover:bg-accent/15 transition-colors"
+                >
+                  <UserCircle2 className="h-5 w-5" />
+                </Link>
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground font-semibold text-sm shadow-md shadow-primary/30 hover:bg-primary/95 hover:shadow-lg hover:shadow-primary/35 transition-all"
+                >
+                  <LogOut className="h-4 w-4" />
+                  Sair
+                </button>
+              </>
+            ) : (
               <Link
-                to={profileLink}
-                aria-label="Abrir perfil"
-                title="Perfil"
-                className="inline-flex items-center justify-center h-8 w-9 rounded-lg border border-border bg-background text-foreground hover:bg-muted transition-colors"
+                to={ctaTo}
+                className="inline-flex items-center px-5 py-2 rounded-lg bg-primary text-primary-foreground font-semibold text-sm shadow-md shadow-primary/30 hover:bg-primary/95 hover:shadow-lg hover:shadow-primary/35 transition-all"
               >
-                <UserCircle2 className="h-5 w-5" />
+                Ver Produtos
               </Link>
-              <button
-                type="button"
-                onClick={handleLogout}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 transition-opacity"
-              >
-                <LogOut className="h-4 w-4" />
-                Sair
-              </button>
-            </>
-          ) : (
-            <Link
-              to={ctaTo}
-              className="inline-flex items-center px-5 py-2 rounded-lg bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 transition-opacity"
-            >
-              Ver Produtos
-            </Link>
-          )}
-        </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -188,13 +184,17 @@ const Navbar = () => {
         <div className="pt-2">
           <AccessibilityControls mobile />
 
-          <ul className="flex flex-col gap-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground px-1 py-1">
+            Navegação
+          </p>
+
+          <ul className="flex flex-col gap-1">
             {storeLinks.map((link) => (
               <li key={link.href}>
                 <a
                   href={link.href}
                   onClick={() => setMobileOpen(false)}
-                  className="block py-2 text-muted-foreground font-medium hover:text-primary transition-colors"
+                  className="block py-2 px-3 rounded-md border border-transparent text-muted-foreground font-semibold hover:text-primary hover:border-primary/25 hover:bg-accent/10 transition-colors"
                 >
                   {link.label}
                 </a>
@@ -202,12 +202,12 @@ const Navbar = () => {
             ))}
           </ul>
 
-          <ul className="flex flex-col gap-2">
+          <ul className="flex flex-col gap-1 mt-2 pt-2 border-t border-border/70">
             {appLinks.map((link) => (
               <li key={link.to}>
                 <Link
                   to={link.to}
-                  className="block py-2 text-muted-foreground font-medium hover:text-primary transition-colors"
+                  className="block py-2 px-3 rounded-md border border-transparent text-muted-foreground font-semibold hover:text-primary hover:border-primary/25 hover:bg-accent/10 transition-colors"
                   onClick={() => setMobileOpen(false)}
                 >
                   {link.label}
@@ -216,10 +216,10 @@ const Navbar = () => {
             ))}
             {loggedIn ? (
               <>
-                <li>
+                <li className="pt-1">
                   <Link
                     to="/carrinho"
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-border text-foreground text-sm font-semibold"
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border-2 border-primary/30 text-foreground text-sm font-semibold"
                     onClick={() => setMobileOpen(false)}
                   >
                     <ShoppingCart className="h-4 w-4" />
@@ -231,7 +231,7 @@ const Navbar = () => {
                   to={profileLink}
                   aria-label="Abrir perfil"
                   title="Perfil"
-                  className="inline-flex items-center justify-center h-8 w-9 rounded-lg border border-border bg-background text-foreground hover:bg-muted transition-colors"
+                  className="inline-flex items-center justify-center h-8 w-9 rounded-lg border-2 border-primary/25 bg-background text-foreground hover:bg-accent/15 transition-colors"
                   onClick={() => setMobileOpen(false)}
                 >
                   <UserCircle2 className="h-5 w-5" />
@@ -242,7 +242,7 @@ const Navbar = () => {
                     setMobileOpen(false);
                     handleLogout();
                   }}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground font-semibold text-sm"
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground font-semibold text-sm shadow-md shadow-primary/30"
                 >
                   <LogOut className="h-4 w-4" />
                   Sair
@@ -253,7 +253,7 @@ const Navbar = () => {
               <li>
                 <Link
                   to={ctaTo}
-                  className="inline-flex items-center px-5 py-2 rounded-lg bg-primary text-primary-foreground font-semibold text-sm"
+                  className="inline-flex items-center px-5 py-2 rounded-lg bg-primary text-primary-foreground font-semibold text-sm shadow-md shadow-primary/30"
                   onClick={() => setMobileOpen(false)}
                 >
                   Ver Produtos

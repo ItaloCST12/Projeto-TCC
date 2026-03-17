@@ -6,8 +6,8 @@ import {
   atualizarProduto,
   excluirProduto,
 } from "../controllers/produto.controller";
-import { authMiddleware, adminMiddleware } from "../middleware/auth.middleware";
-import { uploadProdutoImagem } from "../middleware/upload.middleware";
+import { authMiddleware, adminMiddleware } from "../middlewares/auth.middleware";
+import { uploadProdutoImagem } from "../middlewares/upload.middleware";
 
 const router = Router();
 

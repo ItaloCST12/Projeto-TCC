@@ -1,4 +1,4 @@
-import prisma from "../prisma/client";
+import prisma from "../models/client";
 
 export class ProdutoService {
   async getProdutos() {

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // Mock Prisma client
-vi.mock("../prisma/client", () => ({
+vi.mock("../models/client", () => ({
   default: {
     usuario: {
       findUnique: vi.fn(),
@@ -27,7 +27,7 @@ vi.mock("../utils/auth-secret", () => ({
   AUTH_SECRET: "test-secret-key-for-testing",
 }));
 
-import prisma from "../prisma/client";
+import prisma from "../models/client";
 import * as AuthService from "./auth.service";
 import bcrypt from "bcryptjs";
 

@@ -1,4 +1,4 @@
-import prisma from "../prisma/client";
+import prisma from "../models/client";
 
 type AutorMensagem = "USUARIO" | "SUPORTE";
 

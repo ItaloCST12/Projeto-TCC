@@ -1,4 +1,4 @@
-import prisma from "../prisma/client";
+import prisma from "../models/client";
 import type { Prisma } from "@prisma/client";
 
 export class UsuarioService {

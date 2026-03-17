@@ -9,6 +9,10 @@ import {
   saveCartItems,
   type CartItem,
 } from "@/lib/cart";
+import abacaxiImg from "@/assets/abacaxi.jpg";
+import laranjaImg from "@/assets/laranja.jpg";
+import tangerinaImg from "@/assets/tangerina.jpg";
+import limaoImg from "@/assets/limao.jpg";
 import Navbar from "@/components/Navbar";
 import PageShell from "@/components/PageShell";
 import {
@@ -26,6 +30,7 @@ type Produto = {
   id: number;
   nome: string;
   disponivel: boolean;
+  imagemUrl?: string | null;
   preco?: number | string;
   precoAbacaxiGrande?: number | string | null;
   precoAbacaxiMedio?: number | string | null;
@@ -64,6 +69,8 @@ const formatarMoeda = (valor: number) =>
     style: "currency",
     currency: "BRL",
   }).format(valor);
+
+const API_BASE_URL = (import.meta.env.VITE_API_URL as string | undefined)?.trim() || "";
 
 const parsePreco = (valor: number | string | null | undefined, fallback = 0) => {
   if (typeof valor === "number") {
@@ -122,6 +129,38 @@ const formatarUnidadeItem = (unidade: string, nomeProduto: string) => {
     .split(/\s+/)
     .map((parte) => parte.charAt(0).toUpperCase() + parte.slice(1).toLowerCase())
     .join(" ");
+};
+
+const resolverImagemFallbackPorNome = (nomeProduto: string) => {
+  const nomeNormalizado = normalizarTexto(nomeProduto);
+
+  if (nomeNormalizado.includes("abacaxi")) return abacaxiImg;
+  if (nomeNormalizado.includes("laranja")) return laranjaImg;
+  if (nomeNormalizado.includes("tangerina")) return tangerinaImg;
+  if (nomeNormalizado.includes("limao")) return limaoImg;
+
+  return abacaxiImg;
+};
+
+const resolverImagemProduto = (imagemUrl: string | null | undefined, fallback: string) => {
+  if (!imagemUrl?.trim()) {
+    return fallback;
+  }
+
+  if (imagemUrl.startsWith("http://") || imagemUrl.startsWith("https://")) {
+    return imagemUrl;
+  }
+
+  if (!API_BASE_URL) {
+    return imagemUrl;
+  }
+
+  const normalizedBase = API_BASE_URL.endsWith("/")
+    ? API_BASE_URL.slice(0, -1)
+    : API_BASE_URL;
+  const normalizedPath = imagemUrl.startsWith("/") ? imagemUrl : `/${imagemUrl}`;
+
+  return `${normalizedBase}${normalizedPath}`;
 };
 
 
@@ -671,61 +710,95 @@ const Carrinho = () => {
                   </Link>
                 </div>
               ) : (
-                <ul className="space-y-2">
+                <ul className="space-y-3">
                   {cartItems.map((item) => (
                     <li
                       key={`${item.produtoId}-${item.unidade}`}
-                      className="rounded-lg border border-border bg-background p-3 flex flex-wrap items-center justify-between gap-2"
+                      className="rounded-xl border border-primary/20 bg-background p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
                     >
-                      <div>
-                        <span className="text-sm text-foreground font-medium">
-                          {formatarNomeProduto(item.nome)} ({formatarUnidadeItem(item.unidade, item.nome)})
-                        </span>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Valor unitário: {formatarMoeda(getPrecoUnitarioSeguro(item))}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          Subtotal: {formatarMoeda(getSubtotalItem(item))}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => alterarQuantidade(item.produtoId, item.unidade, -1)}
-                          className="px-2 py-1 rounded border border-border hover:bg-muted"
-                        >
-                          -
-                        </button>
-                        <span className="text-sm min-w-8 text-center">{item.quantidade}</span>
-                        <button
-                          type="button"
-                          onClick={() => alterarQuantidade(item.produtoId, item.unidade, 1)}
-                          className="px-2 py-1 rounded border border-border hover:bg-muted"
-                        >
-                          +
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => removerItem(item.produtoId, item.unidade)}
-                          className="px-2 py-1 rounded border border-border hover:bg-muted text-sm"
-                        >
-                          Remover
-                        </button>
-                      </div>
+                      {(() => {
+                        const produtoCatalogo = produtosPorId.get(item.produtoId);
+                        const imagemFallback = resolverImagemFallbackPorNome(item.nome);
+                        const imagemProduto = resolverImagemProduto(produtoCatalogo?.imagemUrl, imagemFallback);
+                        const precoUnitario = getPrecoUnitarioSeguro(item);
+                        const subtotal = getSubtotalItem(item);
+
+                        return (
+                          <>
+                            <div className="flex items-center gap-3 min-w-0">
+                              <img
+                                src={imagemProduto}
+                                alt={`Foto de ${formatarNomeProduto(item.nome)}`}
+                                className="h-20 w-20 rounded-lg border border-border object-cover bg-muted/40 shrink-0"
+                                loading="lazy"
+                              />
+                              <div className="min-w-0">
+                                <span className="text-sm sm:text-base text-foreground font-semibold block truncate">
+                                  {formatarNomeProduto(item.nome)}
+                                </span>
+                                <p className="text-xs text-muted-foreground mt-0.5">
+                                  Unidade: {formatarUnidadeItem(item.unidade, item.nome)}
+                                </p>
+                                <div className="mt-1 flex flex-wrap gap-2">
+                                  <p className="text-xs sm:text-sm text-foreground">
+                                    Valor unitário:{" "}
+                                    <span className="inline-flex items-center rounded-md border border-primary/40 bg-primary/10 px-2 py-0.5 text-sm sm:text-base font-extrabold text-primary">
+                                      {formatarMoeda(precoUnitario)}
+                                    </span>
+                                  </p>
+                                  <p className="text-xs sm:text-sm text-foreground">
+                                    Subtotal:{" "}
+                                    <span className="inline-flex items-center rounded-md border border-secondary/50 bg-secondary/15 px-2 py-0.5 text-sm sm:text-base font-extrabold text-secondary">
+                                      {formatarMoeda(subtotal)}
+                                    </span>
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2 self-end sm:self-auto">
+                              <button
+                                type="button"
+                                onClick={() => alterarQuantidade(item.produtoId, item.unidade, -1)}
+                                className="px-2.5 py-1.5 rounded-md border-2 border-primary/25 text-foreground font-semibold hover:bg-accent/15"
+                              >
+                                -
+                              </button>
+                              <span className="text-sm min-w-9 text-center font-semibold">{item.quantidade}</span>
+                              <button
+                                type="button"
+                                onClick={() => alterarQuantidade(item.produtoId, item.unidade, 1)}
+                                className="px-2.5 py-1.5 rounded-md border-2 border-primary/25 text-foreground font-semibold hover:bg-accent/15"
+                              >
+                                +
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => removerItem(item.produtoId, item.unidade)}
+                                className="px-3 py-1.5 rounded-md border-2 border-border hover:bg-muted text-sm font-semibold"
+                              >
+                                Remover
+                              </button>
+                            </div>
+                          </>
+                        );
+                      })()}
                     </li>
                   ))}
                 </ul>
               )}
 
-              <div className="rounded-lg border border-border bg-muted/40 p-3">
+              <div className="rounded-lg border-2 border-primary/35 bg-gradient-to-r from-primary/10 via-accent/10 to-secondary/10 p-3">
                 <p className="text-sm text-foreground">
                   Produtos no carrinho: <span className="font-semibold">{cartItems.length}</span>
                 </p>
                 <p className="text-sm text-foreground">
                   Quantidade total: <span className="font-semibold">{totalItens}</span>
                 </p>
-                <p className="text-sm text-foreground">
-                  Valor total dos produtos: <span className="font-semibold">{formatarMoeda(valorTotalCarrinho)}</span>
+                <p className="text-base text-foreground mt-1">
+                  Valor total dos produtos:{" "}
+                  <span className="inline-flex items-center rounded-md border-2 border-primary bg-primary/15 px-2.5 py-1 text-lg sm:text-xl font-black text-primary shadow-md shadow-primary/25">
+                    {formatarMoeda(valorTotalCarrinho)}
+                  </span>
                 </p>
               </div>
 

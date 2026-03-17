@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { PedidoService } from "../models/pedido.service";
+import { PedidoService } from "../services/pedido.service";
 
 const pedidoService = new PedidoService();
 

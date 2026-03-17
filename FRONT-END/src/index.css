@@ -6,8 +6,8 @@
 
 @layer base {
   :root {
-    --background: 45 100% 98%;
-    --foreground: 136 28% 14%;
+    --background: 44 100% 98%;
+    --foreground: 136 30% 13%;
 
     --card: 45 100% 97%;
     --card-foreground: 136 28% 14%;
@@ -15,24 +15,24 @@
     --popover: 45 100% 98%;
     --popover-foreground: 136 28% 14%;
 
-    --primary: 136 53% 43%;
+    --primary: 138 59% 36%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 129 42% 51%;
+    --secondary: 32 92% 56%;
     --secondary-foreground: 0 0% 100%;
 
     --muted: 45 70% 94%;
     --muted-foreground: 136 14% 34%;
 
-    --accent: 45 98% 49%;
-    --accent-foreground: 136 28% 14%;
+    --accent: 42 95% 50%;
+    --accent-foreground: 138 42% 13%;
 
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
 
     --border: 136 22% 82%;
     --input: 136 22% 82%;
-    --ring: 136 53% 43%;
+    --ring: 138 59% 36%;
 
     --radius: 0.75rem;
 
@@ -48,9 +48,9 @@
     --font-display: 'Raleway', sans-serif;
     --font-body: 'Lato', sans-serif;
 
-    --gradient-hero: linear-gradient(180deg, hsla(136, 53%, 43%, 0.66) 0%, hsla(129, 42%, 51%, 0.36) 100%);
-    --shadow-card: 0 4px 24px -4px hsla(136, 53%, 43%, 0.14);
-    --shadow-card-hover: 0 8px 32px -4px hsla(136, 53%, 43%, 0.24);
+    --gradient-hero: linear-gradient(180deg, hsla(138, 59%, 36%, 0.7) 0%, hsla(32, 92%, 56%, 0.34) 100%);
+    --shadow-card: 0 6px 24px -6px hsla(138, 59%, 36%, 0.2);
+    --shadow-card-hover: 0 12px 32px -8px hsla(138, 59%, 36%, 0.32);
   }
 
   .dark {
@@ -214,13 +214,24 @@
   }
 
   a {
+    color: hsl(var(--primary));
+    font-weight: 600;
     text-decoration-thickness: 1.5px;
-    text-underline-offset: 2px;
+    text-underline-offset: 3px;
+    transition: color 0.2s ease, text-decoration-color 0.2s ease;
   }
 
   a:hover,
   a:active {
+    color: hsl(var(--accent-foreground));
     text-decoration: underline;
+    text-decoration-color: hsl(var(--accent));
+  }
+
+  strong,
+  b {
+    color: hsl(var(--primary));
+    font-weight: 800;
   }
 
   h1, h2, h3, h4, h5, h6 {
@@ -289,6 +300,18 @@
   #root [role="button"],
   #root [role="button"] * {
     cursor: pointer !important;
+  }
+
+  #root button,
+  #root [role="button"],
+  #root .bg-primary,
+  #root [class*="bg-primary"] {
+    box-shadow: 0 10px 22px -12px hsl(var(--primary) / 0.75);
+  }
+
+  #root button:hover,
+  #root [role="button"]:hover {
+    filter: saturate(1.08);
   }
 }
 

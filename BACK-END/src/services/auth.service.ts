@@ -1,4 +1,4 @@
-import prisma from "../prisma/client";
+import prisma from "../models/client";
 import bcrypt from "bcryptjs";
 import * as UserService from "./usuario.service";
 import jwt from "jsonwebtoken";

@@ -7,7 +7,7 @@ import {
 	listarTodosEnderecos,
 	buscarCepViaCep,
 } from "../controllers/endereco.controller";
-import { adminMiddleware, authMiddleware } from "../middleware/auth.middleware";
+import { adminMiddleware, authMiddleware } from "../middlewares/auth.middleware";
 
 const router = Router();
 
