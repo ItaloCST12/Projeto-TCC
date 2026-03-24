@@ -1,4 +1,4 @@
-import nodemailer from "nodemailer";
+import { Resend } from "resend";
 
 type SendResetPasswordEmailInput = {
   toEmail: string;
@@ -11,52 +11,26 @@ type SendResetPasswordEmailResult = {
   skipped: boolean;
 };
 
-const parseBoolean = (value: string | undefined, fallback: boolean) => {
-  if (!value) {
-    return fallback;
-  }
-
-  return ["1", "true", "yes", "on"].includes(value.trim().toLowerCase());
-};
-
 const isProduction = process.env.NODE_ENV === "production";
 
-const getSmtpConfig = () => {
-  const host = process.env.SMTP_HOST?.trim();
-  const portRaw = process.env.SMTP_PORT?.trim();
-  const user = process.env.SMTP_USER?.trim();
-  const pass = process.env.SMTP_PASS?.trim();
-  const from = process.env.SMTP_FROM?.trim();
+const getResendConfig = () => {
+  const apiKey = process.env.RESEND_API_KEY?.trim();
+  const from = process.env.RESEND_FROM?.trim();
   const appName = process.env.APP_NAME?.trim() || "Fazenda Bispo";
 
-  if (!host || !portRaw || !user || !pass || !from) {
+  if (!apiKey || !from) {
     return null;
   }
 
-  const port = Number(portRaw);
-  if (!Number.isInteger(port) || port <= 0) {
-    return null;
-  }
-
-  const secure = parseBoolean(process.env.SMTP_SECURE, port === 465);
-
-  return {
-    host,
-    port,
-    secure,
-    user,
-    pass,
-    from,
-    appName,
-  };
+  return { apiKey, from, appName };
 };
 
 export const sendResetPasswordEmail = async (
   input: SendResetPasswordEmailInput,
 ): Promise<SendResetPasswordEmailResult> => {
-  const smtpConfig = getSmtpConfig();
+  const config = getResendConfig();
 
-  if (!smtpConfig) {
+  if (!config) {
     if (isProduction) {
       throw new Error("Serviço de e-mail não configurado");
     }
@@ -64,20 +38,12 @@ export const sendResetPasswordEmail = async (
     return { delivered: false, skipped: true };
   }
 
-  const transporter = nodemailer.createTransport({
-    host: smtpConfig.host,
-    port: smtpConfig.port,
-    secure: smtpConfig.secure,
-    auth: {
-      user: smtpConfig.user,
-      pass: smtpConfig.pass,
-    },
-  });
+  const resend = new Resend(config.apiKey);
 
-  await transporter.sendMail({
-    from: smtpConfig.from,
+  const { error } = await resend.emails.send({
+    from: config.from,
     to: input.toEmail,
-    subject: `${smtpConfig.appName} • Redefinição de senha`,
+    subject: `${config.appName} • Redefinição de senha`,
     text: [
       `Olá,`,
       "",
@@ -95,6 +61,10 @@ export const sendResetPasswordEmail = async (
       <p>Se você não solicitou essa alteração, ignore este e-mail.</p>
     `,
   });
+
+  if (error) {
+    throw new Error(`Falha ao enviar e-mail: ${error.message}`);
+  }
 
   return { delivered: true, skipped: false };
 };

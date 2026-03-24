@@ -192,13 +192,25 @@ const Login = () => {
       <Navbar />
       <PageShell
         title="Entrar"
-        subtitle="Faça login para continuar sua experiência na plataforma."
+        subtitle="Acesse sua conta ou crie um cadastro em poucos passos."
         containerClassName="max-w-3xl"
       >
         <div className="flex items-center justify-center">
-          <div className="w-full max-w-md bg-card border border-border rounded-xl p-6 sm:p-8">
+          <div className="w-full rounded-2xl bg-card border border-border/80 shadow-sm p-6 sm:p-8">
+            <div className="mb-5">
+              <h3 className="font-display text-xl font-semibold text-foreground">
+                {mode === "register" ? "Criar conta" : mode === "forgot" ? "Recuperar acesso" : "Entrar"}
+              </h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                {mode === "register"
+                  ? "Cadastre-se e continue sua experiência na plataforma."
+                  : mode === "forgot"
+                    ? "Solicite um código e redefina sua senha com segurança."
+                    : "Use suas credenciais para acessar sua conta."}
+              </p>
+            </div>
 
-            <div className="grid grid-cols-2 gap-2 bg-muted p-1 rounded-lg mb-6">
+            <div className="grid grid-cols-2 gap-2 rounded-xl border border-border/80 bg-muted/55 p-1.5 mb-6">
               <button
                 type="button"
                 onClick={() => {
@@ -206,10 +218,10 @@ const Login = () => {
                   setError("");
                   setSuccess("");
                 }}
-                className={`rounded-md py-2 text-sm font-semibold transition-colors ${
+                className={`rounded-lg py-2.5 text-sm font-semibold transition-all ${
                   mode === "login" || mode === "forgot"
-                    ? "bg-background text-foreground"
-                    : "text-muted-foreground"
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
                 }`}
               >
                 Entrar
@@ -221,10 +233,10 @@ const Login = () => {
                   setError("");
                   setSuccess("");
                 }}
-                className={`rounded-md py-2 text-sm font-semibold transition-colors ${
+                className={`rounded-lg py-2.5 text-sm font-semibold transition-all ${
                   mode === "register"
-                    ? "bg-background text-foreground"
-                    : "text-muted-foreground"
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
                 }`}
               >
                 Cadastro
@@ -242,7 +254,7 @@ const Login = () => {
                     type="text"
                     value={nome}
                     onChange={(event) => setNome(event.target.value)}
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-foreground outline-none focus:ring-2 focus:ring-primary"
+                    className="w-full rounded-xl border border-border/80 bg-background px-3 py-2.5 text-foreground outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/30"
                     placeholder="Seu nome"
                     required
                   />
@@ -259,7 +271,7 @@ const Login = () => {
                     type="tel"
                     value={telefone}
                     onChange={(event) => handleTelefoneChange(event.target.value)}
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-foreground outline-none focus:ring-2 focus:ring-primary"
+                    className="w-full rounded-xl border border-border/80 bg-background px-3 py-2.5 text-foreground outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/30"
                     placeholder="(00) 00000-0000"
                     inputMode="numeric"
                     autoComplete="tel"
@@ -278,7 +290,7 @@ const Login = () => {
                   type="email"
                   value={email}
                   onChange={(event) => setEmail(event.target.value)}
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-foreground outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full rounded-xl border border-border/80 bg-background px-3 py-2.5 text-foreground outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/30"
                   placeholder="seuemail@exemplo.com"
                   required
                 />
@@ -295,7 +307,7 @@ const Login = () => {
                     type={mostrarSenha ? "text" : "password"}
                     value={senha}
                     onChange={(event) => handleSenhaChange(event.target.value)}
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 pr-10 text-foreground outline-none focus:ring-2 focus:ring-primary"
+                    className="w-full rounded-xl border border-border/80 bg-background px-3 py-2.5 pr-10 text-foreground outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/30"
                     placeholder={mode === "register" ? "Mínimo 8 caracteres" : "Digite sua senha"}
                     inputMode="text"
                     maxLength={128}
@@ -328,7 +340,7 @@ const Login = () => {
                         setNovaSenha("");
                         setConfirmarNovaSenha("");
                       }}
-                      className="text-xs font-medium text-primary hover:opacity-80"
+                      className="text-xs font-semibold text-primary hover:opacity-80"
                     >
                       Esqueci minha senha
                     </button>
@@ -340,7 +352,7 @@ const Login = () => {
               {mode === "forgot" && (
                 <>
                   {forgotStep === "request" ? (
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-sm text-muted-foreground rounded-lg border border-border/70 bg-muted/30 px-3 py-2">
                       Informe seu e-mail para solicitar um código temporário de redefinição.
                     </p>
                   ) : (
@@ -354,7 +366,7 @@ const Login = () => {
                           type="text"
                           value={codigoRedefinicao}
                           onChange={(event) => setCodigoRedefinicao(event.target.value.trim())}
-                          className="w-full rounded-lg border border-border bg-background px-3 py-2 text-foreground outline-none focus:ring-2 focus:ring-primary"
+                          className="w-full rounded-xl border border-border/80 bg-background px-3 py-2.5 text-foreground outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/30"
                           placeholder="Cole o código recebido"
                           required
                         />
@@ -370,7 +382,7 @@ const Login = () => {
                             type={mostrarNovaSenha ? "text" : "password"}
                             value={novaSenha}
                             onChange={(event) => handleNovaSenhaChange(event.target.value)}
-                            className="w-full rounded-lg border border-border bg-background px-3 py-2 pr-10 text-foreground outline-none focus:ring-2 focus:ring-primary"
+                            className="w-full rounded-xl border border-border/80 bg-background px-3 py-2.5 pr-10 text-foreground outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/30"
                             placeholder="Mínimo 8 caracteres"
                             inputMode="text"
                             maxLength={128}
@@ -398,7 +410,7 @@ const Login = () => {
                           type={mostrarNovaSenha ? "text" : "password"}
                           value={confirmarNovaSenha}
                           onChange={(event) => handleConfirmarNovaSenhaChange(event.target.value)}
-                          className="w-full rounded-lg border border-border bg-background px-3 py-2 text-foreground outline-none focus:ring-2 focus:ring-primary"
+                          className="w-full rounded-xl border border-border/80 bg-background px-3 py-2.5 text-foreground outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/30"
                           placeholder="Repita a nova senha"
                           inputMode="text"
                           maxLength={128}
@@ -432,7 +444,7 @@ const Login = () => {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full inline-flex items-center justify-center px-5 py-2 rounded-lg bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 transition-opacity"
+                className="w-full inline-flex items-center justify-center px-5 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm shadow-sm hover:opacity-90 transition-opacity"
               >
                 {loading
                   ? "Enviando..."

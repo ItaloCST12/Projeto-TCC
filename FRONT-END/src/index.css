@@ -6,13 +6,13 @@
 
 @layer base {
   :root {
-    --background: 44 100% 98%;
+    --background: 44 72% 96%;
     --foreground: 136 30% 13%;
 
-    --card: 45 100% 97%;
+    --card: 45 78% 95%;
     --card-foreground: 136 28% 14%;
 
-    --popover: 45 100% 98%;
+    --popover: 45 78% 95%;
     --popover-foreground: 136 28% 14%;
 
     --primary: 138 59% 36%;
@@ -21,8 +21,8 @@
     --secondary: 32 92% 56%;
     --secondary-foreground: 0 0% 100%;
 
-    --muted: 45 70% 94%;
-    --muted-foreground: 136 14% 34%;
+    --muted: 44 50% 90%;
+    --muted-foreground: 136 12% 33%;
 
     --accent: 42 95% 50%;
     --accent-foreground: 138 42% 13%;
@@ -30,8 +30,8 @@
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 136 22% 82%;
-    --input: 136 22% 82%;
+    --border: 136 18% 78%;
+    --input: 136 18% 78%;
     --ring: 138 59% 36%;
 
     --radius: 0.75rem;
@@ -49,8 +49,10 @@
     --font-body: 'Lato', sans-serif;
 
     --gradient-hero: linear-gradient(180deg, hsla(138, 59%, 36%, 0.7) 0%, hsla(32, 92%, 56%, 0.34) 100%);
+    --gradient-surface: radial-gradient(circle at 10% 0%, hsla(42, 92%, 56%, 0.11) 0%, transparent 42%), radial-gradient(circle at 90% 6%, hsla(138, 59%, 36%, 0.1) 0%, transparent 38%);
     --shadow-card: 0 6px 24px -6px hsla(138, 59%, 36%, 0.2);
     --shadow-card-hover: 0 12px 32px -8px hsla(138, 59%, 36%, 0.32);
+    --shadow-soft: 0 16px 30px -22px hsla(136, 54%, 20%, 0.45);
   }
 
   .dark {
@@ -211,6 +213,9 @@
   body {
     @apply bg-background text-foreground;
     font-family: var(--font-body);
+    background-image: var(--gradient-surface);
+    background-attachment: fixed;
+    line-height: 1.55;
   }
 
   a {
@@ -306,7 +311,7 @@
   #root [role="button"],
   #root .bg-primary,
   #root [class*="bg-primary"] {
-    box-shadow: 0 10px 22px -12px hsl(var(--primary) / 0.75);
+    box-shadow: 0 10px 22px -14px hsl(var(--primary) / 0.55);
   }
 
   #root button:hover,
@@ -316,6 +321,23 @@
 }
 
 @layer utilities {
+  .section-wrap {
+    @apply py-16 sm:py-20;
+  }
+
+  .section-heading {
+    @apply font-display text-3xl sm:text-4xl font-bold tracking-tight text-foreground;
+  }
+
+  .section-description {
+    @apply max-w-2xl mx-auto text-base sm:text-lg text-muted-foreground;
+  }
+
+  .glass-card {
+    @apply rounded-2xl border border-border/80 bg-card/95;
+    box-shadow: var(--shadow-soft);
+  }
+
   .text-gradient {
     @apply bg-clip-text text-transparent;
     background-image: linear-gradient(135deg, hsl(136 53% 43%), hsl(45 98% 49%));

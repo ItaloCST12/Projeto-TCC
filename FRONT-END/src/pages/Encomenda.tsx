@@ -443,11 +443,9 @@ const Encomenda = () => {
                                 {opcaoSelecionada.label} — {formatarMoeda(precoOpcaoSelecionada)} / {opcaoSelecionada.unit}
                               </p>
                             )}
-                            {isAbacaxi && (
-                              <p className="text-xs text-muted-foreground mt-1">
-                                Selecionado: {opcaoSelecionada.label} ({formatarMoeda(precoOpcaoSelecionada)} por unidade)
-                              </p>
-                            )}
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Selecionado: {opcaoSelecionada.label} ({formatarMoeda(precoOpcaoSelecionada)} por {opcaoSelecionada.unit})
+                            </p>
                           </div>
 
                           <div>
@@ -546,7 +544,7 @@ const Encomenda = () => {
                             onClick={() => adicionarProdutoViaCard(produto)}
                             className={`w-full inline-flex items-center justify-center px-4 py-2 rounded-lg text-base font-semibold transition-all ${
                               produto.disponivel
-                                ? `bg-primary text-primary-foreground hover:opacity-90 ${animandoAdicaoPorProduto[produto.id] ? "animate-pulse scale-[0.98]" : ""}`
+                                ? `bg-primary text-primary-foreground hover:bg-primary/90 ${animandoAdicaoPorProduto[produto.id] ? "animate-pulse scale-[0.98]" : ""}`
                                 : "bg-muted text-muted-foreground cursor-not-allowed"
                             }`}
                           >

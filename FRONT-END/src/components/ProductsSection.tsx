@@ -95,13 +95,13 @@ const ProductsSection = () => {
   }, [apiProducts, productLookup]);
 
   return (
-    <section id="produtos" className="py-20 bg-muted/50">
+    <section id="produtos" className="section-wrap bg-muted/45">
       <div className="container mx-auto px-4">
         <div className="text-center mb-14">
-          <h2 className="font-display text-3xl sm:text-4xl font-bold text-foreground mb-4">
+          <h2 className="section-heading mb-4">
             Nossos <span className="text-secondary">Produtos</span>
           </h2>
-          <p className="max-w-xl mx-auto text-muted-foreground text-lg">
+          <p className="section-description">
             Frutas cítricas colhidas no auge do frescor diretamente da Fazenda Bispo. Confira nossa seleção, com opções por tamanho e preços acessíveis. Itens sazonais podem estar temporariamente indisponíveis, avise-nos para notificações!
           </p>
         </div>
@@ -113,7 +113,7 @@ const ProductsSection = () => {
             {productsToShow.map((product) => (
             <div
               key={product.name}
-              className="bg-card rounded-xl overflow-hidden shadow-card hover:shadow-card-hover hover:-translate-y-1 transition-all duration-300 group"
+              className="glass-card overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-card-hover group"
             >
               <div className="aspect-square overflow-hidden bg-background">
                 <img
@@ -134,7 +134,7 @@ const ProductsSection = () => {
                     </span>
                   )}
                 </div>
-                <p className="text-muted-foreground text-sm mb-3">{product.description}</p>
+                <p className="text-muted-foreground text-sm leading-relaxed mb-3">{product.description}</p>
                 <div>
                   <div>
                     <span className="text-2xl font-bold text-primary">{product.price}</span>

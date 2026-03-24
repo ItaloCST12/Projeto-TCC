@@ -714,7 +714,7 @@ const Carrinho = () => {
                   {cartItems.map((item) => (
                     <li
                       key={`${item.produtoId}-${item.unidade}`}
-                      className="rounded-xl border border-primary/20 bg-background p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
+                      className="rounded-xl border border-border/70 bg-background p-3 sm:p-4 shadow-sm hover:shadow-md hover:border-primary/25 transition-all duration-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
                     >
                       {(() => {
                         const produtoCatalogo = produtosPorId.get(item.produtoId);
@@ -739,19 +739,23 @@ const Carrinho = () => {
                                 <p className="text-xs text-muted-foreground mt-0.5">
                                   Unidade: {formatarUnidadeItem(item.unidade, item.nome)}
                                 </p>
-                                <div className="mt-1 flex flex-wrap gap-2">
-                                  <p className="text-xs sm:text-sm text-foreground">
-                                    Valor unitário:{" "}
-                                    <span className="inline-flex items-center rounded-md border border-primary/40 bg-primary/10 px-2 py-0.5 text-sm sm:text-base font-extrabold text-primary">
+                                <div className="mt-2 grid grid-cols-1 min-[420px]:grid-cols-2 gap-2">
+                                  <div className="rounded-lg border border-border/80 bg-muted/20 px-3 py-2.5">
+                                    <p className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground/90">
+                                      Valor unitário
+                                    </p>
+                                    <p className="text-lg sm:text-xl leading-none font-semibold tabular-nums text-foreground mt-1">
                                       {formatarMoeda(precoUnitario)}
-                                    </span>
-                                  </p>
-                                  <p className="text-xs sm:text-sm text-foreground">
-                                    Subtotal:{" "}
-                                    <span className="inline-flex items-center rounded-md border border-secondary/50 bg-secondary/15 px-2 py-0.5 text-sm sm:text-base font-extrabold text-secondary">
+                                    </p>
+                                  </div>
+                                  <div className="rounded-lg border border-primary/30 bg-primary/[0.09] px-3 py-2.5 shadow-sm shadow-primary/10">
+                                    <p className="text-[10px] uppercase tracking-[0.16em] text-primary/80">
+                                      Subtotal do item
+                                    </p>
+                                    <p className="text-xl sm:text-2xl leading-none font-bold tabular-nums text-primary mt-1">
                                       {formatarMoeda(subtotal)}
-                                    </span>
-                                  </p>
+                                    </p>
+                                  </div>
                                 </div>
                               </div>
                             </div>
@@ -787,19 +791,28 @@ const Carrinho = () => {
                 </ul>
               )}
 
-              <div className="rounded-lg border-2 border-primary/35 bg-gradient-to-r from-primary/10 via-accent/10 to-secondary/10 p-3">
-                <p className="text-sm text-foreground">
-                  Produtos no carrinho: <span className="font-semibold">{cartItems.length}</span>
-                </p>
-                <p className="text-sm text-foreground">
-                  Quantidade total: <span className="font-semibold">{totalItens}</span>
-                </p>
-                <p className="text-base text-foreground mt-1">
-                  Valor total dos produtos:{" "}
-                  <span className="inline-flex items-center rounded-md border-2 border-primary bg-primary/15 px-2.5 py-1 text-lg sm:text-xl font-black text-primary shadow-md shadow-primary/25">
-                    {formatarMoeda(valorTotalCarrinho)}
-                  </span>
-                </p>
+              <div className="rounded-xl border border-border/80 bg-gradient-to-br from-background via-background to-muted/20 p-4 sm:p-5 shadow-sm">
+                <div className="mb-3 flex items-center justify-between">
+                  <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Resumo financeiro</p>
+                  <span className="h-px flex-1 ml-3 bg-gradient-to-r from-border to-transparent" aria-hidden="true" />
+                </div>
+                <div className="grid gap-2 sm:grid-cols-3">
+                  <div className="rounded-lg border border-border/70 bg-background/90 px-3 py-2.5">
+                    <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">Itens</p>
+                    <p className="text-lg font-semibold tabular-nums text-foreground leading-none mt-1">{cartItems.length}</p>
+                  </div>
+                  <div className="rounded-lg border border-border/70 bg-background/90 px-3 py-2.5">
+                    <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">Quantidade</p>
+                    <p className="text-lg font-semibold tabular-nums text-foreground leading-none mt-1">{totalItens}</p>
+                  </div>
+                  <div className="rounded-lg border border-primary/35 bg-primary/[0.1] px-3 py-2.5 sm:col-span-1 relative overflow-hidden shadow-sm shadow-primary/15">
+                    <span className="pointer-events-none absolute inset-y-0 left-0 w-1.5 bg-primary/55" aria-hidden="true" />
+                    <p className="text-[10px] uppercase tracking-[0.16em] text-primary/80 pl-2">Total do pedido</p>
+                    <p className="text-[1.9rem] sm:text-[2.05rem] font-bold tabular-nums leading-none text-primary mt-1 pl-2">
+                      {formatarMoeda(valorTotalCarrinho)}
+                    </p>
+                  </div>
+                </div>
               </div>
 
               <div className="grid sm:grid-cols-2 gap-3">

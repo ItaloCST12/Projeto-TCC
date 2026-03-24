@@ -50,11 +50,11 @@ const Navbar = () => {
   };
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
+    <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border/80 bg-background/90 backdrop-blur-xl shadow-sm">
       <div className="w-full h-20 px-4 lg:px-8">
         <div className="lg:hidden h-full flex items-center justify-between relative">
           <button
-            className="text-foreground"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-border/70 bg-card/80 text-foreground"
             onClick={() => setMobileOpen(!mobileOpen)}
             aria-label="Menu"
           >
@@ -75,7 +75,7 @@ const Navbar = () => {
 
           <Link
             to={mobileCartTo}
-            className="relative inline-flex items-center justify-center h-9 w-9 rounded-lg border-2 border-primary/30 bg-background text-foreground hover:bg-accent/15 transition-colors"
+            className="relative inline-flex items-center justify-center h-10 w-10 rounded-xl border border-border/80 bg-card text-foreground hover:bg-muted/70 transition-colors"
             aria-label="Carrinho"
             title="Carrinho"
             onClick={() => setMobileOpen(false)}
@@ -102,12 +102,12 @@ const Navbar = () => {
           </a>
 
           <div className="flex items-center justify-center">
-            <div className="inline-flex items-center gap-2 rounded-xl border border-border bg-card/70 px-2 py-1">
+            <div className="inline-flex items-center gap-2 rounded-2xl border border-border/80 bg-card/95 px-2 py-1.5 shadow-sm">
               {storeLinks.map((link) => (
                 <a
                   key={link.href}
                   href={link.href}
-                  className="inline-flex items-center px-3 py-1.5 rounded-md border border-transparent text-muted-foreground font-semibold hover:text-primary hover:border-primary/25 hover:bg-accent/10 transition-colors"
+                  className="inline-flex items-center px-3 py-1.5 rounded-lg border border-transparent text-muted-foreground font-semibold hover:text-primary hover:border-primary/20 hover:bg-muted transition-colors"
                 >
                   {link.label}
                 </a>
@@ -119,7 +119,7 @@ const Navbar = () => {
                 <Link
                   key={link.to}
                   to={link.to}
-                  className="inline-flex items-center px-3 py-1.5 rounded-md border border-transparent text-muted-foreground font-semibold hover:text-primary hover:border-primary/25 hover:bg-accent/10 transition-colors"
+                  className="inline-flex items-center px-3 py-1.5 rounded-lg border border-transparent text-muted-foreground font-semibold hover:text-primary hover:border-primary/20 hover:bg-muted transition-colors"
                 >
                   {link.label}
                 </Link>
@@ -128,7 +128,7 @@ const Navbar = () => {
               {loggedIn && (
                 <Link
                   to="/carrinho"
-                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border-2 border-primary/30 text-foreground text-sm font-semibold hover:bg-accent/15 transition-colors"
+                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border border-primary/25 bg-primary/5 text-foreground text-sm font-semibold hover:bg-primary/10 transition-colors"
                 >
                   <ShoppingCart className="h-4 w-4" />
                   Carrinho
@@ -149,14 +149,14 @@ const Navbar = () => {
                   to={profileLink}
                   aria-label="Abrir perfil"
                   title="Perfil"
-                  className="inline-flex items-center justify-center h-8 w-9 rounded-lg border-2 border-primary/25 bg-background text-foreground hover:bg-accent/15 transition-colors"
+                  className="inline-flex items-center justify-center h-10 w-10 rounded-xl border border-border/80 bg-card text-foreground hover:bg-muted transition-colors"
                 >
                   <UserCircle2 className="h-5 w-5" />
                 </Link>
                 <button
                   type="button"
                   onClick={handleLogout}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground font-semibold text-sm shadow-md shadow-primary/30 hover:bg-primary/95 hover:shadow-lg hover:shadow-primary/35 transition-all"
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm shadow-md shadow-primary/30 hover:bg-primary/95 hover:shadow-lg hover:shadow-primary/35 transition-all"
                 >
                   <LogOut className="h-4 w-4" />
                   Sair
@@ -165,7 +165,7 @@ const Navbar = () => {
             ) : (
               <Link
                 to={ctaTo}
-                className="inline-flex items-center px-5 py-2 rounded-lg bg-primary text-primary-foreground font-semibold text-sm shadow-md shadow-primary/30 hover:bg-primary/95 hover:shadow-lg hover:shadow-primary/35 transition-all"
+                className="inline-flex items-center px-5 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm shadow-md shadow-primary/30 hover:bg-primary/95 hover:shadow-lg hover:shadow-primary/35 transition-all"
               >
                 Ver Produtos
               </Link>
@@ -175,7 +175,7 @@ const Navbar = () => {
       </div>
 
       <div
-        className={`lg:hidden bg-background border-b border-border px-4 overflow-hidden transition-all duration-300 ease-out ${
+        className={`lg:hidden bg-background/95 border-b border-border/80 px-4 overflow-hidden transition-all duration-300 ease-out ${
           mobileOpen
             ? "max-h-[70vh] opacity-100 pb-4"
             : "max-h-0 opacity-0 pb-0 pointer-events-none"
@@ -194,7 +194,7 @@ const Navbar = () => {
                 <a
                   href={link.href}
                   onClick={() => setMobileOpen(false)}
-                  className="block py-2 px-3 rounded-md border border-transparent text-muted-foreground font-semibold hover:text-primary hover:border-primary/25 hover:bg-accent/10 transition-colors"
+                  className="block py-2.5 px-3 rounded-lg border border-transparent text-muted-foreground font-semibold hover:text-primary hover:border-primary/20 hover:bg-muted transition-colors"
                 >
                   {link.label}
                 </a>
@@ -207,7 +207,7 @@ const Navbar = () => {
               <li key={link.to}>
                 <Link
                   to={link.to}
-                  className="block py-2 px-3 rounded-md border border-transparent text-muted-foreground font-semibold hover:text-primary hover:border-primary/25 hover:bg-accent/10 transition-colors"
+                  className="block py-2.5 px-3 rounded-lg border border-transparent text-muted-foreground font-semibold hover:text-primary hover:border-primary/20 hover:bg-muted transition-colors"
                   onClick={() => setMobileOpen(false)}
                 >
                   {link.label}
@@ -219,7 +219,7 @@ const Navbar = () => {
                 <li className="pt-1">
                   <Link
                     to="/carrinho"
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border-2 border-primary/30 text-foreground text-sm font-semibold"
+                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-primary/25 bg-primary/5 text-foreground text-sm font-semibold"
                     onClick={() => setMobileOpen(false)}
                   >
                     <ShoppingCart className="h-4 w-4" />
@@ -231,7 +231,7 @@ const Navbar = () => {
                   to={profileLink}
                   aria-label="Abrir perfil"
                   title="Perfil"
-                  className="inline-flex items-center justify-center h-8 w-9 rounded-lg border-2 border-primary/25 bg-background text-foreground hover:bg-accent/15 transition-colors"
+                  className="inline-flex items-center justify-center h-10 w-10 rounded-xl border border-border/80 bg-card text-foreground hover:bg-muted transition-colors"
                   onClick={() => setMobileOpen(false)}
                 >
                   <UserCircle2 className="h-5 w-5" />
@@ -242,7 +242,7 @@ const Navbar = () => {
                     setMobileOpen(false);
                     handleLogout();
                   }}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground font-semibold text-sm shadow-md shadow-primary/30"
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm shadow-md shadow-primary/30"
                 >
                   <LogOut className="h-4 w-4" />
                   Sair
@@ -253,7 +253,7 @@ const Navbar = () => {
               <li>
                 <Link
                   to={ctaTo}
-                  className="inline-flex items-center px-5 py-2 rounded-lg bg-primary text-primary-foreground font-semibold text-sm shadow-md shadow-primary/30"
+                  className="inline-flex items-center px-5 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm shadow-md shadow-primary/30"
                   onClick={() => setMobileOpen(false)}
                 >
                   Ver Produtos

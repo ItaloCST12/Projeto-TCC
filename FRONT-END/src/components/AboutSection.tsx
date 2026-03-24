@@ -20,30 +20,30 @@ const features = [
 
 const AboutSection = () => {
   return (
-    <section id="historia" className="py-20 bg-background">
+    <section id="historia" className="section-wrap bg-background">
       <div className="container mx-auto px-4">
         <div className="text-center mb-14">
-          <h2 className="font-display text-3xl sm:text-4xl font-bold text-foreground mb-4">
+          <h2 className="section-heading mb-4">
             A Jornada da Fazenda <span className="text-primary">Bispo</span>
           </h2>
-          <p className="max-w-2xl mx-auto text-muted-foreground text-lg">
+          <p className="section-description">
            Nascida da visão de Adaílson em 2002, a Fazenda Bispo transforma terras improdutivas em fontes de vida. Com 20 anos de tradição, cultivamos com amor e responsabilidade, oferecendo frutas que carregam a essência da nossa dedicação familiar e respeito pela terra.
           </p>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-8">
+        <div className="grid md:grid-cols-3 gap-6">
           {features.map((feature) => (
             <div
               key={feature.title}
-              className="bg-card rounded-xl p-8 text-center shadow-card hover:shadow-card-hover transition-shadow duration-300"
+              className="glass-card p-7 text-center transition-all duration-300 hover:-translate-y-0.5 hover:shadow-card-hover"
             >
-              <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-primary/10 mb-5">
+              <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-primary/10 mb-4">
                 <feature.icon className="h-7 w-7 text-primary" />
               </div>
-              <h3 className="font-display text-xl font-semibold text-foreground mb-3">
+              <h3 className="font-display text-xl font-semibold text-foreground mb-2">
                 {feature.title}
               </h3>
-              <p className="text-muted-foreground">{feature.description}</p>
+              <p className="text-muted-foreground leading-relaxed">{feature.description}</p>
             </div>
           ))}
         </div>

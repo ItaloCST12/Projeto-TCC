@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Navigate } from "react-router-dom";
-import { CalendarDays } from "lucide-react";
+import { BarChart3, CalendarDays, Receipt, TrendingUp, Wallet } from "lucide-react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import Navbar from "@/components/Navbar";
 import PageShell from "@/components/PageShell";
 import { apiRequest } from "@/lib/api";
 import { getAuthUser, isAuthenticated } from "@/lib/auth";
+import logoAbacaxi from "@/assets/abacaxi-logo.svg";
 
 type PedidoAdmin = {
   id: number;
@@ -221,6 +222,30 @@ const obterItensPedido = (pedido: PedidoAdmin) => {
 const totalQuantidadePedido = (pedido: PedidoAdmin) =>
   obterItensPedido(pedido).reduce((total, item) => total + (Number(item.quantidade) || 0), 0);
 
+const obterItensVenda = (venda: VendaControle) => {
+  if (venda.items && venda.items.length > 0) {
+    return venda.items;
+  }
+
+  if (venda.produto?.nome) {
+    return [
+      {
+        id: -venda.id,
+        quantidade: 1,
+        unidade: "un",
+        valorUnitario: venda.valorTotal,
+        valorTotalItem: venda.valorTotal,
+        produto: { nome: venda.produto.nome },
+      },
+    ];
+  }
+
+  return [];
+};
+
+const totalQuantidadeVenda = (venda: VendaControle) =>
+  obterItensVenda(venda).reduce((total, item) => total + (Number(item.quantidade) || 0), 0);
+
 const formatarPeriodoVendas = (
   periodo: "last_month" | "last_3_months" | "last_6_months" | "last_year" | "custom",
   dataInicio: string,
@@ -245,6 +270,32 @@ const formatarPeriodoVendas = (
 
   return "Período personalizado";
 };
+
+const carregarImagemComoDataUrl = (src: string) =>
+  new Promise<string>((resolve, reject) => {
+    const imagem = new Image();
+
+    imagem.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = imagem.naturalWidth;
+      canvas.height = imagem.naturalHeight;
+
+      const contexto = canvas.getContext("2d");
+      if (!contexto) {
+        reject(new Error("Não foi possível preparar a imagem para o PDF."));
+        return;
+      }
+
+      contexto.drawImage(imagem, 0, 0);
+      resolve(canvas.toDataURL("image/png"));
+    };
+
+    imagem.onerror = () => {
+      reject(new Error("Não foi possível carregar o logo para o PDF."));
+    };
+
+    imagem.src = src;
+  });
 
 const PainelEntregas = () => {
   const authenticated = isAuthenticated();
@@ -295,6 +346,7 @@ const PainelEntregas = () => {
   const [loadingVendas, setLoadingVendas] = useState(false);
   const [errorVendas, setErrorVendas] = useState("");
   const [vendas, setVendas] = useState<VendaControle[]>([]);
+  const [vendasPeriodoSelecionado, setVendasPeriodoSelecionado] = useState<VendaControle[]>([]);
   const [resumoVendas, setResumoVendas] = useState({ totalVendas: 0, valorTotalArrecadado: 0 });
   const [paginaVendas, setPaginaVendas] = useState(1);
   const [totalPaginasVendas, setTotalPaginasVendas] = useState(1);
@@ -382,12 +434,29 @@ const PainelEntregas = () => {
       setResumoVendas(response.resumo);
       setPaginaVendas(response.pagination.page);
       setTotalPaginasVendas(response.pagination.totalPages);
+
+      const vendasPeriodo: VendaControle[] = [...response.data];
+      if (response.pagination.totalPages > 1) {
+        for (let pagina = 1; pagina <= response.pagination.totalPages; pagina += 1) {
+          if (pagina === response.pagination.page) {
+            continue;
+          }
+
+          const respostaPagina = await apiRequest<RespostaControleVendas>(
+            `/pedidos/controle-vendas?${montarParamsControleVendas(pagina).toString()}`,
+          );
+          vendasPeriodo.push(...respostaPagina.data);
+        }
+      }
+
+      setVendasPeriodoSelecionado(vendasPeriodo);
     } catch (loadError) {
       setErrorVendas(
         loadError instanceof Error
           ? loadError.message
           : "Não foi possível carregar o controle de vendas.",
       );
+      setVendasPeriodoSelecionado([]);
     } finally {
       setLoadingVendas(false);
     }
@@ -535,6 +604,73 @@ const PainelEntregas = () => {
     () => pedidosFiltradosPorTipo.filter((pedido) => isRetirada(pedido)),
     [pedidosFiltradosPorTipo],
   );
+
+  const resumoVendasPorPagamento = useMemo(() => {
+    const acumulado: Record<string, { quantidade: number; valor: number }> = {};
+
+    vendasPeriodoSelecionado.forEach((venda) => {
+      const chave = venda.formaPagamento?.trim() || "Não informado";
+
+      if (!acumulado[chave]) {
+        acumulado[chave] = { quantidade: 0, valor: 0 };
+      }
+
+      acumulado[chave].quantidade += 1;
+      acumulado[chave].valor += Number(venda.valorTotal) || 0;
+    });
+
+    return Object.entries(acumulado)
+      .map(([formaPagamento, dados]) => ({ formaPagamento, ...dados }))
+      .sort((a, b) => b.quantidade - a.quantidade);
+  }, [vendasPeriodoSelecionado]);
+
+  const valorTotalPeriodoSelecionado = useMemo(
+    () => vendasPeriodoSelecionado.reduce((total, venda) => total + (Number(venda.valorTotal) || 0), 0),
+    [vendasPeriodoSelecionado],
+  );
+
+  const ticketMedioPeriodo = useMemo(() => {
+    if (resumoVendas.totalVendas <= 0) {
+      return 0;
+    }
+
+    return resumoVendas.valorTotalArrecadado / resumoVendas.totalVendas;
+  }, [resumoVendas]);
+
+  const maiorVendaPeriodo = useMemo(() => {
+    if (vendasPeriodoSelecionado.length === 0) {
+      return 0;
+    }
+
+    return vendasPeriodoSelecionado.reduce(
+      (maior, venda) => Math.max(maior, Number(venda.valorTotal) || 0),
+      0,
+    );
+  }, [vendasPeriodoSelecionado]);
+
+  const rankingProdutosVendas = useMemo(() => {
+    const acumulado: Record<string, { quantidade: number; valor: number }> = {};
+
+    vendasPeriodoSelecionado.forEach((venda) => {
+      const itens = obterItensVenda(venda);
+
+      itens.forEach((item) => {
+        const nomeProduto = item.produto?.nome?.trim() || "Produto";
+
+        if (!acumulado[nomeProduto]) {
+          acumulado[nomeProduto] = { quantidade: 0, valor: 0 };
+        }
+
+        acumulado[nomeProduto].quantidade += Number(item.quantidade) || 0;
+        acumulado[nomeProduto].valor += Number(item.valorTotalItem) || 0;
+      });
+    });
+
+    return Object.entries(acumulado)
+      .map(([nome, dados]) => ({ nome, ...dados }))
+      .sort((a, b) => b.valor - a.valor)
+      .slice(0, 5);
+  }, [vendasPeriodoSelecionado]);
 
   const finalizarPedido = async (id: number) => {
     setUpdatingId(id);
@@ -792,6 +928,13 @@ const PainelEntregas = () => {
     setErrorVendas("");
 
     try {
+      let logoDataUrl: string | null = null;
+      try {
+        logoDataUrl = await carregarImagemComoDataUrl(logoAbacaxi);
+      } catch {
+        logoDataUrl = null;
+      }
+
       const primeiraResposta = await apiRequest<RespostaControleVendas>(
         `/pedidos/controle-vendas?${montarParamsControleVendas(1).toString()}`,
       );
@@ -816,44 +959,115 @@ const PainelEntregas = () => {
         timeStyle: "short",
       }).format(new Date());
 
+      const resumoPorPagamento = todasAsVendas.reduce<Record<string, { quantidade: number; valor: number }>>(
+        (acumulado, venda) => {
+          const chave = venda.formaPagamento?.trim() || "Não informado";
+
+          if (!acumulado[chave]) {
+            acumulado[chave] = { quantidade: 0, valor: 0 };
+          }
+
+          acumulado[chave].quantidade += 1;
+          acumulado[chave].valor += Number(venda.valorTotal) || 0;
+
+          return acumulado;
+        },
+        {},
+      );
+
+      const cabecalhoY = 12;
+      doc.setFillColor(245, 248, 243);
+      doc.roundedRect(12, cabecalhoY, 186, 34, 3, 3, "F");
+
+      if (logoDataUrl) {
+        doc.addImage(logoDataUrl, "PNG", 16, cabecalhoY + 6, 14, 14);
+      }
+
+      const tituloX = logoDataUrl ? 34 : 16;
+
       doc.setFontSize(16);
-      doc.text("Relatório de Controle de Vendas", 14, 16);
+      doc.text("Relatório de Controle de Vendas", tituloX, cabecalhoY + 11);
 
       doc.setFontSize(11);
-      doc.text(`Período: ${periodoLabel}`, 14, 24);
-      doc.text(`Total de vendas: ${primeiraResposta.resumo.totalVendas}`, 14, 30);
+      doc.text("Fazenda Bispo", tituloX, cabecalhoY + 18);
+
+      doc.setFontSize(10);
+      doc.text(`Período: ${periodoLabel}`, 16, 54);
+      doc.text(`Total de vendas: ${primeiraResposta.resumo.totalVendas}`, 16, 60);
       doc.text(
         `Valor total arrecadado: ${formatarMoeda(primeiraResposta.resumo.valorTotalArrecadado)}`,
-        14,
-        36,
+        16,
+        66,
       );
-      doc.text(`Gerado em: ${dataGeracao}`, 14, 42);
+      doc.text(`Gerado em: ${dataGeracao}`, 16, 72);
 
       autoTable(doc, {
-        startY: 48,
-        head: [["Pedido", "Data", "Cliente", "Produtos", "Forma de pagamento", "Valor total"]],
+        startY: 78,
+        head: [["Forma de pagamento", "Quantidade", "Valor"]],
+        body: Object.entries(resumoPorPagamento)
+          .sort((a, b) => b[1].quantidade - a[1].quantidade)
+          .map(([formaPagamento, dados]) => [
+            formaPagamento,
+            String(dados.quantidade),
+            formatarMoeda(dados.valor),
+          ]),
+        styles: { fontSize: 9, cellPadding: 2.5, textColor: [40, 40, 40] },
+        headStyles: { fillColor: [46, 125, 50], textColor: [255, 255, 255] },
+        columnStyles: {
+          0: { cellWidth: 90 },
+          1: { cellWidth: 35, halign: "center" },
+          2: { cellWidth: 55, halign: "right" },
+        },
+      });
+
+      const ultimoYResumo = (doc as jsPDF & { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY ?? 78;
+
+      autoTable(doc, {
+        startY: ultimoYResumo + 6,
+        head: [["Pedido", "Data", "Cliente", "Pagamento", "Itens", "Total"]],
         body: todasAsVendas.map((venda) => {
           const produtosTexto =
             venda.items && venda.items.length > 0
               ? venda.items
                   .map(
                     (item) =>
-                      `${item.produto?.nome ?? "Produto"} (${item.quantidade} ${item.unidade}) - ${formatarMoeda(item.valorTotalItem)}`,
+                      `${item.produto?.nome ?? "Produto"} - ${item.quantidade} ${item.unidade} - ${formatarMoeda(item.valorTotalItem)}`,
                   )
-                  .join("; ")
+                  .join("\n")
               : `${venda.produto?.nome ?? "Produto"} - ${formatarMoeda(venda.valorTotal)}`;
 
           return [
             `#${venda.id}`,
             formatarData(resolverDataVenda(venda)),
             venda.usuario?.nome || venda.usuario?.email || "-",
-            produtosTexto,
             venda.formaPagamento,
+            produtosTexto,
             formatarMoeda(venda.valorTotal),
           ];
         }),
-        styles: { fontSize: 9, cellPadding: 2 },
-        headStyles: { fillColor: [46, 125, 50] },
+        styles: {
+          fontSize: 8.5,
+          cellPadding: 2.2,
+          textColor: [35, 35, 35],
+          valign: "top",
+          lineColor: [220, 220, 220],
+          lineWidth: 0.1,
+        },
+        headStyles: { fillColor: [46, 125, 50], textColor: [255, 255, 255] },
+        columnStyles: {
+          0: { cellWidth: 16 },
+          1: { cellWidth: 25 },
+          2: { cellWidth: 35 },
+          3: { cellWidth: 25 },
+          4: { cellWidth: 62 },
+          5: { cellWidth: 22, halign: "right" },
+        },
+        didDrawPage: (data) => {
+          const paginaAtual = doc.getCurrentPageInfo().pageNumber;
+          doc.setFontSize(8);
+          doc.setTextColor(120, 120, 120);
+          doc.text(`Página ${paginaAtual}`, data.settings.margin.left, 290);
+        },
       });
 
       doc.save("controle-vendas.pdf");
@@ -1306,16 +1520,124 @@ const PainelEntregas = () => {
               </button>
             </div>
 
-            <div className="grid sm:grid-cols-2 gap-2 mb-4">
-              <div className="rounded-lg border border-border p-3">
-                <p className="text-xs text-muted-foreground">Total de vendas</p>
-                <p className="text-xl font-bold text-foreground">{resumoVendas.totalVendas}</p>
+            <div className="mb-4 rounded-xl border border-border bg-muted/25 p-3 sm:p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <BarChart3 className="h-4 w-4 text-primary" />
+                <h3 className="text-sm font-semibold text-foreground">Dashboard de Vendas</h3>
               </div>
-              <div className="rounded-lg border border-border p-3">
-                <p className="text-xs text-muted-foreground">Valor arrecadado</p>
-                <p className="text-xl font-bold text-foreground">{formatarMoeda(resumoVendas.valorTotalArrecadado)}</p>
+
+              <div className="grid sm:grid-cols-2 xl:grid-cols-4 gap-2 mb-3">
+                <div className="rounded-lg border border-border bg-background p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs text-muted-foreground">Vendas no período</p>
+                    <Receipt className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                  <p className="text-xl font-bold text-foreground mt-1">{resumoVendas.totalVendas}</p>
+                </div>
+                <div className="rounded-lg border border-border bg-background p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs text-muted-foreground">Faturamento</p>
+                    <Wallet className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                  <p className="text-xl font-bold text-foreground mt-1">
+                    {formatarMoeda(resumoVendas.valorTotalArrecadado)}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-border bg-background p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs text-muted-foreground">Ticket médio</p>
+                    <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                  <p className="text-xl font-bold text-foreground mt-1">{formatarMoeda(ticketMedioPeriodo)}</p>
+                </div>
+                <div className="rounded-lg border border-border bg-background p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs text-muted-foreground">Maior venda do período</p>
+                    <BarChart3 className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                  <p className="text-xl font-bold text-foreground mt-1">{formatarMoeda(maiorVendaPeriodo)}</p>
+                </div>
+              </div>
+
+              <div className="grid lg:grid-cols-2 gap-3">
+                <div className="rounded-lg border border-border bg-background p-3">
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground mb-2">
+                    Formas de pagamento (período selecionado)
+                  </p>
+                  {resumoVendasPorPagamento.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">Sem dados de pagamento na página atual.</p>
+                  ) : (
+                    <ul className="space-y-2">
+                      {resumoVendasPorPagamento.map((item) => {
+                        const percentual = valorTotalPeriodoSelecionado > 0
+                          ? (item.valor / valorTotalPeriodoSelecionado) * 100
+                          : 0;
+
+                        return (
+                          <li key={item.formaPagamento}>
+                            <div className="flex items-center justify-between gap-2 text-xs">
+                              <span className="font-medium text-foreground">{item.formaPagamento}</span>
+                              <span className="text-muted-foreground">
+                                {item.quantidade} venda(s) • {formatarMoeda(item.valor)}
+                              </span>
+                            </div>
+                            <div className="mt-1 h-2 rounded-full bg-muted overflow-hidden">
+                              <div
+                                className="h-full rounded-full bg-primary"
+                                style={{ width: `${Math.min(100, Math.max(0, percentual))}%` }}
+                              />
+                            </div>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </div>
+
+                <div className="rounded-lg border border-border bg-background p-3">
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground mb-2">
+                    Top produtos por faturamento (período selecionado)
+                  </p>
+                  {rankingProdutosVendas.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">Sem itens para gerar ranking.</p>
+                  ) : (
+                    <ul className="space-y-2">
+                      {rankingProdutosVendas.map((produto, index) => (
+                        <li key={produto.nome} className="flex items-center justify-between gap-2 text-sm">
+                          <span className="text-foreground">
+                            {index + 1}. {produto.nome}
+                          </span>
+                          <span className="text-muted-foreground">
+                            {produto.quantidade} un • {formatarMoeda(produto.valor)}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
               </div>
             </div>
+
+            {resumoVendasPorPagamento.length > 0 && (
+              <div className="mb-4 rounded-lg border border-border bg-muted/30 p-3">
+                <p className="text-xs uppercase tracking-wide text-muted-foreground mb-2">
+                  Resumo por forma de pagamento
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {resumoVendasPorPagamento.map((item) => (
+                    <div
+                      key={item.formaPagamento}
+                      className="rounded-md border border-border bg-background px-2.5 py-1.5"
+                    >
+                      <p className="text-xs font-semibold text-foreground">{item.formaPagamento}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {item.quantidade} venda(s) • {formatarMoeda(item.valor)}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className="mb-4">
               <button
@@ -1338,48 +1660,72 @@ const PainelEntregas = () => {
               <p className="text-muted-foreground">Nenhuma venda concluída no período selecionado.</p>
             ) : (
               <>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-border text-left">
-                        <th className="py-2 pr-2">Pedido</th>
-                        <th className="py-2 pr-2">Data</th>
-                        <th className="py-2 pr-2">Cliente</th>
-                        <th className="py-2 pr-2">Produtos</th>
-                        <th className="py-2 pr-2">Valor dos produtos</th>
-                        <th className="py-2 pr-2">Pagamento</th>
-                        <th className="py-2 pr-2">Total do pedido</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {vendas.map((venda) => (
-                        <tr key={venda.id} className="border-b border-border/70">
-                          <td className="py-2 pr-2">#{venda.id}</td>
-                          <td className="py-2 pr-2">{formatarData(resolverDataVenda(venda))}</td>
-                          <td className="py-2 pr-2">{venda.usuario?.nome || venda.usuario?.email || "-"}</td>
-                          <td className="py-2 pr-2">
-                            {venda.items && venda.items.length > 0
-                              ? venda.items
-                                  .map(
-                                    (item) =>
-                                      `${item.produto?.nome ?? "Produto"} (${item.quantidade} ${item.unidade})`,
-                                  )
-                                  .join(", ")
-                              : venda.produto?.nome || "-"}
-                          </td>
-                          <td className="py-2 pr-2">
-                            {venda.items && venda.items.length > 0
-                              ? venda.items
-                                  .map((item) => `${item.produto?.nome ?? "Produto"}: ${formatarMoeda(item.valorTotalItem)}`)
-                                  .join(" • ")
-                              : formatarMoeda(venda.valorTotal)}
-                          </td>
-                          <td className="py-2 pr-2">{venda.formaPagamento}</td>
-                          <td className="py-2 pr-2">{formatarMoeda(venda.valorTotal)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                <div className="space-y-3">
+                  {vendas.map((venda) => {
+                    const itens = obterItensVenda(venda);
+
+                    return (
+                      <article key={venda.id} className="rounded-xl border border-border/80 bg-background p-3 sm:p-4">
+                        <div className="flex flex-wrap items-start justify-between gap-2">
+                          <div>
+                            <p className="text-base font-semibold text-foreground">Pedido #{venda.id}</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              {formatarData(resolverDataVenda(venda))}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <span className="inline-flex rounded-full border border-border px-2 py-1 text-xs font-semibold text-foreground bg-muted/60">
+                              {venda.formaPagamento || "Não informado"}
+                            </span>
+                            <p className="text-lg font-bold text-foreground mt-1">
+                              {formatarMoeda(venda.valorTotal)}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="mt-3 grid sm:grid-cols-3 gap-2 text-sm">
+                          <div className="rounded-md border border-border/70 bg-muted/25 px-2.5 py-2">
+                            <p className="text-xs text-muted-foreground">Cliente</p>
+                            <p className="text-foreground font-medium truncate">
+                              {venda.usuario?.nome || venda.usuario?.email || "-"}
+                            </p>
+                          </div>
+                          <div className="rounded-md border border-border/70 bg-muted/25 px-2.5 py-2">
+                            <p className="text-xs text-muted-foreground">Itens no pedido</p>
+                            <p className="text-foreground font-medium">{totalQuantidadeVenda(venda)}</p>
+                          </div>
+                          <div className="rounded-md border border-border/70 bg-muted/25 px-2.5 py-2">
+                            <p className="text-xs text-muted-foreground">Valor dos produtos</p>
+                            <p className="text-foreground font-medium">{formatarMoeda(venda.valorTotal)}</p>
+                          </div>
+                        </div>
+
+                        <div className="mt-3 rounded-lg border border-border/70 overflow-hidden">
+                          <div className="grid grid-cols-[1.5fr_auto_auto] gap-2 bg-muted/40 px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                            <span>Produto</span>
+                            <span>Qtd.</span>
+                            <span>Subtotal</span>
+                          </div>
+                          <ul className="divide-y divide-border/70">
+                            {itens.map((item) => (
+                              <li
+                                key={item.id}
+                                className="grid grid-cols-[1.5fr_auto_auto] gap-2 px-3 py-2 text-sm"
+                              >
+                                <span className="text-foreground truncate">{item.produto?.nome ?? "Produto"}</span>
+                                <span className="text-muted-foreground text-right">
+                                  {item.quantidade} {item.unidade}
+                                </span>
+                                <span className="text-foreground font-medium text-right">
+                                  {formatarMoeda(item.valorTotalItem)}
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      </article>
+                    );
+                  })}
                 </div>
 
                 {totalPaginasVendas > 1 && (
