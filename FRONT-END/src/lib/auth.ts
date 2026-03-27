@@ -9,20 +9,44 @@ export type AuthUser = {
 const TOKEN_KEY = "authToken";
 const USER_KEY = "authUser";
 
-export const getAuthToken = () => localStorage.getItem(TOKEN_KEY);
+const readStorage = (key: string) => {
+  try {
+    return window.localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+};
+
+const writeStorage = (key: string, value: string) => {
+  try {
+    window.localStorage.setItem(key, value);
+  } catch {
+    // Silencia erro de storage indisponivel para nao quebrar o app.
+  }
+};
+
+const removeStorage = (key: string) => {
+  try {
+    window.localStorage.removeItem(key);
+  } catch {
+    // Silencia erro de storage indisponivel para nao quebrar o app.
+  }
+};
+
+export const getAuthToken = () => readStorage(TOKEN_KEY);
 
 export const setAuthSession = (token: string, user: AuthUser) => {
-  localStorage.setItem(TOKEN_KEY, token);
-  localStorage.setItem(USER_KEY, JSON.stringify(user));
+  writeStorage(TOKEN_KEY, token);
+  writeStorage(USER_KEY, JSON.stringify(user));
 };
 
 export const clearAuthSession = () => {
-  localStorage.removeItem(TOKEN_KEY);
-  localStorage.removeItem(USER_KEY);
+  removeStorage(TOKEN_KEY);
+  removeStorage(USER_KEY);
 };
 
 export const getAuthUser = (): AuthUser | null => {
-  const raw = localStorage.getItem(USER_KEY);
+  const raw = readStorage(USER_KEY);
   if (!raw) {
     return null;
   }

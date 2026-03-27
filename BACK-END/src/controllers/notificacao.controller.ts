@@ -86,6 +86,20 @@ export const marcarNotificacoesComoLidas = async (req: Request, res: Response) =
   }
 };
 
+export const limparNotificacoes = async (req: Request, res: Response) => {
+  try {
+    const usuarioId = req.usuario?.usuarioId;
+    if (!usuarioId) {
+      return res.status(401).json({ error: "Usuário não autenticado" });
+    }
+
+    const resultado = await notificacaoService.limparTodas(usuarioId, req.usuario?.role);
+    return res.json(resultado);
+  } catch (error) {
+    return res.status(400).json({ error: (error as Error).message });
+  }
+};
+
 export const registrarPushSubscription = async (req: Request, res: Response) => {
   try {
     const usuarioId = req.usuario?.usuarioId;

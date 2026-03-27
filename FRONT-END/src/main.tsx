@@ -1,8 +1,46 @@
 import { createRoot } from "react-dom/client";
+import React, { type ReactNode } from "react";
 import App from "./App.tsx";
 import "./index.css";
 
+// Fallback class local para evitar tela branca em erros de runtime do React.
+class AppErrorBoundary extends React.Component<{ children: ReactNode }, { hasError: boolean }> {
+	constructor(props: { children: ReactNode }) {
+		super(props);
+		this.state = { hasError: false };
+	}
+
+	static getDerivedStateFromError() {
+		return { hasError: true };
+	}
+
+	override componentDidCatch(error: unknown) {
+		console.error("[APP] Erro de renderizacao:", error);
+	}
+
+	override render() {
+		if (this.state.hasError) {
+			return (
+				<div className="min-h-screen flex items-center justify-center bg-background text-foreground p-6 text-center">
+					<div>
+						<h1 className="text-xl font-semibold">Nao foi possivel carregar a pagina.</h1>
+						<p className="mt-2 text-sm text-muted-foreground">
+							Recarregue a pagina. Se persistir, limpe os dados do site no navegador.
+						</p>
+					</div>
+				</div>
+			);
+		}
+
+		return this.props.children;
+	}
+}
+
 const registrarServiceWorkerPush = () => {
+	if (!window.isSecureContext) {
+		return;
+	}
+
 	if (!("serviceWorker" in navigator)) {
 		return;
 	}
@@ -111,9 +149,13 @@ const bootstrapVlibras = () => {
 };
 
 const bootstrapAccessibilityWidget = () => {
-	const handTalkLoaded = bootstrapHandTalk();
-	if (!handTalkLoaded) {
-		bootstrapVlibras();
+	try {
+		const handTalkLoaded = bootstrapHandTalk();
+		if (!handTalkLoaded) {
+			bootstrapVlibras();
+		}
+	} catch (error) {
+		console.error("[A11Y] Falha ao inicializar widget de acessibilidade:", error);
 	}
 };
 
@@ -127,4 +169,13 @@ if (document.readyState === "loading") {
 
 registrarServiceWorkerPush();
 
-createRoot(document.getElementById("root")!).render(<App />);
+const rootElement = document.getElementById("root");
+if (!rootElement) {
+	throw new Error("Elemento #root nao encontrado.");
+}
+
+createRoot(rootElement).render(
+	<AppErrorBoundary>
+		<App />
+	</AppErrorBoundary>,
+);

@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { Bell, CheckCheck } from "lucide-react";
+import { Bell, CheckCheck, Trash2 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { apiRequest } from "@/lib/api";
+import { getAuthUser } from "@/lib/auth";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -59,11 +61,15 @@ const formatarData = (valor: string) => {
 };
 
 const NotificationBell = ({ mobile = false }: Props) => {
+  const navigate = useNavigate();
+  const usuario = getAuthUser();
+  const isAdmin = usuario?.role === "ADMIN";
   const [itens, setItens] = useState<Notificacao[]>([]);
   const [naoLidas, setNaoLidas] = useState(0);
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState("");
   const [pushAtivo, setPushAtivo] = useState(false);
+  const suportaNotificationApi = typeof window !== "undefined" && "Notification" in window;
 
   const temNotificacoes = itens.length > 0;
 
@@ -91,7 +97,11 @@ const NotificationBell = ({ mobile = false }: Props) => {
   };
 
   const inscreverPushNoDispositivo = async () => {
-    if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+    if (
+      !("serviceWorker" in navigator) ||
+      !("PushManager" in window) ||
+      !suportaNotificationApi
+    ) {
       return;
     }
 
@@ -187,6 +197,29 @@ const NotificationBell = ({ mobile = false }: Props) => {
     }
   };
 
+  const limparNotificacoes = async () => {
+    try {
+      await apiRequest("/notificacoes", { method: "DELETE" });
+      setItens([]);
+      setNaoLidas(0);
+      setErro("");
+    } catch (error) {
+      setErro(error instanceof Error ? error.message : "Falha ao limpar notificações.");
+    }
+  };
+
+  const abrirDestinoDaNotificacao = async (item: Notificacao) => {
+    if (!item.lida) {
+      try {
+        await marcarTodasComoLidas();
+      } catch {
+        // Segue com a navegação mesmo se houver erro ao atualizar leitura.
+      }
+    }
+
+    navigate(isAdmin ? "/painel-entregas" : "/minhas-encomendas");
+  };
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -211,7 +244,7 @@ const NotificationBell = ({ mobile = false }: Props) => {
         <div className="px-3 py-2 border-b border-border flex items-center justify-between gap-2">
           <DropdownMenuLabel className="p-0 text-sm">Notificações recentes</DropdownMenuLabel>
           <div className="inline-flex items-center gap-2">
-            {!pushAtivo && Notification.permission !== "denied" && (
+            {!pushAtivo && suportaNotificationApi && Notification.permission !== "denied" && (
               <button
                 type="button"
                 onClick={() => void inscreverPushNoDispositivo()}
@@ -228,6 +261,14 @@ const NotificationBell = ({ mobile = false }: Props) => {
               <CheckCheck className="h-3.5 w-3.5" />
               Marcar lidas
             </button>
+            <button
+              type="button"
+              onClick={() => void limparNotificacoes()}
+              className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-semibold text-muted-foreground hover:bg-muted hover:text-foreground"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              Limpar
+            </button>
           </div>
         </div>
 
@@ -243,11 +284,22 @@ const NotificationBell = ({ mobile = false }: Props) => {
               {itens.map((item) => (
                 <li
                   key={item.id}
-                  className={`rounded-lg border px-3 py-2 ${
+                  className={`rounded-lg border px-3 py-2 cursor-pointer transition-colors hover:bg-muted/70 ${
                     item.lida
                       ? "border-border/70 bg-background"
                       : "border-primary/25 bg-primary/5"
                   }`}
+                  onClick={() => {
+                    void abrirDestinoDaNotificacao(item);
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      void abrirDestinoDaNotificacao(item);
+                    }
+                  }}
+                  role="button"
+                  tabIndex={0}
                 >
                   <p className="text-sm font-semibold text-foreground leading-tight">{item.titulo}</p>
                   <p className="text-sm text-muted-foreground mt-1 leading-snug">{item.mensagem}</p>

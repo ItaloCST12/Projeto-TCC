@@ -5,6 +5,7 @@ import {
   registrarPushSubscription,
   marcarNotificacoesComoLidas,
   removerPushSubscription,
+  limparNotificacoes,
 } from "../controllers/notificacao.controller";
 import { authMiddleware } from "../middlewares/auth.middleware";
 
@@ -15,5 +16,6 @@ router.get("/push/public-key", obterChavePublicaPush);
 router.post("/push/inscrever", authMiddleware, registrarPushSubscription);
 router.delete("/push/inscrever", authMiddleware, removerPushSubscription);
 router.patch("/marcar-lidas", authMiddleware, marcarNotificacoesComoLidas);
+router.delete("/", authMiddleware, limparNotificacoes);
 
 export default router;

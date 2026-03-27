@@ -11,6 +11,30 @@ const MAX_QUANTIDADE_POR_ITEM = 1000;
 
 const isBrowser = () => typeof window !== "undefined";
 
+const readStorage = (key: string) => {
+  if (!isBrowser()) {
+    return null;
+  }
+
+  try {
+    return window.localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+};
+
+const writeStorage = (key: string, value: string) => {
+  if (!isBrowser()) {
+    return;
+  }
+
+  try {
+    window.localStorage.setItem(key, value);
+  } catch {
+    // Silencia erro de storage indisponivel para nao quebrar o app.
+  }
+};
+
 const normalizeQuantidade = (quantidade: number) => {
   if (!Number.isFinite(quantidade)) {
     return 1;
@@ -70,7 +94,7 @@ const writeCart = (items: CartItem[]) => {
     return;
   }
 
-  window.localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items));
+  writeStorage(CART_STORAGE_KEY, JSON.stringify(items));
   notifyCartUpdated();
 };
 
@@ -79,7 +103,7 @@ export const getCartItems = (): CartItem[] => {
     return [];
   }
 
-  const raw = window.localStorage.getItem(CART_STORAGE_KEY);
+  const raw = readStorage(CART_STORAGE_KEY);
   if (!raw) {
     return [];
   }

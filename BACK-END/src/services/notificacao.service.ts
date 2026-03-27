@@ -286,4 +286,21 @@ export class NotificacaoService {
       atualizadas: resultado.count,
     };
   }
+
+  async limparTodas(usuarioId: number, role?: string) {
+    const destino = resolverDestino(role);
+
+    const whereBase =
+      destino === "ADMIN"
+        ? { destinoRole: "ADMIN" as const }
+        : { destinoRole: "CLIENTE" as const, usuarioId };
+
+    const resultado = await prisma.notificacao.deleteMany({
+      where: whereBase,
+    });
+
+    return {
+      removidas: resultado.count,
+    };
+  }
 }

@@ -64,7 +64,29 @@ const apiPrefixes = [
   "/notificacoes",
 ];
 
-app.use(helmet());
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: [
+          "'self'",
+          "https://plugin.handtalk.me",
+          "https://vlibras.gov.br",
+        ],
+        styleSrc: ["'self'", "https:", "'unsafe-inline'"],
+        imgSrc: ["'self'", "data:", "https:"],
+        connectSrc: ["'self'", "https:", "wss:"],
+        fontSrc: ["'self'", "https:", "data:"],
+        frameSrc: ["'self'", "https:"],
+        workerSrc: ["'self'"],
+        upgradeInsecureRequests: null,
+      },
+    },
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+    crossOriginEmbedderPolicy: false,
+  }),
+);
 app.use(express.json());
 app.use(
   cors({
@@ -72,18 +94,27 @@ app.use(
     credentials: true,
   }),
 );
-app.use(express.static(staticDir));
+app.use(
+  express.static(staticDir, {
+    index: false,
+  }),
+);
 app.use(routes);
 
 app.get("/", (_req, res) => {
+  res.setHeader("Cache-Control", "no-store");
   res.sendFile(path.join(staticDir, "index.html"));
 });
 
 app.get(/.*/, (req, res, next) => {
-  if (apiPrefixes.some((prefix) => req.path.startsWith(prefix))) {
+  const isApiRoute = apiPrefixes.some((prefix) => req.path.startsWith(prefix));
+  const isStaticFileRequest = path.extname(req.path) !== "";
+
+  if (isApiRoute || isStaticFileRequest) {
     return next();
   }
 
+  res.setHeader("Cache-Control", "no-store");
   return res.sendFile(path.join(staticDir, "index.html"));
 });
 
