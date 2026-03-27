@@ -1,8 +1,18 @@
 import { formasPagamentoDisponiveis } from "./pagamento.service";
 import prisma from "../models/client";
 import { Prisma } from "@prisma/client";
+import { NotificacaoService } from "./notificacao.service";
 
 const MAX_QUANTIDADE_POR_ITEM = 1000;
+const notificacaoService = new NotificacaoService();
+
+const executarNotificacaoSemFalhar = async (callback: () => Promise<unknown>) => {
+  try {
+    await callback();
+  } catch (error) {
+    console.error("[NOTIFICACOES] Falha ao criar notificação:", error);
+  }
+};
 
 type FiltroPedidos = {
   page: number;
@@ -319,7 +329,7 @@ export class PedidoService {
             return valorUnitarioPrincipal * quantidadePrincipal;
           })();
 
-    return prisma.pedido.create({
+    const pedidoCriado = await prisma.pedido.create({
       data: {
         usuarioId,
         produtoId: produtoIdPrincipal,
@@ -338,6 +348,17 @@ export class PedidoService {
         endereco: true,
       },
     });
+
+    await executarNotificacaoSemFalhar(() =>
+      notificacaoService.criarParaAdmins({
+        tipo: "NOVO_PEDIDO",
+        titulo: "Você tem um novo pedido",
+        mensagem: `Novo pedido #${pedidoCriado.id} criado e aguardando processamento.`,
+        pedidoId: pedidoCriado.id,
+      }),
+    );
+
+    return pedidoCriado;
   }
 
   async getHistoricoUsuario(usuarioId: number) {
@@ -624,6 +645,15 @@ export class PedidoService {
       data: { status: "PRONTO_PARA_RETIRADA" },
     });
 
+    await executarNotificacaoSemFalhar(() =>
+      notificacaoService.criarParaCliente(pedidoAtualizado.usuarioId, {
+        tipo: "PEDIDO_PRONTO_RETIRADA",
+        titulo: "Seu pedido está disponível para retirada",
+        mensagem: `O pedido #${pedidoAtualizado.id} está pronto para retirada no local.`,
+        pedidoId: pedidoAtualizado.id,
+      }),
+    );
+
     return pedidoAtualizado;
   }
 
@@ -662,6 +692,15 @@ export class PedidoService {
       data: { status: "SAIU_PARA_ENTREGA" },
     });
 
+    await executarNotificacaoSemFalhar(() =>
+      notificacaoService.criarParaCliente(pedidoAtualizado.usuarioId, {
+        tipo: "PEDIDO_SAIU_PARA_ENTREGA",
+        titulo: "Seu pedido saiu para entrega",
+        mensagem: `O pedido #${pedidoAtualizado.id} saiu para entrega.`,
+        pedidoId: pedidoAtualizado.id,
+      }),
+    );
+
     return pedidoAtualizado;
   }
 
@@ -685,9 +724,20 @@ export class PedidoService {
       throw new Error("Este pedido já foi cancelado");
     }
 
-    return prisma.pedido.update({
+    const pedidoCancelado = await prisma.pedido.update({
       where: { id },
       data: { status: "CANCELADO" },
     });
+
+    await executarNotificacaoSemFalhar(() =>
+      notificacaoService.criarParaAdmins({
+        tipo: "PEDIDO_CANCELADO",
+        titulo: "Pedido cancelado",
+        mensagem: `O pedido #${pedidoCancelado.id} foi cancelado pelo cliente.`,
+        pedidoId: pedidoCancelado.id,
+      }),
+    );
+
+    return pedidoCancelado;
   }
 }

@@ -61,6 +61,7 @@ const apiPrefixes = [
   "/pedidos",
   "/pagamentos",
   "/atendimentos",
+  "/notificacoes",
 ];
 
 app.use(helmet());

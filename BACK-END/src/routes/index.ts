@@ -7,6 +7,7 @@ import produtoRoutes from "./produto.route";
 import pedidoRoutes from "./pedido.route";
 import pagamentoRoutes from "./pagamento.route";
 import atendimentoRoutes from "./atendimento.route";
+import notificacaoRoutes from "./notificacao.route";
 
 const router = Router();
 
@@ -17,5 +18,6 @@ router.use("/produtos", produtoRoutes);
 router.use("/pedidos", pedidoRoutes);
 router.use("/pagamentos", pagamentoRoutes);
 router.use("/atendimentos", atendimentoRoutes);
+router.use("/notificacoes", notificacaoRoutes);
 
 export default router;

@@ -5,6 +5,7 @@ import { clearAuthSession, getAuthUser, isAuthenticated } from "@/lib/auth";
 import { getCartTotalItems, subscribeToCartUpdates } from "@/lib/cart";
 import logoAbacaxi from "@/assets/abacaxi-logo.svg";
 import AccessibilityControls from "@/components/AccessibilityControls";
+import NotificationBell from "@/components/NotificationBell";
 
 const storeLinks = [
   { label: "Início", href: "/#inicio" },
@@ -73,20 +74,23 @@ const Navbar = () => {
             />
           </a>
 
-          <Link
-            to={mobileCartTo}
-            className="relative inline-flex items-center justify-center h-10 w-10 rounded-xl border border-border/80 bg-card text-foreground hover:bg-muted/70 transition-colors"
-            aria-label="Carrinho"
-            title="Carrinho"
-            onClick={() => setMobileOpen(false)}
-          >
-            <ShoppingCart className="h-5 w-5" />
-            {loggedIn && cartTotalItems > 0 && (
-              <span className="absolute -top-1 -right-1 inline-flex items-center justify-center min-w-5 h-5 px-1 rounded-full bg-primary text-primary-foreground text-[10px] font-semibold leading-none">
-                {cartTotalItems}
-              </span>
-            )}
-          </Link>
+          <div className="flex items-center gap-2">
+            {loggedIn && <NotificationBell mobile />}
+            <Link
+              to={mobileCartTo}
+              className="relative inline-flex items-center justify-center h-10 w-10 rounded-xl border border-border/80 bg-card text-foreground hover:bg-muted/70 transition-colors"
+              aria-label="Carrinho"
+              title="Carrinho"
+              onClick={() => setMobileOpen(false)}
+            >
+              <ShoppingCart className="h-5 w-5" />
+              {loggedIn && cartTotalItems > 0 && (
+                <span className="absolute -top-1 -right-1 inline-flex items-center justify-center min-w-5 h-5 px-1 rounded-full bg-primary text-primary-foreground text-[10px] font-semibold leading-none">
+                  {cartTotalItems}
+                </span>
+              )}
+            </Link>
+          </div>
         </div>
 
         <div className="hidden lg:grid h-full grid-cols-[auto_1fr_auto] items-center gap-6">
@@ -145,6 +149,7 @@ const Navbar = () => {
 
             {loggedIn ? (
               <>
+                <NotificationBell />
                 <Link
                   to={profileLink}
                   aria-label="Abrir perfil"

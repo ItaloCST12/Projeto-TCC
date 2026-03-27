@@ -19,6 +19,8 @@ model Usuario {
   pedidos              Pedido[]
   atendimentoMensagens AtendimentoMensagem[]
   resetTokens          PasswordResetToken[]
+  notificacoes         Notificacao[]
+  pushSubscriptions    PushSubscription[]
 }
 
 model PasswordResetToken {
@@ -75,6 +77,42 @@ model Pedido {
   endereco       Endereco?     @relation(fields: [enderecoId], references: [id])
   items          ItemPedido[]
   pagamentoPix   PagamentoPix?
+  notificacoes   Notificacao[]
+}
+
+model Notificacao {
+  id          Int      @id @default(autoincrement())
+  usuarioId   Int?
+  pedidoId    Int?
+  destinoRole String
+  tipo        String
+  titulo      String
+  mensagem    String
+  lida        Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  usuario     Usuario? @relation(fields: [usuarioId], references: [id])
+  pedido      Pedido?  @relation(fields: [pedidoId], references: [id])
+
+  @@index([destinoRole, lida, createdAt])
+  @@index([usuarioId, lida, createdAt])
+  @@index([pedidoId])
+}
+
+model PushSubscription {
+  id             Int      @id @default(autoincrement())
+  usuarioId      Int
+  destinoRole    String
+  endpoint       String   @unique
+  p256dh         String
+  auth           String
+  expirationTime BigInt?
+  ativa          Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  usuario        Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@index([usuarioId, ativa])
+  @@index([destinoRole, ativa])
 }
 
 model PagamentoPix {

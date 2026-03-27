@@ -2,6 +2,18 @@ import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
 
+const registrarServiceWorkerPush = () => {
+	if (!("serviceWorker" in navigator)) {
+		return;
+	}
+
+	window.addEventListener("load", () => {
+		void navigator.serviceWorker.register("/push-sw.js").catch((error) => {
+			console.error("[PUSH] Falha ao registrar service worker:", error);
+		});
+	});
+};
+
 const HANDTALK_SCRIPT_ID = "handtalk-plugin-script";
 const HANDTALK_TOKEN = import.meta.env.VITE_HANDTALK_TOKEN?.trim();
 
@@ -112,5 +124,7 @@ if (document.readyState === "loading") {
 } else {
 	bootstrapAccessibilityWidget();
 }
+
+registrarServiceWorkerPush();
 
 createRoot(document.getElementById("root")!).render(<App />);
