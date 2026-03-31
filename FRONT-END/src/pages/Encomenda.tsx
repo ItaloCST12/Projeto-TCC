@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
+import { Package } from "lucide-react";
 import abacaxiImg from "@/assets/abacaxi.jpg";
 import laranjaImg from "@/assets/laranja.jpg";
 import tangerinaImg from "@/assets/tangerina.jpg";
@@ -327,6 +328,7 @@ const Encomenda = () => {
       <Navbar />
       <PageShell
         title="Produtos"
+        titleIcon={<Package className="h-5 w-5" />}
         subtitle={`${user?.nome ? `Olá, ${user.nome}.` : "Você está logado."} Escolha os produtos nos cards e adicione ao carrinho.`}
         containerClassName="max-w-6xl"
       >

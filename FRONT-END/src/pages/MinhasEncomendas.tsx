@@ -231,6 +231,7 @@ const MinhasEncomendas = () => {
       <Navbar />
       <PageShell
         title="Minhas Encomendas"
+        titleIcon={<CalendarDays className="h-5 w-5" />}
         subtitle={`${user?.nome ? `Olá, ${user.nome}.` : "Você está logado."} Acompanhe todos os seus pedidos em um só lugar.`}
         containerClassName="max-w-5xl"
       >

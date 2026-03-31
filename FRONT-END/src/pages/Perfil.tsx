@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
+import { UserCircle2 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import PageShell from "@/components/PageShell";
 import { apiRequest } from "@/lib/api";
@@ -198,6 +199,7 @@ const Perfil = () => {
       <Navbar />
       <PageShell
         title="Meu Perfil"
+        titleIcon={<UserCircle2 className="h-5 w-5" />}
         subtitle="Acompanhe seus dados, pedidos e atividade na plataforma."
         containerClassName="max-w-5xl"
       >

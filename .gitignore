@@ -1,5 +1,53 @@
-node_modules
-dist
+# ===== Dependências =====
+node_modules/
+
+# ===== Build =====
+dist/
+BACK-END/public/assets/
+
+# ===== Variáveis de ambiente =====
 .env
-.prisma
+.env.local
+.env.*.local
+BACK-END/.env
+FRONT-END/.env
+
+# ===== Prisma =====
+.prisma/
+
+# ===== Logs =====
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# ===== OS =====
 .DS_Store
+Thumbs.db
+Desktop.ini
+
+# ===== Editores e IDEs =====
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# ===== Chaves e credenciais =====
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.cert
+
+# ===== Cobertura de testes =====
+coverage/
+
+# ===== Docker volumes locais =====
+data_pgdir/
+data_pgadmin/

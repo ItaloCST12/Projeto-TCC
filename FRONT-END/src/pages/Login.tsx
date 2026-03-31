@@ -1,6 +1,6 @@
 import { FormEvent, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, UserCircle2 } from "lucide-react";
 import { apiRequest } from "@/lib/api";
 import { setAuthSession } from "@/lib/auth";
 import Navbar from "@/components/Navbar";
@@ -192,6 +192,7 @@ const Login = () => {
       <Navbar />
       <PageShell
         title="Entrar"
+        titleIcon={<UserCircle2 className="h-5 w-5" />}
         subtitle="Acesse sua conta ou crie um cadastro em poucos passos."
         containerClassName="max-w-3xl"
       >

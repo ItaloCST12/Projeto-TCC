@@ -1105,6 +1105,7 @@ const PainelEntregas = () => {
       <Navbar />
       <PageShell
         title="Painel Administrativo"
+        titleIcon={<BarChart3 className="h-5 w-5" />}
         subtitle="Gerencie entregas e produtos em um único lugar."
       >
         <div className="bg-card border border-border rounded-xl p-2 mb-4 flex flex-wrap gap-2 w-full">

@@ -45,18 +45,6 @@ export const login = async (data: { email: string; password?: string }) => {
   };
 };
 
-export const me = async (userId: string) => {
-  const user = await prisma.usuario.findUnique({
-    where: { id: Number(userId) },
-  });
-  if (!user) {
-    throw new Error("Usuário não encontrado!");
-  }
-
-  const { password, ...userWithoutPassword } = user;
-  return userWithoutPassword;
-};
-
 export const register = async (data: {
   nome: string;
   email: string;

@@ -1,5 +1,6 @@
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Navigate } from "react-router-dom";
+import { MessageCircle } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import PageShell from "@/components/PageShell";
 import { apiRequest } from "@/lib/api";
@@ -293,6 +294,7 @@ const Chat = () => {
       <Navbar />
       <PageShell
         title="Atendimento da Plataforma"
+        titleIcon={<MessageCircle className="h-5 w-5" />}
         subtitle={isAdmin ? "Atenda clientes e acompanhe conversas." : "Converse com nosso suporte."}
         containerClassName="max-w-5xl"
       >

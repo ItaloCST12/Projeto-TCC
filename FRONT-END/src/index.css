@@ -36,15 +36,6 @@
 
     --radius: 0.75rem;
 
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 240 5.9% 10%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 4.8% 95.9%;
-    --sidebar-accent-foreground: 240 5.9% 10%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
-
     --font-display: 'Raleway', sans-serif;
     --font-body: 'Lato', sans-serif;
 
@@ -75,14 +66,6 @@
     --border: 136 18% 22%;
     --input: 136 18% 22%;
     --ring: 129 42% 51%;
-    --sidebar-background: 136 24% 9%;
-    --sidebar-foreground: 45 100% 96%;
-    --sidebar-primary: 129 42% 51%;
-    --sidebar-primary-foreground: 136 24% 9%;
-    --sidebar-accent: 136 16% 18%;
-    --sidebar-accent-foreground: 45 100% 96%;
-    --sidebar-border: 136 18% 22%;
-    --sidebar-ring: 129 42% 51%;
   }
 
   .high-contrast {
@@ -113,15 +96,6 @@
     --border: 0 0% 100%;
     --input: 0 0% 100%;
     --ring: 56 100% 50%;
-
-    --sidebar-background: 0 0% 0%;
-    --sidebar-foreground: 0 0% 100%;
-    --sidebar-primary: 56 100% 50%;
-    --sidebar-primary-foreground: 0 0% 0%;
-    --sidebar-accent: 0 0% 15%;
-    --sidebar-accent-foreground: 0 0% 100%;
-    --sidebar-border: 0 0% 100%;
-    --sidebar-ring: 56 100% 50%;
   }
 
   .high-contrast body {

@@ -1,5 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
-import { Bell, CheckCheck, Trash2 } from "lucide-react";
+import {
+  AlertCircle,
+  Bell,
+  CheckCheck,
+  Clock3,
+  Inbox,
+  Loader2,
+  Package,
+  Settings2,
+  Trash2,
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { apiRequest } from "@/lib/api";
 import { getAuthUser } from "@/lib/auth";
@@ -14,6 +24,7 @@ import {
 type Notificacao = {
   id: number;
   pedidoId?: number | null;
+  tipo?: string;
   titulo: string;
   mensagem: string;
   lida: boolean;
@@ -60,6 +71,20 @@ const formatarData = (valor: string) => {
   }).format(data);
 };
 
+const obterIconeNotificacao = (item: Notificacao) => {
+  const tipo = String(item.tipo ?? "").toLowerCase();
+
+  if (item.pedidoId || tipo.includes("pedido") || tipo.includes("entrega")) {
+    return Package;
+  }
+
+  if (tipo.includes("sistema") || tipo.includes("config")) {
+    return Settings2;
+  }
+
+  return Bell;
+};
+
 const NotificationBell = ({ mobile = false }: Props) => {
   const navigate = useNavigate();
   const usuario = getAuthUser();
@@ -68,7 +93,6 @@ const NotificationBell = ({ mobile = false }: Props) => {
   const [naoLidas, setNaoLidas] = useState(0);
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState("");
-  const [pushAtivo, setPushAtivo] = useState(false);
   const suportaNotificationApi = typeof window !== "undefined" && "Notification" in window;
 
   const temNotificacoes = itens.length > 0;
@@ -149,8 +173,6 @@ const NotificationBell = ({ mobile = false }: Props) => {
         },
       },
     });
-
-    setPushAtivo(true);
   };
 
   useEffect(() => {
@@ -242,17 +264,11 @@ const NotificationBell = ({ mobile = false }: Props) => {
 
       <DropdownMenuContent align="end" className="w-[340px] p-0">
         <div className="px-3 py-2 border-b border-border flex items-center justify-between gap-2">
-          <DropdownMenuLabel className="p-0 text-sm">Notificações recentes</DropdownMenuLabel>
+          <DropdownMenuLabel className="p-0 text-sm inline-flex items-center gap-1.5">
+            <Bell className="h-4 w-4 text-primary" />
+            Notificações recentes
+          </DropdownMenuLabel>
           <div className="inline-flex items-center gap-2">
-            {!pushAtivo && suportaNotificationApi && Notification.permission !== "denied" && (
-              <button
-                type="button"
-                onClick={() => void inscreverPushNoDispositivo()}
-                className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-semibold text-primary hover:bg-primary/10"
-              >
-                Ativar push
-              </button>
-            )}
             <button
               type="button"
               onClick={() => void marcarTodasComoLidas()}
@@ -274,45 +290,74 @@ const NotificationBell = ({ mobile = false }: Props) => {
 
         <div className="max-h-80 overflow-y-auto p-2">
           {loading ? (
-            <p className="px-2 py-3 text-sm text-muted-foreground">Carregando notificações...</p>
+            <p className="px-2 py-3 text-sm text-muted-foreground inline-flex items-center gap-2">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Carregando notificações...
+            </p>
           ) : erro ? (
-            <p className="px-2 py-3 text-sm text-destructive">{erro}</p>
+            <p className="px-2 py-3 text-sm text-destructive inline-flex items-center gap-2">
+              <AlertCircle className="h-4 w-4" />
+              {erro}
+            </p>
           ) : !temNotificacoes ? (
-            <p className="px-2 py-3 text-sm text-muted-foreground">Nenhuma notificação recente.</p>
+            <p className="px-2 py-3 text-sm text-muted-foreground inline-flex items-center gap-2">
+              <Inbox className="h-4 w-4" />
+              Nenhuma notificação recente.
+            </p>
           ) : (
             <ul className="space-y-1">
-              {itens.map((item) => (
-                <li
-                  key={item.id}
-                  className={`rounded-lg border px-3 py-2 cursor-pointer transition-colors hover:bg-muted/70 ${
-                    item.lida
-                      ? "border-border/70 bg-background"
-                      : "border-primary/25 bg-primary/5"
-                  }`}
-                  onClick={() => {
-                    void abrirDestinoDaNotificacao(item);
-                  }}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" || event.key === " ") {
-                      event.preventDefault();
+              {itens.map((item) => {
+                const IconeNotificacao = obterIconeNotificacao(item);
+
+                return (
+                  <li
+                    key={item.id}
+                    className={`rounded-lg border px-3 py-2 cursor-pointer transition-colors hover:bg-muted/70 ${
+                      item.lida
+                        ? "border-border/70 bg-background"
+                        : "border-primary/25 bg-primary/5"
+                    }`}
+                    onClick={() => {
                       void abrirDestinoDaNotificacao(item);
-                    }
-                  }}
-                  role="button"
-                  tabIndex={0}
-                >
-                  <p className="text-sm font-semibold text-foreground leading-tight">{item.titulo}</p>
-                  <p className="text-sm text-muted-foreground mt-1 leading-snug">{item.mensagem}</p>
-                  <div className="mt-2 flex items-center justify-between">
-                    {item.pedidoId ? (
-                      <span className="text-xs text-foreground font-medium">Pedido #{item.pedidoId}</span>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">Sistema</span>
-                    )}
-                    <span className="text-xs text-muted-foreground">{formatarData(item.createdAt)}</span>
-                  </div>
-                </li>
-              ))}
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        void abrirDestinoDaNotificacao(item);
+                      }
+                    }}
+                    role="button"
+                    tabIndex={0}
+                  >
+                    <div className="flex items-start gap-2">
+                      <span className="mt-0.5 inline-flex h-6 w-6 items-center justify-center rounded-md bg-muted text-foreground">
+                        <IconeNotificacao className="h-3.5 w-3.5" />
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-foreground leading-tight">{item.titulo}</p>
+                        <p className="text-sm text-muted-foreground mt-1 leading-snug">{item.mensagem}</p>
+                        <div className="mt-2 flex items-center justify-between">
+                          {item.pedidoId ? (
+                            <span className="text-xs text-foreground font-medium inline-flex items-center gap-1">
+                              <Package className="h-3.5 w-3.5" />
+                              Pedido #{item.pedidoId}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-muted-foreground inline-flex items-center gap-1">
+                              <Settings2 className="h-3.5 w-3.5" />
+                              Sistema
+                            </span>
+                          )}
+                          <span className="text-xs text-muted-foreground inline-flex items-center gap-1">
+                            <Clock3 className="h-3.5 w-3.5" />
+                            {formatarData(item.createdAt)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </div>

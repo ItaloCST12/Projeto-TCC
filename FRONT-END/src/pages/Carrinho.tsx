@@ -1,5 +1,6 @@
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
+import { ShoppingCart } from "lucide-react";
 import { apiRequest } from "@/lib/api";
 import { getAuthUser, isAuthenticated } from "@/lib/auth";
 import {
@@ -677,6 +678,7 @@ const Carrinho = () => {
       <Navbar />
       <PageShell
         title="Carrinho"
+        titleIcon={<ShoppingCart className="h-5 w-5" />}
         subtitle={`${user?.nome ? `Olá, ${user.nome}.` : "Você está logado."} Revise os itens e finalize a encomenda.`}
         containerClassName="max-w-4xl"
       >

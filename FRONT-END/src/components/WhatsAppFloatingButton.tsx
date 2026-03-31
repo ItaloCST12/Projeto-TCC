@@ -9,7 +9,7 @@ const WhatsAppFloatingButton = () => {
       rel="noopener noreferrer"
       aria-label="Abrir WhatsApp da empresa"
       title="Falar no WhatsApp"
-      className="fixed right-4 bottom-4 z-50 inline-flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-card hover:opacity-90 transition-opacity"
+      className="fixed right-4 bottom-24 lg:bottom-4 z-40 inline-flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-card hover:opacity-90 transition-opacity"
     >
       <svg
         xmlns="http://www.w3.org/2000/svg"

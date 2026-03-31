@@ -13,6 +13,7 @@ import MinhasEncomendas from "./pages/MinhasEncomendas";
 import Perfil from "./pages/Perfil";
 import Chat from "./pages/Chat";
 import PainelEntregas from "./pages/PainelEntregas";
+import MobileBottomNav from "./components/MobileBottomNav";
 
 const queryClient = new QueryClient();
 
@@ -34,6 +35,7 @@ const App = () => (
           <Route path="*" element={<NotFound />} />
         </Routes>
         <WhatsAppFloatingButton />
+        <MobileBottomNav />
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>

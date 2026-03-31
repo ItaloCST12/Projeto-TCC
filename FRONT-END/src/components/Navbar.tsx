@@ -1,6 +1,18 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { LogOut, Menu, ShoppingCart, UserCircle2, X } from "lucide-react";
+import {
+  BarChart3,
+  CalendarDays,
+  Home,
+  LogIn,
+  LogOut,
+  Menu,
+  MessageCircle,
+  Package,
+  ShoppingCart,
+  UserCircle2,
+  X,
+} from "lucide-react";
 import { clearAuthSession, getAuthUser, isAuthenticated } from "@/lib/auth";
 import { getCartTotalItems, subscribeToCartUpdates } from "@/lib/cart";
 import logoAbacaxi from "@/assets/abacaxi-logo.svg";
@@ -8,7 +20,7 @@ import AccessibilityControls from "@/components/AccessibilityControls";
 import NotificationBell from "@/components/NotificationBell";
 
 const storeLinks = [
-  { label: "Início", href: "/#inicio" },
+  { label: "Início", href: "/#inicio", icon: Home },
 ];
 
 const Navbar = () => {
@@ -34,12 +46,14 @@ const Navbar = () => {
 
   const appLinks = loggedIn
     ? [
-        { label: "Produtos", to: "/encomenda" },
-        ...(!isAdmin ? [{ label: "Minhas encomendas", to: "/minhas-encomendas" }] : []),
-        { label: "Atendimento", to: "/chat" },
-        ...(isAdmin ? [{ label: "Painel", to: "/painel-entregas" }] : []),
+        { label: "Produtos", to: "/encomenda", icon: Package },
+        ...(!isAdmin
+          ? [{ label: "Minhas encomendas", to: "/minhas-encomendas", icon: CalendarDays }]
+          : []),
+        { label: "Atendimento", to: "/chat", icon: MessageCircle },
+        ...(isAdmin ? [{ label: "Painel", to: "/painel-entregas", icon: BarChart3 }] : []),
       ]
-    : [{ label: "Entrar", to: "/login" }];
+    : [{ label: "Entrar", to: "/login", icon: LogIn }];
 
   const ctaTo = loggedIn ? "/encomenda" : "/login?redirect=/encomenda";
   const profileLink = isAdmin ? "/painel-entregas" : "/perfil";
@@ -111,8 +125,9 @@ const Navbar = () => {
                 <a
                   key={link.href}
                   href={link.href}
-                  className="inline-flex items-center px-3 py-1.5 rounded-lg border border-transparent text-muted-foreground font-semibold hover:text-primary hover:border-primary/20 hover:bg-muted transition-colors"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-transparent text-muted-foreground font-semibold hover:text-primary hover:border-primary/20 hover:bg-muted transition-colors"
                 >
+                  <link.icon className="h-4 w-4" />
                   {link.label}
                 </a>
               ))}
@@ -123,8 +138,9 @@ const Navbar = () => {
                 <Link
                   key={link.to}
                   to={link.to}
-                  className="inline-flex items-center px-3 py-1.5 rounded-lg border border-transparent text-muted-foreground font-semibold hover:text-primary hover:border-primary/20 hover:bg-muted transition-colors"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-transparent text-muted-foreground font-semibold hover:text-primary hover:border-primary/20 hover:bg-muted transition-colors"
                 >
+                  <link.icon className="h-4 w-4" />
                   {link.label}
                 </Link>
               ))}
@@ -170,8 +186,9 @@ const Navbar = () => {
             ) : (
               <Link
                 to={ctaTo}
-                className="inline-flex items-center px-5 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm shadow-md shadow-primary/30 hover:bg-primary/95 hover:shadow-lg hover:shadow-primary/35 transition-all"
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm shadow-md shadow-primary/30 hover:bg-primary/95 hover:shadow-lg hover:shadow-primary/35 transition-all"
               >
+                <Package className="h-4 w-4" />
                 Ver Produtos
               </Link>
             )}
@@ -199,8 +216,9 @@ const Navbar = () => {
                 <a
                   href={link.href}
                   onClick={() => setMobileOpen(false)}
-                  className="block py-2.5 px-3 rounded-lg border border-transparent text-muted-foreground font-semibold hover:text-primary hover:border-primary/20 hover:bg-muted transition-colors"
+                  className="inline-flex w-full items-center gap-2 py-2.5 px-3 rounded-lg border border-transparent text-muted-foreground font-semibold hover:text-primary hover:border-primary/20 hover:bg-muted transition-colors"
                 >
+                  <link.icon className="h-4 w-4" />
                   {link.label}
                 </a>
               </li>
@@ -212,9 +230,10 @@ const Navbar = () => {
               <li key={link.to}>
                 <Link
                   to={link.to}
-                  className="block py-2.5 px-3 rounded-lg border border-transparent text-muted-foreground font-semibold hover:text-primary hover:border-primary/20 hover:bg-muted transition-colors"
+                  className="inline-flex w-full items-center gap-2 py-2.5 px-3 rounded-lg border border-transparent text-muted-foreground font-semibold hover:text-primary hover:border-primary/20 hover:bg-muted transition-colors"
                   onClick={() => setMobileOpen(false)}
                 >
+                  <link.icon className="h-4 w-4" />
                   {link.label}
                 </Link>
               </li>
@@ -258,9 +277,10 @@ const Navbar = () => {
               <li>
                 <Link
                   to={ctaTo}
-                  className="inline-flex items-center px-5 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm shadow-md shadow-primary/30"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm shadow-md shadow-primary/30"
                   onClick={() => setMobileOpen(false)}
                 >
+                  <Package className="h-4 w-4" />
                   Ver Produtos
                 </Link>
               </li>
@@ -268,6 +288,7 @@ const Navbar = () => {
           </ul>
         </div>
       </div>
+
     </nav>
   );
 };

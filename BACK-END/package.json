@@ -42,7 +42,6 @@
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
     "@types/cors": "^2.8.19",
-    "@types/helmet": "^0.0.48",
     "@types/ws": "^8.18.1",
     "vitest": "^4.0.18"
   }
