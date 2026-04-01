@@ -37,15 +37,15 @@
 
 ## 🎯 Sobre o Projeto
 
-Plataforma web completa voltada para a **venda e gestão de pedidos de frutas**, com foco em abacaxis, laranjas, limões e tangerinas. O sistema integra catálogo de produtos, carrinho de compras, pagamento via PIX (Mercado Pago), atendimento ao cliente em tempo real via WebSocket e notificações push.
+Plataforma web completa voltada para a **venda e gestão de pedidos de frutas**, com foco em abacaxis, laranjas, limões e tangerinas. O sistema integra catálogo de produtos, carrinho de compras, atendimento ao cliente em tempo real via WebSocket e notificações push.
 
 ### Para quem é
 
-| Perfil              | Uso                                                                      |
-| ------------------- | ------------------------------------------------------------------------ |
-| **Clientes**        | Navegar no catálogo, montar pedidos, pagar via PIX e acompanhar entregas |
-| **Administradores** | Gerenciar produtos, acompanhar pedidos, relatórios e painel de entregas  |
-| **Suporte**         | Atender clientes em tempo real pelo chat integrado                       |
+| Perfil              | Uso                                                                     |
+| ------------------- | ----------------------------------------------------------------------- |
+| **Clientes**        | Navegar no catálogo, montar pedidos e acompanhar entregas               |
+| **Administradores** | Gerenciar produtos, acompanhar pedidos, relatórios e painel de entregas |
+| **Suporte**         | Atender clientes em tempo real pelo chat integrado                      |
 
 ---
 
@@ -54,11 +54,11 @@ Plataforma web completa voltada para a **venda e gestão de pedidos de frutas**,
 - **Autenticação JWT** — Registro, login, recuperação de senha por e-mail (Resend)
 - **Catálogo de produtos** — CRUD completo com upload de imagens, soft delete e preços por tamanho
 - **Carrinho & Pedidos** — Criação de pedidos com múltiplos itens, seleção de endereço e acompanhamento de status
-- **Pagamento PIX** — Integração com Mercado Pago, geração de QR Code e conciliação automática
+- **Pagamento manual** — Escolha entre PIX ou dinheiro, sem processamento de pagamento na plataforma
 - **Chat em tempo real** — Atendimento via WebSocket com autenticação JWT
 - **Notificações Push** — Web Push com VAPID para avisos fora do site
 - **Painel administrativo** — Gestão de entregas, pedidos e usuários
-- **Acessibilidade** — Integração com Hand Talk (Libras), controles de acessibilidade e design responsivo
+- **Acessibilidade** — Integração com VLibras (Libras), controles de acessibilidade e design responsivo
 - **Geração de PDF** — Exportação de relatórios e comprovantes (jsPDF)
 
 ---
@@ -71,11 +71,6 @@ Plataforma web completa voltada para a **venda e gestão de pedidos de frutas**,
 │  React/Vite  │ HTTP  │  Express + WS    │Prisma │              │
 │  TailwindCSS │◀──────│  Node.js + TS    │◀──────│              │
 └──────────────┘       └──────────────────┘       └──────────────┘
-                              │
-                        ┌─────┴─────┐
-                        │ Mercado   │
-                        │ Pago API  │
-                        └───────────┘
 ```
 
 - O **frontend** builda para dentro de `BACK-END/public/`, servido como SPA pelo Express
@@ -278,13 +273,6 @@ O comando `build` compila o frontend e o serve via Express na mesma porta do bac
 | `GET`   | `/pedidos/me`         | Pedidos do usuário       |
 | `GET`   | `/pedidos`            | Listar todos (admin)     |
 | `PATCH` | `/pedidos/:id/status` | Atualizar status (admin) |
-
-### Pagamentos (`/pagamentos`)
-
-| Método | Rota                 | Descrição                       |
-| ------ | -------------------- | ------------------------------- |
-| `GET`  | `/pagamentos/formas` | Formas de pagamento disponíveis |
-| `POST` | `/pagamentos/pix`    | Gerar pagamento PIX             |
 
 ### Endereços (`/enderecos`)
 

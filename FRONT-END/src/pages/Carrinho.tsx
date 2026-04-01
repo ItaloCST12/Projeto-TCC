@@ -46,16 +46,13 @@ type Endereco = {
   cep: string;
 };
 
-type FormasPagamentoResponse = {
-  formas: string[];
-};
-
 type PedidoCriadoResponse = {
   id: number;
   formaPagamento: string;
 };
 
 const MAX_QUANTIDADE_POR_ITEM = 1000;
+const FORMAS_PAGAMENTO_DISPONIVEIS = ["PIX", "DINHEIRO"] as const;
 
 const PRECO_PADRAO_PRODUTO: Record<string, number> = {
   laranja: 50,
@@ -200,11 +197,10 @@ const Carrinho = () => {
 
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [produtosCatalogo, setProdutosCatalogo] = useState<Produto[]>([]);
-  const [formasPagamento, setFormasPagamento] = useState<string[]>([]);
   const [enderecos, setEnderecos] = useState<Endereco[]>([]);
 
   const [tipoEntrega, setTipoEntrega] = useState<"retirada" | "entrega">("retirada");
-  const [formaPagamento, setFormaPagamento] = useState("PIX");
+  const [formaPagamento, setFormaPagamento] = useState<string>(FORMAS_PAGAMENTO_DISPONIVEIS[0]);
   const [enderecoId, setEnderecoId] = useState<number | "">("");
   const [rua, setRua] = useState("");
   const [numero, setNumero] = useState("");
@@ -310,9 +306,8 @@ const Carrinho = () => {
       setError("");
 
       try {
-        const [produtosResponse, formasResponse, enderecosResponse] = await Promise.all([
+        const [produtosResponse, enderecosResponse] = await Promise.all([
           apiRequest<Produto[]>("/produtos"),
-          apiRequest<FormasPagamentoResponse>("/pagamentos/formas"),
           apiRequest<Endereco[]>("/enderecos/me"),
         ]);
 
@@ -339,11 +334,6 @@ const Carrinho = () => {
 
         setCartItems(carrinhoSanitizado);
         saveCartItems(carrinhoSanitizado);
-
-        setFormasPagamento(formasResponse.formas);
-        if (formasResponse.formas.length > 0) {
-          setFormaPagamento(formasResponse.formas[0]);
-        }
 
         setEnderecos(enderecosResponse);
         if (enderecosResponse.length > 0) {
@@ -731,7 +721,7 @@ const Carrinho = () => {
                               <img
                                 src={imagemProduto}
                                 alt={`Foto de ${formatarNomeProduto(item.nome)}`}
-                                className="h-20 w-20 rounded-lg border border-border object-cover bg-muted/40 shrink-0"
+                                className="h-28 w-28 sm:h-32 sm:w-32 rounded-lg border border-border object-cover bg-muted/40 shrink-0"
                                 loading="lazy"
                               />
                               <div className="min-w-0">
@@ -843,7 +833,7 @@ const Carrinho = () => {
                     onChange={(event) => setFormaPagamento(event.target.value)}
                     className="w-full rounded-lg border border-border bg-background px-3 py-2 text-foreground"
                   >
-                    {formasPagamento.map((forma) => (
+                    {FORMAS_PAGAMENTO_DISPONIVEIS.map((forma) => (
                       <option key={forma} value={forma}>
                         {forma}
                       </option>

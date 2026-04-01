@@ -1,7 +1,6 @@
 /// <reference types="vite/client" />
 
 interface ImportMetaEnv {
-	readonly VITE_HANDTALK_TOKEN?: string;
 }
 
 interface ImportMeta {

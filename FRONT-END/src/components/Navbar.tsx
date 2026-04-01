@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import {
   BarChart3,
   CalendarDays,
@@ -25,7 +27,9 @@ const storeLinks = [
 
 const Navbar = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const [cartTotalItems, setCartTotalItems] = useState(0);
+  const location = useLocation();
   const loggedIn = isAuthenticated();
   const user = getAuthUser();
   const isAdmin = user?.role === "ADMIN";
@@ -43,6 +47,52 @@ const Navbar = () => {
     syncCartCount();
     return subscribeToCartUpdates(syncCartCount);
   }, [loggedIn]);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    if (!mobileOpen) {
+      return;
+    }
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setMobileOpen(false);
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [mobileOpen]);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(min-width: 1024px)");
+    const onDesktop = (event: MediaQueryListEvent) => {
+      if (event.matches) {
+        setMobileOpen(false);
+      }
+    };
+
+    mediaQuery.addEventListener("change", onDesktop);
+    return () => {
+      mediaQuery.removeEventListener("change", onDesktop);
+    };
+  }, []);
+
+  useEffect(() => {
+    document.body.style.overflow = mobileOpen ? "hidden" : "";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [mobileOpen]);
 
   const appLinks = loggedIn
     ? [
@@ -64,7 +114,149 @@ const Navbar = () => {
     window.location.href = "/";
   };
 
+  const mobileDrawer = (
+    <div
+      className={`lg:hidden fixed inset-0 z-[120] transition-opacity duration-300 ${
+        mobileOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+      }`}
+      aria-hidden={!mobileOpen}
+    >
+      <button
+        type="button"
+        className="absolute inset-0 bg-black/45"
+        aria-label="Fechar menu"
+        onClick={() => setMobileOpen(false)}
+      />
+
+      <aside
+        className="absolute left-0 top-0 h-full w-[88vw] max-w-sm bg-background border-r border-border/80 shadow-2xl transition-transform duration-300 ease-out will-change-transform"
+        style={{ transform: mobileOpen ? "translateX(0)" : "translateX(-100%)" }}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Menu lateral"
+      >
+        <div className="flex h-full flex-col">
+          <div className="flex items-center justify-between border-b border-border/70 px-4 py-4">
+            <a
+              href="/#inicio"
+              className="inline-flex items-center gap-2"
+              onClick={() => setMobileOpen(false)}
+            >
+              <img src={logoAbacaxi} alt="Logo Fazenda Bispo" className="h-10 w-10 object-contain" />
+              <span className="font-display text-lg font-bold text-foreground leading-none">
+                Fazenda <span className="text-primary">Bispo</span>
+              </span>
+            </a>
+            <button
+              type="button"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-border/70 bg-card/80 text-foreground"
+              aria-label="Fechar menu"
+              onClick={() => setMobileOpen(false)}
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+
+          <div className="flex-1 overflow-y-auto px-4 py-3">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground px-1 pb-2">
+              Navegação
+            </p>
+
+            <ul className="flex flex-col gap-1">
+              {storeLinks.map((link) => (
+                <li key={link.href}>
+                  <a
+                    href={link.href}
+                    onClick={() => setMobileOpen(false)}
+                    className="inline-flex w-full items-center gap-2 py-2.5 px-3 rounded-lg border border-transparent text-muted-foreground font-semibold hover:text-primary hover:border-primary/20 hover:bg-muted transition-colors"
+                  >
+                    <link.icon className="h-4 w-4" />
+                    {link.label}
+                  </a>
+                </li>
+              ))}
+
+              {appLinks.map((link) => (
+                <li key={link.to}>
+                  <Link
+                    to={link.to}
+                    className="inline-flex w-full items-center gap-2 py-2.5 px-3 rounded-lg border border-transparent text-muted-foreground font-semibold hover:text-primary hover:border-primary/20 hover:bg-muted transition-colors"
+                    onClick={() => setMobileOpen(false)}
+                  >
+                    <link.icon className="h-4 w-4" />
+                    {link.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+
+            <div className="mt-4 border-t border-border/70 pt-4">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground px-1 pb-2">
+                Acessibilidade
+              </p>
+              <AccessibilityControls mobile />
+            </div>
+
+            {loggedIn ? (
+              <div className="mt-4 border-t border-border/70 pt-4">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground px-1 pb-2">
+                  Conta
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  <Link
+                    to="/carrinho"
+                    className="inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border border-primary/25 bg-primary/5 text-foreground text-sm font-semibold"
+                    onClick={() => setMobileOpen(false)}
+                  >
+                    <ShoppingCart className="h-4 w-4" />
+                    {cartTotalItems}
+                  </Link>
+                  <Link
+                    to={profileLink}
+                    aria-label="Abrir perfil"
+                    title="Perfil"
+                    className="inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border border-border/80 bg-card text-foreground text-sm font-semibold hover:bg-muted transition-colors"
+                    onClick={() => setMobileOpen(false)}
+                  >
+                    <UserCircle2 className="h-4 w-4" />
+                    Perfil
+                  </Link>
+                </div>
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  <NotificationBell mobile />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMobileOpen(false);
+                      handleLogout();
+                    }}
+                    className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm shadow-md shadow-primary/30"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    Sair
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="mt-4 border-t border-border/70 pt-4">
+                <Link
+                  to={ctaTo}
+                  className="inline-flex w-full items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm shadow-md shadow-primary/30"
+                  onClick={() => setMobileOpen(false)}
+                >
+                  <Package className="h-4 w-4" />
+                  Ver Produtos
+                </Link>
+              </div>
+            )}
+          </div>
+        </div>
+      </aside>
+    </div>
+  );
+
   return (
+    <>
     <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border/80 bg-background/90 backdrop-blur-xl shadow-sm">
       <div className="w-full h-20 px-4 lg:px-8">
         <div className="lg:hidden h-full flex items-center justify-between relative">
@@ -196,100 +388,9 @@ const Navbar = () => {
         </div>
       </div>
 
-      <div
-        className={`lg:hidden bg-background/95 border-b border-border/80 px-4 overflow-hidden transition-all duration-300 ease-out ${
-          mobileOpen
-            ? "max-h-[70vh] opacity-100 pb-4"
-            : "max-h-0 opacity-0 pb-0 pointer-events-none"
-        }`}
-      >
-        <div className="pt-2">
-          <AccessibilityControls mobile />
-
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground px-1 py-1">
-            Navegação
-          </p>
-
-          <ul className="flex flex-col gap-1">
-            {storeLinks.map((link) => (
-              <li key={link.href}>
-                <a
-                  href={link.href}
-                  onClick={() => setMobileOpen(false)}
-                  className="inline-flex w-full items-center gap-2 py-2.5 px-3 rounded-lg border border-transparent text-muted-foreground font-semibold hover:text-primary hover:border-primary/20 hover:bg-muted transition-colors"
-                >
-                  <link.icon className="h-4 w-4" />
-                  {link.label}
-                </a>
-              </li>
-            ))}
-          </ul>
-
-          <ul className="flex flex-col gap-1 mt-2 pt-2 border-t border-border/70">
-            {appLinks.map((link) => (
-              <li key={link.to}>
-                <Link
-                  to={link.to}
-                  className="inline-flex w-full items-center gap-2 py-2.5 px-3 rounded-lg border border-transparent text-muted-foreground font-semibold hover:text-primary hover:border-primary/20 hover:bg-muted transition-colors"
-                  onClick={() => setMobileOpen(false)}
-                >
-                  <link.icon className="h-4 w-4" />
-                  {link.label}
-                </Link>
-              </li>
-            ))}
-            {loggedIn ? (
-              <>
-                <li className="pt-1">
-                  <Link
-                    to="/carrinho"
-                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-primary/25 bg-primary/5 text-foreground text-sm font-semibold"
-                    onClick={() => setMobileOpen(false)}
-                  >
-                    <ShoppingCart className="h-4 w-4" />
-                    Carrinho ({cartTotalItems})
-                  </Link>
-                </li>
-                <li className="pt-1 flex items-center gap-2">
-                <Link
-                  to={profileLink}
-                  aria-label="Abrir perfil"
-                  title="Perfil"
-                  className="inline-flex items-center justify-center h-10 w-10 rounded-xl border border-border/80 bg-card text-foreground hover:bg-muted transition-colors"
-                  onClick={() => setMobileOpen(false)}
-                >
-                  <UserCircle2 className="h-5 w-5" />
-                </Link>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMobileOpen(false);
-                    handleLogout();
-                  }}
-                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm shadow-md shadow-primary/30"
-                >
-                  <LogOut className="h-4 w-4" />
-                  Sair
-                </button>
-                </li>
-              </>
-            ) : (
-              <li>
-                <Link
-                  to={ctaTo}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm shadow-md shadow-primary/30"
-                  onClick={() => setMobileOpen(false)}
-                >
-                  <Package className="h-4 w-4" />
-                  Ver Produtos
-                </Link>
-              </li>
-            )}
-          </ul>
-        </div>
-      </div>
-
     </nav>
+      {mounted ? createPortal(mobileDrawer, document.body) : null}
+    </>
   );
 };
 

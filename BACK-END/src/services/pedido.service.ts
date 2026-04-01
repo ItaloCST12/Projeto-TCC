@@ -1,10 +1,12 @@
-import { formasPagamentoDisponiveis } from "./pagamento.service";
 import prisma from "../models/client";
 import { Prisma } from "@prisma/client";
 import { NotificacaoService } from "./notificacao.service";
+import { EstoqueService } from "./estoque.service";
 
 const MAX_QUANTIDADE_POR_ITEM = 1000;
+const FORMAS_PAGAMENTO_DISPONIVEIS = ["PIX", "DINHEIRO"];
 const notificacaoService = new NotificacaoService();
+const estoqueService = new EstoqueService();
 
 const executarNotificacaoSemFalhar = async (callback: () => Promise<unknown>) => {
   try {
@@ -119,7 +121,7 @@ export class PedidoService {
       throw new Error("Forma de pagamento é obrigatória");
     }
 
-    if (!formasPagamentoDisponiveis.includes(formaPagamento)) {
+    if (!FORMAS_PAGAMENTO_DISPONIVEIS.includes(formaPagamento)) {
       throw new Error("Forma de pagamento inválida");
     }
 
@@ -131,6 +133,11 @@ export class PedidoService {
     }
     if (!produtoPrincipal.disponivel) {
       throw new Error("Produto principal indisponível");
+    }
+    if (produtoPrincipal.estoque < quantidadePrincipal) {
+      throw new Error(
+        `Estoque insuficiente para o produto ${produtoPrincipal.nome}. Disponível: ${produtoPrincipal.estoque}`,
+      );
     }
 
     if (enderecoId) {
@@ -183,9 +190,9 @@ export class PedidoService {
       });
       const produtosMap = new Map<
         number,
-        { id: number; disponivel: boolean }
+        { id: number; nome: string; disponivel: boolean; estoque: number }
       >(
-        produtos.map((produto: { id: number; disponivel: boolean }) => [
+        produtos.map((produto) => [
           produto.id,
           produto,
         ]),
@@ -198,6 +205,11 @@ export class PedidoService {
         }
         if (!produto.disponivel) {
           throw new Error(`Produto do item ${item.produtoId} indisponível`);
+        }
+        if (produto.estoque < item.quantidade) {
+          throw new Error(
+            `Estoque insuficiente para o produto ${produto.nome}. Disponível: ${produto.estoque}`,
+          );
         }
       }
     }
@@ -329,24 +341,37 @@ export class PedidoService {
             return valorUnitarioPrincipal * quantidadePrincipal;
           })();
 
-    const pedidoCriado = await prisma.pedido.create({
-      data: {
-        usuarioId,
-        produtoId: produtoIdPrincipal,
-        enderecoId: enderecoId ?? null,
-        quantidade: quantidadePrincipal,
-        unidade: unidadePedido,
-        tipoEntrega,
-        formaPagamento,
-        valorTotal: valorTotalPedido,
-        status: "PENDENTE",
-        ...(itensComValor && { items: { create: itensComValor } }),
-      },
-      include: {
-        items: { include: { produto: true } },
-        produto: true,
-        endereco: true,
-      },
+    const pedidoCriado = await prisma.$transaction(async (tx) => {
+      const pedido = await tx.pedido.create({
+        data: {
+          usuarioId,
+          produtoId: produtoIdPrincipal,
+          enderecoId: enderecoId ?? null,
+          quantidade: quantidadePrincipal,
+          unidade: unidadePedido,
+          tipoEntrega,
+          formaPagamento,
+          valorTotal: valorTotalPedido,
+          status: "PENDENTE",
+          ...(itensComValor && { items: { create: itensComValor } }),
+        },
+      });
+
+      await estoqueService.reprocessarEstoquePedido(
+        tx,
+        pedido.id,
+        "SAIDA",
+        `Pedido #${pedido.id}`,
+      );
+
+      return tx.pedido.findUniqueOrThrow({
+        where: { id: pedido.id },
+        include: {
+          items: { include: { produto: true } },
+          produto: true,
+          endereco: true,
+        },
+      });
     });
 
     await executarNotificacaoSemFalhar(() =>
@@ -724,9 +749,20 @@ export class PedidoService {
       throw new Error("Este pedido já foi cancelado");
     }
 
-    const pedidoCancelado = await prisma.pedido.update({
-      where: { id },
-      data: { status: "CANCELADO" },
+    const pedidoCancelado = await prisma.$transaction(async (tx) => {
+      const atualizado = await tx.pedido.update({
+        where: { id },
+        data: { status: "CANCELADO" },
+      });
+
+      await estoqueService.reprocessarEstoquePedido(
+        tx,
+        id,
+        "DEVOLUCAO",
+        `Cancelamento pedido #${id}`,
+      );
+
+      return atualizado;
     });
 
     await executarNotificacaoSemFalhar(() =>

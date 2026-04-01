@@ -83,7 +83,7 @@ export const atualizarDisponibilidade = async (req: Request, res: Response) => {
 
 export const cadastrarProduto = async (req: Request, res: Response) => {
   try {
-    const { nome, preco, disponivel } = req.body;
+    const { nome, preco, disponivel, estoque } = req.body;
     if (!nome || typeof nome !== "string") {
       throw new Error("Nome do produto é obrigatório");
     }
@@ -93,12 +93,18 @@ export const cadastrarProduto = async (req: Request, res: Response) => {
       throw new Error("Preço do produto inválido");
     }
 
+    const estoqueNumber = Number(estoque);
+    if (!Number.isFinite(estoqueNumber) || estoqueNumber < 0) {
+      throw new Error("Estoque é obrigatório e deve ser maior ou igual a zero");
+    }
+
     const imagemUrl = getImagemUrlFromFile(req);
 
     const produto = await produtoService.cadastrarProduto(
       nome.trim(),
       precoNumber,
       parseBoolean(disponivel, true),
+      Math.trunc(estoqueNumber),
       imagemUrl,
     );
     res.status(201).json(produto);

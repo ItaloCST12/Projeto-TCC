@@ -28,10 +28,19 @@ export class ProdutoService {
     nome: string,
     preco: number,
     disponivel: boolean = true,
+    estoque: number,
     imagemUrl?: string,
   ) {
+    const estoqueNormalizado = Math.max(0, Math.trunc(estoque));
+
     return await prisma.produto.create({
-      data: { nome, preco, disponivel, imagemUrl: imagemUrl ?? null },
+      data: {
+        nome,
+        preco,
+        disponivel,
+        estoque: estoqueNormalizado,
+        imagemUrl: imagemUrl ?? null,
+      },
     });
   }
 

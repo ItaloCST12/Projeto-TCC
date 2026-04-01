@@ -52,54 +52,22 @@ const registrarServiceWorkerPush = () => {
 	});
 };
 
-const HANDTALK_SCRIPT_ID = "handtalk-plugin-script";
-const HANDTALK_TOKEN = import.meta.env.VITE_HANDTALK_TOKEN?.trim();
-
-const bootstrapHandTalk = () => {
-	if (!HANDTALK_TOKEN) {
-		return false;
-	}
-
-	const maybeInitWidget = () => {
-		const handTalkWindow = window as Window & {
-			HT?: new (options: {
-				token: string;
-				align?: "left" | "right";
-				videoEnabled?: boolean;
-				ytEmbedReplace?: boolean;
-			}) => unknown;
-		};
-
-		if (handTalkWindow.HT && !document.body.dataset.handtalkInitialized) {
-			new handTalkWindow.HT({
-				token: HANDTALK_TOKEN,
-				align: "right",
-				videoEnabled: true,
-				ytEmbedReplace: true,
-			});
-			document.body.dataset.handtalkInitialized = "true";
-		}
-	};
-
-	const existingScript = document.getElementById(HANDTALK_SCRIPT_ID) as HTMLScriptElement | null;
-	if (existingScript) {
-		maybeInitWidget();
-		return true;
-	}
-
-	const script = document.createElement("script");
-	script.id = HANDTALK_SCRIPT_ID;
-	script.src = "https://plugin.handtalk.me/web/latest/handtalk.min.js";
-	script.async = true;
-	script.onload = maybeInitWidget;
-	document.body.appendChild(script);
-
-	return true;
-};
-
 const bootstrapVlibras = () => {
 	const widgetContainerId = "vlibras-plugin-container";
 	const scriptId = "vlibras-plugin-script";
+	const styleId = "vlibras-plugin-overrides";
+
+	if (!document.getElementById(styleId)) {
+		const style = document.createElement("style");
+		style.id = styleId;
+		style.textContent = `
+			#vlibras-plugin-container [vw-access-button],
+			#vlibras-plugin-container .vw-access-button {
+				z-index: 2147483000 !important;
+			}
+		`;
+		document.head.appendChild(style);
+	}
 
 	if (!document.getElementById(widgetContainerId)) {
 		const root = document.createElement("div");
@@ -128,7 +96,11 @@ const bootstrapVlibras = () => {
 			VLibras?: { Widget: new (url: string) => unknown };
 		};
 
-		if (vlibrasWindow.VLibras?.Widget && !document.body.dataset.vlibrasInitialized) {
+		if (!vlibrasWindow.VLibras?.Widget) {
+			return;
+		}
+
+		if (!document.body.dataset.vlibrasInitialized) {
 			new vlibrasWindow.VLibras.Widget("https://vlibras.gov.br/app");
 			document.body.dataset.vlibrasInitialized = "true";
 		}
@@ -145,15 +117,15 @@ const bootstrapVlibras = () => {
 	script.src = "https://vlibras.gov.br/app/vlibras-plugin.js";
 	script.async = true;
 	script.onload = maybeInitWidget;
+	script.onerror = () => {
+		console.error("[A11Y] Falha ao carregar script do VLibras.");
+	};
 	document.body.appendChild(script);
 };
 
 const bootstrapAccessibilityWidget = () => {
 	try {
-		const handTalkLoaded = bootstrapHandTalk();
-		if (!handTalkLoaded) {
-			bootstrapVlibras();
-		}
+		bootstrapVlibras();
 	} catch (error) {
 		console.error("[A11Y] Falha ao inicializar widget de acessibilidade:", error);
 	}

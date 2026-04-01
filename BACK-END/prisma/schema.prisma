@@ -47,37 +47,54 @@ model Endereco {
 }
 
 model Produto {
-  id                  Int          @id @default(autoincrement())
+  id                  Int                   @id @default(autoincrement())
   nome                String
-  preco               Decimal      @default(0) @db.Decimal(10, 2)
-  precoAbacaxiGrande  Decimal?     @db.Decimal(10, 2)
-  precoAbacaxiMedio   Decimal?     @db.Decimal(10, 2)
-  precoAbacaxiPequeno Decimal?     @db.Decimal(10, 2)
-  disponivel          Boolean      @default(true)
-  excluido            Boolean      @default(false)
+  preco               Decimal               @default(0) @db.Decimal(10, 2)
+  precoAbacaxiGrande  Decimal?              @db.Decimal(10, 2)
+  precoAbacaxiMedio   Decimal?              @db.Decimal(10, 2)
+  precoAbacaxiPequeno Decimal?              @db.Decimal(10, 2)
+  estoque             Int                   @default(0)
+  disponivel          Boolean               @default(true)
+  excluido            Boolean               @default(false)
   imagemUrl           String?
   pedidos             Pedido[]
   itemPedidos         ItemPedido[]
+  movimentacoes       MovimentacaoEstoque[]
 }
 
 model Pedido {
-  id             Int           @id @default(autoincrement())
-  createdAt      DateTime      @default(now())
+  id             Int                   @id @default(autoincrement())
+  createdAt      DateTime              @default(now())
   usuarioId      Int
   produtoId      Int
   enderecoId     Int?
   quantidade     Int
   unidade        String
   tipoEntrega    String
-  formaPagamento String        @default("PIX")
-  valorTotal     Decimal       @default(0) @db.Decimal(10, 2)
-  status         String        @default("PENDENTE")
-  usuario        Usuario       @relation(fields: [usuarioId], references: [id])
-  produto        Produto       @relation(fields: [produtoId], references: [id])
-  endereco       Endereco?     @relation(fields: [enderecoId], references: [id])
+  formaPagamento String                @default("DINHEIRO")
+  valorTotal     Decimal               @default(0) @db.Decimal(10, 2)
+  status         String                @default("PENDENTE")
+  usuario        Usuario               @relation(fields: [usuarioId], references: [id])
+  produto        Produto               @relation(fields: [produtoId], references: [id])
+  endereco       Endereco?             @relation(fields: [enderecoId], references: [id])
   items          ItemPedido[]
-  pagamentoPix   PagamentoPix?
+  movimentacoes  MovimentacaoEstoque[]
   notificacoes   Notificacao[]
+}
+
+model MovimentacaoEstoque {
+  id         Int      @id @default(autoincrement())
+  produtoId  Int
+  tipo       String
+  quantidade Int
+  motivo     String?
+  pedidoId   Int?
+  createdAt  DateTime @default(now())
+  produto    Produto  @relation(fields: [produtoId], references: [id])
+  pedido     Pedido?  @relation(fields: [pedidoId], references: [id])
+
+  @@index([produtoId, createdAt])
+  @@index([tipo])
 }
 
 model Notificacao {
@@ -113,40 +130,6 @@ model PushSubscription {
 
   @@index([usuarioId, ativa])
   @@index([destinoRole, ativa])
-}
-
-model PagamentoPix {
-  id                    Int                  @id @default(autoincrement())
-  pedidoId              Int                  @unique
-  provider              String               @default("MERCADO_PAGO")
-  providerTransactionId String?              @unique
-  status                String               @default("PENDENTE")
-  qrCode                String?
-  qrCodeBase64          String?
-  ticketUrl             String?
-  expiresAt             DateTime?
-  valor                 Decimal              @default(0) @db.Decimal(10, 2)
-  rawPayload            Json?
-  createdAt             DateTime             @default(now())
-  updatedAt             DateTime             @updatedAt
-  pedido                Pedido               @relation(fields: [pedidoId], references: [id])
-  eventos               PagamentoPixEvento[]
-
-  @@index([status])
-}
-
-model PagamentoPixEvento {
-  id             Int           @id @default(autoincrement())
-  pagamentoPixId Int?
-  tipo           String
-  sucesso        Boolean       @default(true)
-  mensagem       String?
-  payload        Json?
-  createdAt      DateTime      @default(now())
-  pagamentoPix   PagamentoPix? @relation(fields: [pagamentoPixId], references: [id])
-
-  @@index([pagamentoPixId, tipo])
-  @@index([createdAt])
 }
 
 model ItemPedido {

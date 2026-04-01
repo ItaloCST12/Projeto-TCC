@@ -47,14 +47,14 @@ sequenceDiagram
     participant Svc as Services
     participant WS as WebSocket Server
     participant DB as PostgreSQL (Prisma)
-    participant Ext as Serviços Externos<br/>(ViaCEP / Resend / MercadoPago)
+    participant Ext as Serviços Externos<br/>(ViaCEP / Resend)
 
     rect rgb(230, 245, 255)
         Note over Cliente, Ext: INICIALIZAÇÃO DO SISTEMA
         Express->>DB: Prisma Client connect()
         Express->>WS: Inicializar WebSocket Server (mesma porta HTTP)
         Express->>Express: helmet() → json() → cors() → static()
-        Express->>Express: Registrar rotas (/auth, /usuarios, /produtos, /pedidos, /enderecos, /atendimentos, /pagamentos)
+        Express->>Express: Registrar rotas (/auth, /usuarios, /produtos, /pedidos, /enderecos, /atendimentos, /notificacoes, /estoque)
         Express->>Express: SPA fallback (index.html)
     end
 
@@ -593,11 +593,10 @@ sequenceDiagram
 
 ### Integrações Externas
 
-| Serviço          | Protocolo        | Uso                                                | Tratamento de Falha                                          |
-| ---------------- | ---------------- | -------------------------------------------------- | ------------------------------------------------------------ |
-| **ViaCEP**       | HTTP GET (REST)  | Consulta de endereço por CEP                       | Retorna erro ao cliente se API indisponível                  |
-| **Resend**       | HTTP POST (REST) | Envio de email de recuperação de senha             | Em dev: código retornado no response HTTP                    |
-| **Mercado Pago** | —                | Schema preparado (`PagamentoPix`), integração stub | Formas de pagamento: PIX e DINHEIRO (sem processamento real) |
+| Serviço    | Protocolo        | Uso                                    | Tratamento de Falha                         |
+| ---------- | ---------------- | -------------------------------------- | ------------------------------------------- |
+| **ViaCEP** | HTTP GET (REST)  | Consulta de endereço por CEP           | Retorna erro ao cliente se API indisponível |
+| **Resend** | HTTP POST (REST) | Envio de email de recuperação de senha | Em dev: código retornado no response HTTP   |
 
 ---
 

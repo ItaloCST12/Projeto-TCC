@@ -41,8 +41,34 @@ type ProdutoAdmin = {
   precoAbacaxiGrande?: number | string | null;
   precoAbacaxiMedio?: number | string | null;
   precoAbacaxiPequeno?: number | string | null;
+  estoque: number;
   disponivel: boolean;
   imagemUrl?: string | null;
+};
+
+type ProdutoEstoqueResumo = {
+  id: number;
+  nome: string;
+  estoque: number;
+  disponivel: boolean;
+};
+
+type RespostaResumoEstoque = {
+  data: ProdutoEstoqueResumo[];
+  resumo: {
+    totalProdutos: number;
+    estoqueCritico: number;
+  };
+};
+
+type MovimentacaoEstoque = {
+  id: number;
+  tipo: string;
+  quantidade: number;
+  motivo?: string | null;
+  createdAt: string;
+  pedido?: { id: number } | null;
+  produto?: { id: number; nome: string };
 };
 
 type UsuarioAdmin = {
@@ -181,6 +207,41 @@ const formatarMoeda = (valor: number | string) =>
     Number(valor) || 0,
   );
 
+const classStatusEstoque = (estoque: number) => {
+  if (estoque <= 0) {
+    return "bg-destructive/15 text-destructive";
+  }
+  if (estoque <= 5) {
+    return "bg-yellow-500/15 text-yellow-700";
+  }
+  return "bg-primary/15 text-primary";
+};
+
+const labelStatusEstoque = (estoque: number) => {
+  if (estoque <= 0) {
+    return "Crítico";
+  }
+  if (estoque <= 5) {
+    return "Atenção";
+  }
+  return "Ok";
+};
+
+const PRECO_PADRAO_PRODUTO: Record<string, number> = {
+  laranja: 50,
+  tangerina: 5,
+  limao: 60,
+  "limão": 60,
+  abacaxi: 5,
+};
+
+const normalizarTexto = (valor: string) =>
+  valor
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+
 const parsePrecoParaExibicao = (valor: number | string | null | undefined, fallback = 0) => {
   if (typeof valor === "number") {
     return Number.isFinite(valor) ? valor : fallback;
@@ -192,12 +253,40 @@ const parsePrecoParaExibicao = (valor: number | string | null | undefined, fallb
       return fallback;
     }
 
-    const normalizado = texto.replace(/\./g, "").replace(",", ".");
+    // Aceita tanto formato pt-BR (12,34) quanto formato com ponto decimal (12.34).
+    const normalizado =
+      texto.includes(",") && texto.includes(".")
+        ? texto.replace(/\./g, "").replace(",", ".")
+        : texto.replace(",", ".");
     const convertido = Number(normalizado);
     return Number.isFinite(convertido) ? convertido : fallback;
   }
 
   return fallback;
+};
+
+const resolverPrecoAtualProduto = (produto: ProdutoAdmin) => {
+  const precoPrincipal = parsePrecoParaExibicao(produto.preco, 0);
+  if (precoPrincipal > 0) {
+    return precoPrincipal;
+  }
+
+  const precosPorTamanho = [
+    parsePrecoParaExibicao(produto.precoAbacaxiPequeno, 0),
+    parsePrecoParaExibicao(produto.precoAbacaxiMedio, 0),
+    parsePrecoParaExibicao(produto.precoAbacaxiGrande, 0),
+  ].filter((valor) => valor > 0);
+
+  if (precosPorTamanho.length > 0) {
+    return Math.min(...precosPorTamanho);
+  }
+
+  const nomeNormalizado = normalizarTexto(produto.nome || "");
+  if (nomeNormalizado.includes("abacaxi")) {
+    return 5;
+  }
+
+  return PRECO_PADRAO_PRODUTO[nomeNormalizado] ?? 0;
 };
 
 const obterItensPedido = (pedido: PedidoAdmin) => {
@@ -326,8 +415,10 @@ const PainelEntregas = () => {
   const [novoProdutoNome, setNovoProdutoNome] = useState("");
   const [novoProdutoPreco, setNovoProdutoPreco] = useState(0);
   const [novoProdutoDisponivel, setNovoProdutoDisponivel] = useState(true);
+  const [novoProdutoEstoqueInicial, setNovoProdutoEstoqueInicial] = useState<string>("");
   const [novoProdutoImagem, setNovoProdutoImagem] = useState<File | null>(null);
   const [precoEditadoPorProduto, setPrecoEditadoPorProduto] = useState<Record<number, string>>({});
+  const [estoqueEditadoPorProduto, setEstoqueEditadoPorProduto] = useState<Record<number, string>>({});
   const [precoAbacaxiEditadoPorProduto, setPrecoAbacaxiEditadoPorProduto] = useState<
     Record<number, { grande: string; medio: string; pequeno: string }>
   >({});
@@ -356,6 +447,12 @@ const PainelEntregas = () => {
   >("last_month");
   const [dataInicioVendas, setDataInicioVendas] = useState("");
   const [dataFimVendas, setDataFimVendas] = useState("");
+  const [resumoEstoque, setResumoEstoque] = useState<RespostaResumoEstoque | null>(null);
+  const [movimentacoesEstoque, setMovimentacoesEstoque] = useState<MovimentacaoEstoque[]>([]);
+  const [produtoMovimentacaoId, setProdutoMovimentacaoId] = useState<number | null>(null);
+  const [loadingEstoque, setLoadingEstoque] = useState(false);
+  const [errorEstoque, setErrorEstoque] = useState("");
+  const [updatingEstoqueId, setUpdatingEstoqueId] = useState<number | null>(null);
   const inputImagemRef = useRef<HTMLInputElement | null>(null);
 
   const loadPedidos = async (page = paginaPedidos) => {
@@ -401,6 +498,43 @@ const PainelEntregas = () => {
       );
     } finally {
       setLoadingProdutos(false);
+    }
+  };
+
+  const loadResumoEstoque = async () => {
+    setLoadingEstoque(true);
+    setErrorEstoque("");
+
+    try {
+      const response = await apiRequest<RespostaResumoEstoque>("/produtos/estoque/resumo");
+      setResumoEstoque(response);
+    } catch (loadError) {
+      setErrorEstoque(
+        loadError instanceof Error
+          ? loadError.message
+          : "Não foi possível carregar o resumo de estoque.",
+      );
+    } finally {
+      setLoadingEstoque(false);
+    }
+  };
+
+  const loadMovimentacoesEstoque = async (produtoId: number) => {
+    setErrorEstoque("");
+
+    try {
+      const response = await apiRequest<RespostaPaginada<MovimentacaoEstoque>>(
+        `/produtos/${produtoId}/estoque/movimentacoes?page=1`,
+      );
+      setMovimentacoesEstoque(response.data);
+      setProdutoMovimentacaoId(produtoId);
+    } catch (loadError) {
+      setErrorEstoque(
+        loadError instanceof Error
+          ? loadError.message
+          : "Não foi possível carregar movimentações de estoque.",
+      );
+      setMovimentacoesEstoque([]);
     }
   };
 
@@ -509,6 +643,7 @@ const PainelEntregas = () => {
   useEffect(() => {
     void loadPedidos(1);
     void loadProdutos();
+    void loadResumoEstoque();
     void loadUsuarios();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -737,6 +872,10 @@ const PainelEntregas = () => {
       formData.append("nome", novoProdutoNome.trim());
       formData.append("preco", String(novoProdutoPreco));
       formData.append("disponivel", String(novoProdutoDisponivel));
+      if (novoProdutoEstoqueInicial.trim() === "") {
+        throw new Error("Informe o estoque inicial do produto");
+      }
+      formData.append("estoque", novoProdutoEstoqueInicial.trim());
       if (novoProdutoImagem) {
         formData.append("imagem", novoProdutoImagem);
       }
@@ -749,11 +888,12 @@ const PainelEntregas = () => {
       setNovoProdutoNome("");
       setNovoProdutoPreco(0);
       setNovoProdutoDisponivel(true);
+      setNovoProdutoEstoqueInicial("");
       setNovoProdutoImagem(null);
       if (inputImagemRef.current) {
         inputImagemRef.current.value = "";
       }
-      await loadProdutos();
+      await Promise.all([loadProdutos(), loadResumoEstoque()]);
       setFeedbackProduto("Produto cadastrado com sucesso.");
     } catch (saveError) {
       setErrorProdutos(
@@ -769,7 +909,7 @@ const PainelEntregas = () => {
   const getPrecoEditado = (produto: ProdutoAdmin) => {
     return (
       precoEditadoPorProduto[produto.id] ??
-      String(parsePrecoParaExibicao(produto.preco, 0).toFixed(2))
+      String(resolverPrecoAtualProduto(produto).toFixed(2))
     );
   };
 
@@ -792,7 +932,7 @@ const PainelEntregas = () => {
         body: { preco },
       });
 
-      await loadProdutos();
+      await Promise.all([loadProdutos(), loadResumoEstoque()]);
       setPrecoEditadoPorProduto((current) => {
         const next = { ...current };
         delete next[produto.id];
@@ -807,6 +947,49 @@ const PainelEntregas = () => {
       );
     } finally {
       setUpdatingProdutoId(null);
+    }
+  };
+
+  const getEstoqueGestaoEditado = (produto: ProdutoEstoqueResumo) => {
+    return estoqueEditadoPorProduto[produto.id] ?? String(produto.estoque);
+  };
+
+  const salvarEstoqueProdutoGestao = async (produto: ProdutoEstoqueResumo) => {
+    const valorDigitado = getEstoqueGestaoEditado(produto).replace(",", ".").trim();
+    const estoque = Number(valorDigitado);
+
+    if (!Number.isFinite(estoque) || estoque < 0) {
+      setErrorEstoque("Informe um estoque válido (0 ou maior).");
+      return;
+    }
+
+    setUpdatingEstoqueId(produto.id);
+    setErrorEstoque("");
+
+    try {
+      await apiRequest(`/produtos/${produto.id}/estoque`, {
+        method: "POST",
+        body: {
+          tipo: "AJUSTE",
+          quantidade: Math.trunc(estoque),
+          motivo: "Ajuste manual na aba de gestão de estoque",
+        },
+      });
+
+      await Promise.all([loadResumoEstoque(), loadProdutos(), loadMovimentacoesEstoque(produto.id)]);
+      setEstoqueEditadoPorProduto((current) => {
+        const next = { ...current };
+        delete next[produto.id];
+        return next;
+      });
+    } catch (updateError) {
+      setErrorEstoque(
+        updateError instanceof Error
+          ? updateError.message
+          : "Não foi possível atualizar o estoque.",
+      );
+    } finally {
+      setUpdatingEstoqueId(null);
     }
   };
 
@@ -853,7 +1036,7 @@ const PainelEntregas = () => {
         },
       });
 
-      await loadProdutos();
+      await Promise.all([loadProdutos(), loadResumoEstoque()]);
       setPrecoAbacaxiEditadoPorProduto((current) => {
         const next = { ...current };
         delete next[produto.id];
@@ -880,7 +1063,7 @@ const PainelEntregas = () => {
         method: "PATCH",
         body: { disponivel },
       });
-      await loadProdutos();
+      await Promise.all([loadProdutos(), loadResumoEstoque()]);
       setFeedbackProduto("Disponibilidade atualizada.");
     } catch (updateError) {
       setErrorProdutos(
@@ -910,7 +1093,7 @@ const PainelEntregas = () => {
       await apiRequest(`/produtos/${produto.id}`, {
         method: "DELETE",
       });
-      await loadProdutos();
+      await Promise.all([loadProdutos(), loadResumoEstoque()]);
       setFeedbackProduto("Produto excluído com sucesso.");
     } catch (deleteError) {
       setErrorProdutos(
@@ -1111,7 +1294,10 @@ const PainelEntregas = () => {
         <div className="bg-card border border-border rounded-xl p-2 mb-4 flex flex-wrap gap-2 w-full">
           <button
             type="button"
-            onClick={() => setAbaAtiva("produtos")}
+            onClick={() => {
+              setAbaAtiva("produtos");
+              void loadResumoEstoque();
+            }}
             className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors flex-1 min-w-[160px] ${
               abaAtiva === "produtos"
                 ? "bg-primary text-primary-foreground"
@@ -1756,8 +1942,8 @@ const PainelEntregas = () => {
             )}
           </section>
         ) : abaAtiva === "produtos" ? (
-          <div className="grid xl:grid-cols-[360px_1fr] gap-4">
-            <section className="bg-card border border-border rounded-xl p-4 sm:p-6 h-fit">
+          <div className="space-y-6">
+            <section className="bg-card border border-border rounded-xl p-6 sm:p-8">
               <h2 className="font-display text-2xl font-bold text-foreground mb-1">
                 Cadastrar Produto
               </h2>
@@ -1765,7 +1951,7 @@ const PainelEntregas = () => {
                 Cadastre novos itens e deixe-os prontos para encomenda.
               </p>
 
-              <form onSubmit={cadastrarProduto} className="space-y-3">
+              <form onSubmit={cadastrarProduto} className="space-y-4">
                 <div>
                   <label htmlFor="novo-produto" className="block text-sm font-medium text-foreground mb-1">
                     Nome do produto
@@ -1775,7 +1961,7 @@ const PainelEntregas = () => {
                     type="text"
                     value={novoProdutoNome}
                     onChange={(event) => setNovoProdutoNome(event.target.value)}
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-foreground"
+                    className="w-full rounded-lg border border-border bg-background px-4 py-3 text-foreground"
                     placeholder="Ex.: Manga Palmer"
                     required
                   />
@@ -1792,7 +1978,7 @@ const PainelEntregas = () => {
                     step="0.01"
                     value={novoProdutoPreco}
                     onChange={(event) => setNovoProdutoPreco(Number(event.target.value))}
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-foreground"
+                    className="w-full rounded-lg border border-border bg-background px-4 py-3 text-foreground"
                     placeholder="Ex.: 12.50"
                     required
                   />
@@ -1808,6 +1994,23 @@ const PainelEntregas = () => {
                 </label>
 
                 <div>
+                  <label htmlFor="novo-produto-estoque" className="block text-sm font-medium text-foreground mb-1">
+                    Estoque inicial
+                  </label>
+                  <input
+                    id="novo-produto-estoque"
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={novoProdutoEstoqueInicial}
+                    onChange={(event) => setNovoProdutoEstoqueInicial(event.target.value)}
+                    className="w-full rounded-lg border border-border bg-background px-4 py-3 text-foreground"
+                    placeholder="Ex.: 100"
+                    required
+                  />
+                </div>
+
+                <div>
                   <label htmlFor="novo-produto-imagem" className="block text-sm font-medium text-foreground mb-1">
                     Foto do produto
                   </label>
@@ -1817,7 +2020,7 @@ const PainelEntregas = () => {
                     type="file"
                     accept="image/png,image/jpeg,image/webp"
                     onChange={(event) => setNovoProdutoImagem(event.target.files?.[0] ?? null)}
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-foreground file:mr-3 file:rounded-md file:border-0 file:bg-muted file:px-3 file:py-1.5 file:text-sm"
+                    className="w-full rounded-lg border border-border bg-background px-4 py-3 text-foreground file:mr-3 file:rounded-md file:border-0 file:bg-muted file:px-3 file:py-1.5 file:text-sm"
                   />
                   <p className="text-xs text-muted-foreground mt-1">Formatos: JPG, PNG ou WEBP.</p>
                 </div>
@@ -1825,39 +2028,192 @@ const PainelEntregas = () => {
                 <button
                   type="submit"
                   disabled={savingProduto}
-                  className="w-full inline-flex items-center justify-center px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-50"
+                  className="w-full inline-flex items-center justify-center px-4 py-3 rounded-lg bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-50"
                 >
                   {savingProduto ? "Cadastrando..." : "Cadastrar produto"}
                 </button>
               </form>
             </section>
 
-            <section className="bg-card border border-border rounded-xl p-4 sm:p-6">
-              <h2 className="font-display text-2xl font-bold text-foreground mb-4">
-                Catálogo Administrativo
-              </h2>
+            <div className="grid gap-6">
+              <section className="order-2 bg-card border border-border rounded-xl p-6 sm:p-8">
+                <h2 className="font-display text-2xl sm:text-3xl font-bold text-foreground mb-5">
+                  Gestão de Estoque
+                </h2>
 
-              <div className="grid sm:grid-cols-3 gap-2 mb-4">
-                <div className="border border-border rounded-lg p-3">
+                {loadingEstoque ? (
+                  <p className="text-muted-foreground">Carregando estoque...</p>
+                ) : (
+                  <>
+                    {errorEstoque && <p className="text-sm text-destructive mb-3">{errorEstoque}</p>}
+
+                    <div className="grid sm:grid-cols-3 gap-3 mb-5">
+                      <div className="border border-border rounded-lg p-4">
+                        <p className="text-xs text-muted-foreground">Produtos com controle</p>
+                        <p className="text-xl font-bold text-foreground">{resumoEstoque?.resumo.totalProdutos ?? 0}</p>
+                      </div>
+                      <div className="border border-border rounded-lg p-4">
+                        <p className="text-xs text-muted-foreground">Produtos zerados</p>
+                        <p className="text-xl font-bold text-destructive">{resumoEstoque?.resumo.estoqueCritico ?? 0}</p>
+                      </div>
+                      <div className="border border-border rounded-lg p-4">
+                        <p className="text-xs text-muted-foreground">Atualização</p>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            void loadResumoEstoque();
+                          }}
+                          className="mt-1 inline-flex items-center px-3 py-1 rounded-md border border-border text-sm font-semibold hover:bg-muted"
+                        >
+                          Atualizar resumo
+                        </button>
+                      </div>
+                    </div>
+
+                    {!resumoEstoque || resumoEstoque.data.length === 0 ? (
+                      <p className="text-muted-foreground">Nenhum produto com controle de estoque configurado.</p>
+                    ) : (
+                      <div className="space-y-3 max-h-[680px] overflow-y-auto pr-1">
+                        {resumoEstoque.data.map((produto) => (
+                          <article key={produto.id} className="rounded-lg border border-border p-4">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <div>
+                                <p className="font-semibold text-foreground">{produto.nome}</p>
+                                <p className="text-xs text-muted-foreground">ID: {produto.id}</p>
+                              </div>
+                              <span
+                                className={`text-xs font-semibold px-2 py-0.5 rounded-full ${classStatusEstoque(produto.estoque)}`}
+                              >
+                                {labelStatusEstoque(produto.estoque)}
+                              </span>
+                            </div>
+
+                            <div className="mt-3 grid sm:grid-cols-2 gap-3 text-sm">
+                              <div className="rounded-md border border-border p-3">
+                                <p className="text-xs text-muted-foreground">Estoque atual</p>
+                                <p className="font-semibold text-foreground">{produto.estoque}</p>
+                              </div>
+                              <div className="rounded-md border border-border p-3">
+                                <p className="text-xs text-muted-foreground">Disponibilidade</p>
+                                <p className="font-semibold text-foreground">
+                                  {produto.disponivel ? "Disponível" : "Indisponível"}
+                                </p>
+                              </div>
+                            </div>
+
+                            <p className="mt-3 text-xs text-muted-foreground">
+                              Digite o estoque final desejado e clique em salvar.
+                            </p>
+
+                            <div className="mt-3 grid md:grid-cols-[180px_auto_auto] gap-3">
+                              <input
+                                type="number"
+                                min="0"
+                                step="1"
+                                value={getEstoqueGestaoEditado(produto)}
+                                onChange={(event) =>
+                                  setEstoqueEditadoPorProduto((current) => ({
+                                    ...current,
+                                    [produto.id]: event.target.value,
+                                  }))
+                                }
+                                className="rounded-md border border-border bg-background px-3 py-2.5 text-sm"
+                                placeholder="Estoque final"
+                              />
+                              <button
+                                type="button"
+                                disabled={updatingEstoqueId === produto.id}
+                                onClick={() => {
+                                  void salvarEstoqueProdutoGestao(produto);
+                                }}
+                                className="inline-flex items-center justify-center px-3 py-2.5 rounded-md bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-50"
+                              >
+                                {updatingEstoqueId === produto.id ? "Salvando..." : "Salvar estoque"}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  void loadMovimentacoesEstoque(produto.id);
+                                }}
+                                className="inline-flex items-center justify-center px-3 py-2.5 rounded-md border border-border text-sm font-semibold hover:bg-muted"
+                              >
+                                Histórico
+                              </button>
+                            </div>
+                          </article>
+                        ))}
+                      </div>
+                    )}
+
+                    {produtoMovimentacaoId && (
+                      <div className="mt-5 rounded-lg border border-border p-4">
+                        <div className="flex items-center justify-between gap-2 mb-2">
+                          <h3 className="text-sm font-semibold text-foreground">
+                            Últimas movimentações do produto #{produtoMovimentacaoId}
+                          </h3>
+                          <button
+                            type="button"
+                            onClick={() => setProdutoMovimentacaoId(null)}
+                            className="text-xs text-muted-foreground hover:text-foreground"
+                          >
+                            Fechar
+                          </button>
+                        </div>
+
+                        {movimentacoesEstoque.length === 0 ? (
+                          <p className="text-sm text-muted-foreground">Sem movimentações registradas.</p>
+                        ) : (
+                          <ul className="space-y-2">
+                            {movimentacoesEstoque.map((mov) => (
+                              <li key={mov.id} className="rounded-md border border-border px-3 py-3 text-sm">
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                  <span className="font-semibold text-foreground">
+                                    {mov.tipo} • {mov.quantidade}
+                                  </span>
+                                  <span className="text-xs text-muted-foreground">
+                                    {formatarData(mov.createdAt)}
+                                  </span>
+                                </div>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {mov.motivo || "Sem motivo informado"}
+                                  {mov.pedido?.id ? ` • Pedido #${mov.pedido.id}` : ""}
+                                </p>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    )}
+                  </>
+                )}
+              </section>
+
+              <section className="order-1 bg-card border border-border rounded-xl p-6 sm:p-8">
+                <h2 className="font-display text-2xl sm:text-3xl font-bold text-foreground mb-5">
+                  Catálogo Administrativo
+                </h2>
+
+              <div className="grid sm:grid-cols-3 gap-3 mb-5">
+                <div className="border border-border rounded-lg p-4">
                   <p className="text-xs text-muted-foreground">Total</p>
                   <p className="text-xl font-bold text-foreground">{produtos.length}</p>
                 </div>
-                <div className="border border-border rounded-lg p-3">
+                <div className="border border-border rounded-lg p-4">
                   <p className="text-xs text-muted-foreground">Disponíveis</p>
                   <p className="text-xl font-bold text-foreground">{totalDisponiveis}</p>
                 </div>
-                <div className="border border-border rounded-lg p-3">
+                <div className="border border-border rounded-lg p-4">
                   <p className="text-xs text-muted-foreground">Indisponíveis</p>
                   <p className="text-xl font-bold text-foreground">{produtos.length - totalDisponiveis}</p>
                 </div>
               </div>
 
-              <div className="grid md:grid-cols-[1fr_auto] gap-2 mb-3">
+              <div className="grid md:grid-cols-[1fr_auto] gap-3 mb-4">
                 <input
                   type="text"
                   value={buscaProduto}
                   onChange={(event) => setBuscaProduto(event.target.value)}
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-foreground"
+                  className="w-full rounded-lg border border-border bg-background px-4 py-3 text-foreground"
                   placeholder="Buscar produto por nome"
                 />
                 <select
@@ -1867,7 +2223,7 @@ const PainelEntregas = () => {
                       event.target.value as "todos" | "disponiveis" | "indisponiveis",
                     )
                   }
-                  className="rounded-lg border border-border bg-background px-3 py-2 text-foreground"
+                  className="rounded-lg border border-border bg-background px-4 py-3 text-foreground"
                 >
                   <option value="todos">Todos</option>
                   <option value="disponiveis">Só disponíveis</option>
@@ -1883,14 +2239,14 @@ const PainelEntregas = () => {
               ) : produtosFiltrados.length === 0 ? (
                 <p className="text-muted-foreground">Nenhum produto encontrado com os filtros atuais.</p>
               ) : (
-                <ul className="space-y-2 max-h-[520px] overflow-y-auto pr-1">
+                <ul className="space-y-3 max-h-[680px] overflow-y-auto pr-1">
                   {produtosFiltrados.map((produto) => (
-                    <li key={produto.id} className="border border-border rounded-lg p-3">
-                      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                    <li key={produto.id} className="border border-border rounded-lg p-4">
+                      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                         <div>
                           <p className="font-semibold text-foreground">{produto.nome}</p>
                           <p className="text-sm text-muted-foreground mt-1">
-                            Preço atual: {formatarMoeda(parsePrecoParaExibicao(produto.preco, 0))}
+                            Preço atual: {formatarMoeda(resolverPrecoAtualProduto(produto))}
                           </p>
                           <div className="mt-1 flex items-center gap-2">
                             <span className="text-xs text-muted-foreground">ID: {produto.id}</span>
@@ -1903,10 +2259,15 @@ const PainelEntregas = () => {
                             >
                               {produto.disponivel ? "Disponível" : "Indisponível"}
                             </span>
+                            <span
+                              className={`text-xs font-semibold px-2 py-0.5 rounded-full ${classStatusEstoque(produto.estoque)}`}
+                            >
+                              Estoque: {produto.estoque}
+                            </span>
                           </div>
 
-                          <div className="mt-2 flex flex-wrap items-center gap-2">
-                            <label className="text-xs text-muted-foreground">Preço (R$)</label>
+                          <div className="mt-3 flex flex-wrap items-center gap-3">
+                            <label className="text-sm text-muted-foreground">Preço (R$)</label>
                             <input
                               type="number"
                               min="0"
@@ -1918,7 +2279,7 @@ const PainelEntregas = () => {
                                   [produto.id]: event.target.value,
                                 }))
                               }
-                              className="w-28 rounded-md border border-border bg-background px-2 py-1 text-sm text-foreground"
+                              className="w-32 rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground"
                             />
                             <button
                               type="button"
@@ -1926,7 +2287,7 @@ const PainelEntregas = () => {
                               onClick={() => {
                                 void atualizarPrecoProduto(produto);
                               }}
-                              className="inline-flex items-center px-2.5 py-1 rounded-md border border-border text-xs font-semibold hover:bg-muted disabled:opacity-50"
+                              className="inline-flex items-center px-3 py-2 rounded-md border border-border text-sm font-semibold hover:bg-muted disabled:opacity-50"
                             >
                               {updatingProdutoId === produto.id ? "Salvando..." : "Salvar preço"}
                             </button>
@@ -2011,14 +2372,14 @@ const PainelEntregas = () => {
                             </div>
                           )}
                         </div>
-                        <div className="flex w-full sm:w-auto flex-row sm:flex-col items-stretch sm:items-end gap-2">
+                        <div className="flex w-full sm:w-auto flex-row sm:flex-col items-stretch sm:items-end gap-3">
                           <button
                             type="button"
                             disabled={updatingProdutoId === produto.id}
                             onClick={() =>
                               atualizarDisponibilidadeProduto(produto.id, !produto.disponivel)
                             }
-                            className="inline-flex items-center justify-center px-3 py-1 rounded-md border border-border text-sm font-semibold hover:bg-muted disabled:opacity-50"
+                            className="inline-flex items-center justify-center px-4 py-2 rounded-md border border-border text-sm font-semibold hover:bg-muted disabled:opacity-50"
                           >
                             {updatingProdutoId === produto.id
                               ? "Atualizando..."
@@ -2032,7 +2393,7 @@ const PainelEntregas = () => {
                             onClick={() => {
                               void excluirProduto(produto);
                             }}
-                            className="inline-flex items-center justify-center px-3 py-1 rounded-md border border-destructive/50 text-sm font-semibold text-destructive hover:bg-destructive/10 disabled:opacity-50"
+                            className="inline-flex items-center justify-center px-4 py-2 rounded-md border border-destructive/50 text-sm font-semibold text-destructive hover:bg-destructive/10 disabled:opacity-50"
                           >
                             {updatingProdutoId === produto.id ? "Processando..." : "Excluir"}
                           </button>
@@ -2042,7 +2403,8 @@ const PainelEntregas = () => {
                   ))}
                 </ul>
               )}
-            </section>
+              </section>
+            </div>
           </div>
         ) : (
           <section className="bg-card border border-border rounded-xl p-4 sm:p-6">

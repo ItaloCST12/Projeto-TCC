@@ -17,7 +17,6 @@ export default defineConfig(({ mode }) => ({
       "/enderecos": "http://localhost:3333",
       "/produtos": "http://localhost:3333",
       "/pedidos": "http://localhost:3333",
-      "/pagamentos": "http://localhost:3333",
       "/atendimentos": "http://localhost:3333",
     },
   },

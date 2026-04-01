@@ -8,7 +8,6 @@ import http from "http";
 import net from "net";
 import routes from "./routes";
 import { initAtendimentoSocket } from "./socket/atendimento.socket";
-import { iniciarConciliacaoPixAutomatica } from "./services/pagamento.service";
 
 const envPaths = [
   path.resolve(process.cwd(), "..", ".env"),
@@ -59,7 +58,6 @@ const apiPrefixes = [
   "/enderecos",
   "/produtos",
   "/pedidos",
-  "/pagamentos",
   "/atendimentos",
   "/notificacoes",
 ];
@@ -71,7 +69,6 @@ app.use(
         defaultSrc: ["'self'"],
         scriptSrc: [
           "'self'",
-          "https://plugin.handtalk.me",
           "https://vlibras.gov.br",
         ],
         styleSrc: ["'self'", "https:", "'unsafe-inline'"],
@@ -121,11 +118,6 @@ app.get(/.*/, (req, res, next) => {
 const server = http.createServer(app);
 
 initAtendimentoSocket(server);
-const pararConciliacaoPix = iniciarConciliacaoPixAutomatica();
-
-server.on("close", () => {
-  pararConciliacaoPix();
-});
 
 const obterPortaDisponivel = (portaInicialTeste: number) =>
   new Promise<number>((resolve, reject) => {
