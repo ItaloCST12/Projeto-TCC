@@ -5,6 +5,7 @@ import Navbar from "@/components/Navbar";
 import PageShell from "@/components/PageShell";
 import { apiRequest } from "@/lib/api";
 import { getAuthToken, getAuthUser, isAuthenticated } from "@/lib/auth";
+import { Skeleton } from "@/components/ui/skeleton";
 
 type Mensagem = {
   id: number;
@@ -331,7 +332,12 @@ const Chat = () => {
           <div className="bg-card border border-border rounded-xl p-4">
             <h2 className="font-semibold text-foreground mb-3">Mensagens</h2>
             {loading ? (
-              <p className="text-muted-foreground">Carregando...</p>
+              <div className="space-y-3">
+                <Skeleton className="h-16 w-3/4" />
+                <Skeleton className="h-16 w-2/3 ml-auto" />
+                <Skeleton className="h-16 w-4/5" />
+                <Skeleton className="h-24 w-full" />
+              </div>
             ) : (
               <>
                 <div className="border border-border rounded-lg p-3 min-h-[280px] max-h-[420px] overflow-y-auto mb-4 space-y-2">

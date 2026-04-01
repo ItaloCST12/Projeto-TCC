@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
-import { CalendarDays } from "lucide-react";
+import { CalendarDays, CheckCircle2, Clock3, PackageCheck, Truck } from "lucide-react";
 import { apiRequest } from "@/lib/api";
 import { getAuthUser, isAuthenticated } from "@/lib/auth";
 import Navbar from "@/components/Navbar";
 import PageShell from "@/components/PageShell";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -119,6 +120,38 @@ const formatarStatusPedido = (status?: string) => {
   }
 
   return status || "-";
+};
+
+const ETAPAS_STATUS_ENTREGA = [
+  { label: "Pendente", icon: Clock3 },
+  { label: "Pronto", icon: CheckCircle2 },
+  { label: "Saiu para entrega", icon: Truck },
+  { label: "Entregue", icon: PackageCheck },
+] as const;
+
+const ETAPAS_STATUS_RETIRADA = [
+  { label: "Pendente", icon: Clock3 },
+  { label: "Pronto para retirada", icon: CheckCircle2 },
+  { label: "Retirado", icon: PackageCheck },
+] as const;
+
+const resolverIndiceStatusEntrega = (status?: string) => {
+  const statusNormalizado = (status ?? "").trim().toUpperCase();
+
+  if (statusNormalizado === "PENDENTE") return 0;
+  if (statusNormalizado === "PRONTO_PARA_RETIRADA") return 1;
+  if (statusNormalizado === "SAIU_PARA_ENTREGA") return 2;
+  if (statusNormalizado === "COMPLETADO") return 3;
+  return 0;
+};
+
+const resolverIndiceStatusRetirada = (status?: string) => {
+  const statusNormalizado = (status ?? "").trim().toUpperCase();
+
+  if (statusNormalizado === "PENDENTE") return 0;
+  if (statusNormalizado === "PRONTO_PARA_RETIRADA") return 1;
+  if (statusNormalizado === "COMPLETADO") return 2;
+  return 0;
 };
 
 const MinhasEncomendas = () => {
@@ -281,7 +314,16 @@ const MinhasEncomendas = () => {
           </form>
 
           {loading ? (
-            <p className="text-muted-foreground text-sm">Carregando encomendas...</p>
+            <div className="space-y-3">
+              {Array.from({ length: 3 }).map((_, index) => (
+                <div key={`pedido-skeleton-${index}`} className="rounded-lg border border-border bg-background p-4 space-y-3">
+                  <Skeleton className="h-4 w-32" />
+                  <Skeleton className="h-3 w-2/3" />
+                  <Skeleton className="h-14 w-full" />
+                  <Skeleton className="h-8 w-36" />
+                </div>
+              ))}
+            </div>
           ) : error ? (
             <p className="text-destructive text-sm">{error}</p>
           ) : pedidos.length === 0 ? (
@@ -325,9 +367,15 @@ const MinhasEncomendas = () => {
                       <p className="text-sm font-semibold text-foreground">
                         Pedido #{pedido.id}
                       </p>
-                      <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-muted text-muted-foreground text-xs font-semibold">
-                        {formatarStatusPedido(pedido.status)}
-                      </span>
+                      {pedido.status === "CANCELADO" ? (
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-destructive/10 text-destructive text-xs font-semibold">
+                          Cancelado
+                        </span>
+                      ) : (
+                        <span className="text-xs font-medium text-muted-foreground">
+                          {formatarStatusPedido(pedido.status)}
+                        </span>
+                      )}
                     </div>
 
                     <div className="grid sm:grid-cols-2 gap-2 text-sm mb-3">
@@ -344,6 +392,51 @@ const MinhasEncomendas = () => {
                         Itens: <span className="text-foreground">{totalItensPedido}</span>
                       </p>
                     </div>
+
+                    {pedido.status !== "CANCELADO" && (
+                      <div className="mb-3 overflow-x-auto">
+                        <div className="flex items-start min-w-[560px] gap-2">
+                          {(isRetirada(pedido) ? ETAPAS_STATUS_RETIRADA : ETAPAS_STATUS_ENTREGA).map((etapa, index) => {
+                            const Icone = etapa.icon;
+                            const indiceAtual = isRetirada(pedido)
+                              ? resolverIndiceStatusRetirada(pedido.status)
+                              : resolverIndiceStatusEntrega(pedido.status);
+                            const concluida = index < indiceAtual;
+                            const ativa = index === indiceAtual;
+
+                            return (
+                              <div key={`${pedido.id}-${etapa.label}`} className="flex-1 flex items-center gap-2">
+                                <div
+                                  className={`h-8 w-8 rounded-full border inline-flex items-center justify-center shrink-0 ${
+                                    concluida || ativa
+                                      ? "border-primary bg-primary/15 text-primary"
+                                      : "border-border bg-muted/30 text-muted-foreground"
+                                  }`}
+                                >
+                                  <Icone className="h-4 w-4" />
+                                </div>
+                                <div className="min-w-0">
+                                  <p
+                                    className={`text-xs font-semibold ${
+                                      ativa ? "text-foreground" : "text-muted-foreground"
+                                    }`}
+                                  >
+                                    {etapa.label}
+                                  </p>
+                                  <div className="mt-1 h-1.5 rounded-full bg-muted/60 overflow-hidden">
+                                    <div
+                                      className={`h-full rounded-full ${
+                                        concluida || ativa ? "bg-primary" : "bg-transparent"
+                                      }`}
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
 
                     <div className="rounded-md border border-border/80 p-3">
                       <p className="text-xs text-muted-foreground mb-2">Produtos encomendados</p>

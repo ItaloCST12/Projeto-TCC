@@ -108,6 +108,7 @@ const Navbar = () => {
   const ctaTo = loggedIn ? "/encomenda" : "/login?redirect=/encomenda";
   const profileLink = isAdmin ? "/painel-entregas" : "/perfil";
   const mobileCartTo = loggedIn ? "/carrinho" : "/login?redirect=/carrinho";
+  const cartBadgeCount = cartTotalItems > 99 ? "99+" : String(cartTotalItems);
 
   const handleLogout = () => {
     clearAuthSession();
@@ -291,8 +292,8 @@ const Navbar = () => {
             >
               <ShoppingCart className="h-5 w-5" />
               {loggedIn && cartTotalItems > 0 && (
-                <span className="absolute -top-1 -right-1 inline-flex items-center justify-center min-w-5 h-5 px-1 rounded-full bg-primary text-primary-foreground text-[10px] font-semibold leading-none">
-                  {cartTotalItems}
+                <span className="absolute -top-1.5 -right-1.5 inline-flex items-center justify-center min-w-5 h-5 px-1 rounded-full bg-secondary text-secondary-foreground text-[10px] font-bold leading-none shadow-sm">
+                  {cartBadgeCount}
                 </span>
               )}
             </Link>
@@ -342,11 +343,15 @@ const Navbar = () => {
                   to="/carrinho"
                   className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border border-primary/25 bg-primary/5 text-foreground text-sm font-semibold hover:bg-primary/10 transition-colors"
                 >
-                  <ShoppingCart className="h-4 w-4" />
-                  Carrinho
-                  <span className="inline-flex items-center justify-center min-w-6 h-6 px-1 rounded-full bg-primary text-primary-foreground text-xs">
-                    {cartTotalItems}
+                  <span className="relative inline-flex">
+                    <ShoppingCart className="h-4 w-4" />
+                    {cartTotalItems > 0 && (
+                      <span className="absolute -top-2 -right-2 inline-flex items-center justify-center min-w-4 h-4 px-1 rounded-full bg-secondary text-secondary-foreground text-[10px] font-bold leading-none">
+                        {cartBadgeCount}
+                      </span>
+                    )}
                   </span>
+                  Carrinho
                 </Link>
               )}
             </div>

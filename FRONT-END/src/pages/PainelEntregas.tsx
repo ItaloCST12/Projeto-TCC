@@ -8,6 +8,21 @@ import PageShell from "@/components/PageShell";
 import { apiRequest } from "@/lib/api";
 import { getAuthUser, isAuthenticated } from "@/lib/auth";
 import logoAbacaxi from "@/assets/abacaxi-logo.svg";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Skeleton } from "@/components/ui/skeleton";
+import PainelProdutos from "@/components/painel-entregas/PainelProdutos";
+import PainelPedidos from "@/components/painel-entregas/PainelPedidos";
+import PainelUsuarios from "@/components/painel-entregas/PainelUsuarios";
+import PainelRelatorios from "@/components/painel-entregas/PainelRelatorios";
 
 type PedidoAdmin = {
   id: number;
@@ -429,6 +444,7 @@ const PainelEntregas = () => {
     "todos" | "disponiveis" | "indisponiveis"
   >("todos");
   const [feedbackProduto, setFeedbackProduto] = useState("");
+  const [produtoParaExcluir, setProdutoParaExcluir] = useState<ProdutoAdmin | null>(null);
   const [paginaPedidos, setPaginaPedidos] = useState(1);
   const [totalPaginasPedidos, setTotalPaginasPedidos] = useState(1);
   const [totalPedidos, setTotalPedidos] = useState(0);
@@ -1077,14 +1093,6 @@ const PainelEntregas = () => {
   };
 
   const excluirProduto = async (produto: ProdutoAdmin) => {
-    const confirmou = window.confirm(
-      `Deseja excluir o produto "${produto.nome}"? Esta ação não pode ser desfeita.`,
-    );
-
-    if (!confirmou) {
-      return;
-    }
-
     setUpdatingProdutoId(produto.id);
     setErrorProdutos("");
     setFeedbackProduto("");
@@ -1103,6 +1111,7 @@ const PainelEntregas = () => {
       );
     } finally {
       setUpdatingProdutoId(null);
+      setProdutoParaExcluir(null);
     }
   };
 
@@ -1346,6 +1355,7 @@ const PainelEntregas = () => {
         </div>
 
         {abaAtiva === "entregas" ? (
+          <PainelPedidos>
           <section className="bg-card border border-border rounded-xl p-4 sm:p-6">
             <h2 className="font-display text-2xl font-bold text-foreground mb-4">
               Gestão de Entregas ({totalPedidos})
@@ -1397,7 +1407,15 @@ const PainelEntregas = () => {
             </div>
 
             {loadingPedidos ? (
-              <p className="text-muted-foreground">Carregando pedidos...</p>
+              <div className="space-y-3">
+                {Array.from({ length: 3 }).map((_, index) => (
+                  <div key={`painel-pedidos-skeleton-${index}`} className="rounded-lg border border-border bg-background p-4 space-y-3">
+                    <Skeleton className="h-5 w-40" />
+                    <Skeleton className="h-3 w-3/4" />
+                    <Skeleton className="h-16 w-full" />
+                  </div>
+                ))}
+              </div>
             ) : (
               <>
                 {errorPedidos && <p className="text-sm text-destructive mb-4">{errorPedidos}</p>}
@@ -1641,7 +1659,9 @@ const PainelEntregas = () => {
               </>
             )}
           </section>
+          </PainelPedidos>
         ) : abaAtiva === "vendas" ? (
+          <PainelRelatorios>
           <section className="bg-card border border-border rounded-xl p-4 sm:p-6">
             <h2 className="font-display text-2xl font-bold text-foreground mb-4">
               Controle de Vendas
@@ -1941,7 +1961,9 @@ const PainelEntregas = () => {
               </>
             )}
           </section>
+          </PainelRelatorios>
         ) : abaAtiva === "produtos" ? (
+          <PainelProdutos>
           <div className="space-y-6">
             <section className="bg-card border border-border rounded-xl p-6 sm:p-8">
               <h2 className="font-display text-2xl font-bold text-foreground mb-1">
@@ -2235,7 +2257,15 @@ const PainelEntregas = () => {
               {feedbackProduto && <p className="text-sm text-primary mb-3">{feedbackProduto}</p>}
 
               {loadingProdutos ? (
-                <p className="text-muted-foreground">Carregando produtos...</p>
+                <div className="space-y-3">
+                  {Array.from({ length: 3 }).map((_, index) => (
+                    <div key={`painel-produtos-skeleton-${index}`} className="rounded-lg border border-border bg-background p-4 space-y-3">
+                      <Skeleton className="h-5 w-48" />
+                      <Skeleton className="h-4 w-2/3" />
+                      <Skeleton className="h-10 w-full" />
+                    </div>
+                  ))}
+                </div>
               ) : produtosFiltrados.length === 0 ? (
                 <p className="text-muted-foreground">Nenhum produto encontrado com os filtros atuais.</p>
               ) : (
@@ -2391,7 +2421,7 @@ const PainelEntregas = () => {
                             type="button"
                             disabled={updatingProdutoId === produto.id}
                             onClick={() => {
-                              void excluirProduto(produto);
+                              setProdutoParaExcluir(produto);
                             }}
                             className="inline-flex items-center justify-center px-4 py-2 rounded-md border border-destructive/50 text-sm font-semibold text-destructive hover:bg-destructive/10 disabled:opacity-50"
                           >
@@ -2406,7 +2436,9 @@ const PainelEntregas = () => {
               </section>
             </div>
           </div>
+          </PainelProdutos>
         ) : (
+          <PainelUsuarios>
           <section className="bg-card border border-border rounded-xl p-4 sm:p-6">
             <h2 className="font-display text-2xl font-bold text-foreground mb-4">
               Perfis de Usuários
@@ -2497,7 +2529,41 @@ const PainelEntregas = () => {
               </div>
             )}
           </section>
+          </PainelUsuarios>
         )}
+
+        <AlertDialog
+          open={produtoParaExcluir !== null}
+          onOpenChange={(open) => {
+            if (!open && updatingProdutoId === null) {
+              setProdutoParaExcluir(null);
+            }
+          }}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Deseja excluir este produto?</AlertDialogTitle>
+              <AlertDialogDescription>
+                {produtoParaExcluir
+                  ? `O produto ${produtoParaExcluir.nome} será excluído permanentemente.`
+                  : "Esta ação não pode ser desfeita."}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={updatingProdutoId !== null}>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                disabled={updatingProdutoId !== null || produtoParaExcluir === null}
+                onClick={() => {
+                  if (produtoParaExcluir) {
+                    void excluirProduto(produtoParaExcluir);
+                  }
+                }}
+              >
+                {updatingProdutoId !== null ? "Excluindo..." : "Confirmar"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </PageShell>
     </div>
   );

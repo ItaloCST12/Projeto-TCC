@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
-import { Navigate } from "react-router-dom";
-import { Package } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Navigate, useNavigate } from "react-router-dom";
+import { Package, Search } from "lucide-react";
 import abacaxiImg from "@/assets/abacaxi.jpg";
 import laranjaImg from "@/assets/laranja.jpg";
 import tangerinaImg from "@/assets/tangerina.jpg";
@@ -10,6 +10,8 @@ import { addToCart } from "@/lib/cart";
 import { getAuthUser, isAuthenticated } from "@/lib/auth";
 import Navbar from "@/components/Navbar";
 import PageShell from "@/components/PageShell";
+import { toast } from "@/components/ui/sonner";
+import { Skeleton } from "@/components/ui/skeleton";
 
 type Produto = {
   id: number;
@@ -183,15 +185,16 @@ const resolverImagemProduto = (imagemUrl: string | null | undefined, fallback: s
 const Encomenda = () => {
   const authenticated = isAuthenticated();
   const user = getAuthUser();
+  const navigate = useNavigate();
 
   const [produtos, setProdutos] = useState<Produto[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
   const [animandoAdicaoPorProduto, setAnimandoAdicaoPorProduto] = useState<Record<number, boolean>>({});
   const [quantidadePorProduto, setQuantidadePorProduto] = useState<Record<number, number>>({});
   const [quantidadeEditandoPorProduto, setQuantidadeEditandoPorProduto] = useState<Record<number, string>>({});
   const [unidadePorProduto, setUnidadePorProduto] = useState<Record<number, string>>({});
+  const [buscaProduto, setBuscaProduto] = useState("");
 
   useEffect(() => {
     const load = async () => {
@@ -219,7 +222,19 @@ const Encomenda = () => {
     return <Navigate to="/login?redirect=/encomenda" replace />;
   }
 
+  const produtosFiltrados = useMemo(() => {
+    const termo = normalizarTexto(buscaProduto);
+    if (!termo) {
+      return produtos;
+    }
+
+    return produtos.filter((produto) =>
+      normalizarTexto(produto.nome).includes(termo),
+    );
+  }, [buscaProduto, produtos]);
+
   const hasProdutos = produtos.length > 0;
+  const hasProdutosFiltrados = produtosFiltrados.length > 0;
 
   const getProdutoVisual = (nomeProduto: string): ProdutoVisual => {
     const normalizedName = resolverChaveVisualProduto(nomeProduto);
@@ -298,7 +313,6 @@ const Encomenda = () => {
   const adicionarProdutoViaCard = (produto: Produto) => {
     if (!produto.disponivel) {
       setError(`${produto.nome} está indisponível no momento.`);
-      setSuccess("");
       return;
     }
 
@@ -319,7 +333,13 @@ const Encomenda = () => {
       }));
     }, 550);
 
-    setSuccess(`${produto.nome} adicionado ao carrinho.`);
+    toast.success("Produto adicionado ao carrinho", {
+      description: `${produto.nome} foi adicionado com sucesso.`,
+      action: {
+        label: "Ver Carrinho",
+        onClick: () => navigate("/carrinho"),
+      },
+    });
     setError("");
   };
 
@@ -334,20 +354,49 @@ const Encomenda = () => {
       >
         <div className="bg-card border border-border rounded-xl p-6 mb-6">
           {loading ? (
-            <p className="text-muted-foreground">Carregando produtos...</p>
+            <div className="space-y-4">
+              <Skeleton className="h-6 w-36" />
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                {Array.from({ length: 6 }).map((_, index) => (
+                  <div key={`skeleton-produto-${index}`} className="rounded-xl border border-border p-4 space-y-3">
+                    <Skeleton className="aspect-square w-full rounded-lg" />
+                    <Skeleton className="h-5 w-1/2" />
+                    <Skeleton className="h-4 w-11/12" />
+                    <Skeleton className="h-10 w-full rounded-lg" />
+                    <Skeleton className="h-10 w-full rounded-lg" />
+                  </div>
+                ))}
+              </div>
+            </div>
           ) : (
             <div className="space-y-6">
               <div className="flex items-center justify-between gap-3">
                 <h2 className="font-display text-xl font-semibold text-foreground">Produtos</h2>
               </div>
 
+              <label className="inline-flex w-full items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground">
+                <Search className="h-4 w-4 text-muted-foreground" />
+                <input
+                  type="text"
+                  value={buscaProduto}
+                  onChange={(event) => setBuscaProduto(event.target.value)}
+                  className="w-full bg-transparent outline-none"
+                  placeholder="Buscar produto por nome"
+                  aria-label="Buscar produto por nome"
+                />
+              </label>
+
               {!hasProdutos ? (
                 <p className="text-sm text-muted-foreground">
                   Cadastre produtos no back-end para habilitar encomendas.
                 </p>
+              ) : !hasProdutosFiltrados ? (
+                <p className="text-sm text-muted-foreground">
+                  Nenhum produto encontrado para "{buscaProduto}".
+                </p>
               ) : (
                 <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                  {produtos.map((produto) => {
+                  {produtosFiltrados.map((produto) => {
                     const visual = getProdutoVisual(produto.nome);
                     const imagemCard = resolverImagemProduto(produto.imagemUrl, visual.image);
                     const isAbacaxi = normalizarTexto(produto.nome).includes("abacaxi");
@@ -564,7 +613,6 @@ const Encomenda = () => {
               )}
 
               {error && <p className="text-sm text-destructive">{error}</p>}
-              {success && <p className="text-sm text-primary">{success}</p>}
             </div>
           )}
         </div>

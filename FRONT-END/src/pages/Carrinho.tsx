@@ -26,6 +26,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { toast } from "@/components/ui/sonner";
 
 type Produto = {
   id: number;
@@ -212,6 +213,7 @@ const Carrinho = () => {
   const [savingEndereco, setSavingEndereco] = useState(false);
   const [deletingEnderecoId, setDeletingEnderecoId] = useState<number | null>(null);
   const [enderecoParaExcluir, setEnderecoParaExcluir] = useState<Endereco | null>(null);
+  const [itemParaRemover, setItemParaRemover] = useState<CartItem | null>(null);
   const [enderecoFormError, setEnderecoFormError] = useState("");
   const [enderecoFormSuccess, setEnderecoFormSuccess] = useState("");
   const [editingEnderecoId, setEditingEnderecoId] = useState<number | null>(null);
@@ -293,6 +295,7 @@ const Carrinho = () => {
       ),
     [cartItems, getSubtotalItem],
   );
+  const subtotalCarrinho = valorTotalCarrinho;
 
   const enderecoLabel = (endereco: Endereco) => {
     const numeroFormatado = endereco.numero?.trim() ? `, ${endereco.numero}` : "";
@@ -316,10 +319,12 @@ const Carrinho = () => {
         const produtosDisponiveis = produtosResponse.filter((produto) => produto.disponivel);
         const produtosMap = new Map(produtosDisponiveis.map((produto) => [produto.id, produto.nome]));
 
+        const itensRemovidos: string[] = [];
         const carrinhoSanitizado = getCartItems()
           .map((item) => {
             const nomeAtual = produtosMap.get(item.produtoId);
             if (!nomeAtual) {
+              itensRemovidos.push(item.nome);
               return null;
             }
 
@@ -334,6 +339,15 @@ const Carrinho = () => {
 
         setCartItems(carrinhoSanitizado);
         saveCartItems(carrinhoSanitizado);
+
+        if (itensRemovidos.length > 0) {
+          const nomesRemovidos = [...new Set(itensRemovidos)];
+          nomesRemovidos.forEach((nomeProduto) => {
+            toast.warning(
+              `O produto ${nomeProduto} foi removido do carrinho pois não está mais disponível.`,
+            );
+          });
+        }
 
         setEnderecos(enderecosResponse);
         if (enderecosResponse.length > 0) {
@@ -769,7 +783,7 @@ const Carrinho = () => {
                               </button>
                               <button
                                 type="button"
-                                onClick={() => removerItem(item.produtoId, item.unidade)}
+                                onClick={() => setItemParaRemover(item)}
                                 className="px-3 py-1.5 rounded-md border-2 border-border hover:bg-muted text-sm font-semibold"
                               >
                                 Remover
@@ -797,6 +811,12 @@ const Carrinho = () => {
                     <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">Quantidade</p>
                     <p className="text-lg font-semibold tabular-nums text-foreground leading-none mt-1">{totalItens}</p>
                   </div>
+                              <div className="rounded-lg border border-border/70 bg-background/90 px-3 py-2.5">
+                                <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">Subtotal</p>
+                                <p className="text-lg font-semibold tabular-nums text-foreground leading-none mt-1">
+                                  {formatarMoeda(subtotalCarrinho)}
+                                </p>
+                              </div>
                   <div className="rounded-lg border border-primary/35 bg-primary/[0.1] px-3 py-2.5 sm:col-span-1 relative overflow-hidden shadow-sm shadow-primary/15">
                     <span className="pointer-events-none absolute inset-y-0 left-0 w-1.5 bg-primary/55" aria-hidden="true" />
                     <p className="text-[10px] uppercase tracking-[0.16em] text-primary/80 pl-2">Total do pedido</p>
@@ -841,39 +861,45 @@ const Carrinho = () => {
                   </select>
                 </div>
 
-                <div className="sm:col-span-2">
-                  <label className="block text-sm font-medium text-foreground mb-1">
-                    Endereço de entrega
-                  </label>
-                  <select
-                    value={enderecoId}
-                    onChange={(event) => {
-                      const value = event.target.value;
-                      if (value) {
-                        setEnderecoId(Number(value));
-                        return;
-                      }
-                      setEnderecoId("");
-                    }}
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-foreground"
-                    required={tipoEntrega === "entrega"}
-                  >
-                    {enderecos.length === 0 ? (
-                      <option value="">Nenhum endereço cadastrado</option>
-                    ) : (
-                      enderecos.map((endereco) => (
-                        <option key={endereco.id} value={endereco.id}>
-                          {enderecoLabel(endereco)}
-                        </option>
-                      ))
+                {tipoEntrega === "entrega" ? (
+                  <div className="sm:col-span-2">
+                    <label className="block text-sm font-medium text-foreground mb-1">
+                      Endereço de entrega
+                    </label>
+                    <select
+                      value={enderecoId}
+                      onChange={(event) => {
+                        const value = event.target.value;
+                        if (value) {
+                          setEnderecoId(Number(value));
+                          return;
+                        }
+                        setEnderecoId("");
+                      }}
+                      className="w-full rounded-lg border border-border bg-background px-3 py-2 text-foreground"
+                      required
+                    >
+                      {enderecos.length === 0 ? (
+                        <option value="">Nenhum endereço cadastrado</option>
+                      ) : (
+                        enderecos.map((endereco) => (
+                          <option key={endereco.id} value={endereco.id}>
+                            {enderecoLabel(endereco)}
+                          </option>
+                        ))
+                      )}
+                    </select>
+                    {enderecos.length === 0 && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Cadastre um endereço na seção “Meus endereços” abaixo.
+                      </p>
                     )}
-                  </select>
-                  {enderecos.length === 0 && (
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Cadastre um endereço na seção “Meus endereços” abaixo.
-                    </p>
-                  )}
-                </div>
+                  </div>
+                ) : (
+                  <div className="sm:col-span-2 rounded-lg border border-border bg-muted/35 px-3 py-2 text-sm text-muted-foreground">
+                    Retirada selecionada: não é necessário informar endereço de entrega.
+                  </div>
+                )}
               </div>
 
               {error && <p className="text-sm text-destructive">{error}</p>}
@@ -1071,6 +1097,39 @@ const Carrinho = () => {
                 }}
               >
                 {deletingEnderecoId !== null ? "Excluindo..." : "Confirmar exclusão"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <AlertDialog
+          open={itemParaRemover !== null}
+          onOpenChange={(open) => {
+            if (!open) {
+              setItemParaRemover(null);
+            }
+          }}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Deseja remover este item?</AlertDialogTitle>
+              <AlertDialogDescription>
+                {itemParaRemover
+                  ? `O produto ${formatarNomeProduto(itemParaRemover.nome)} será removido do carrinho.`
+                  : "O item selecionado será removido do carrinho."}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => {
+                  if (itemParaRemover) {
+                    removerItem(itemParaRemover.produtoId, itemParaRemover.unidade);
+                    setItemParaRemover(null);
+                  }
+                }}
+              >
+                Confirmar
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
