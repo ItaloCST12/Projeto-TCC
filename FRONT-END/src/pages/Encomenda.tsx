@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
-import { Package, Search } from "lucide-react";
+import { Package } from "lucide-react";
 import abacaxiImg from "@/assets/abacaxi.jpg";
 import laranjaImg from "@/assets/laranja.jpg";
 import tangerinaImg from "@/assets/tangerina.jpg";
@@ -194,7 +194,6 @@ const Encomenda = () => {
   const [quantidadePorProduto, setQuantidadePorProduto] = useState<Record<number, number>>({});
   const [quantidadeEditandoPorProduto, setQuantidadeEditandoPorProduto] = useState<Record<number, string>>({});
   const [unidadePorProduto, setUnidadePorProduto] = useState<Record<number, string>>({});
-  const [buscaProduto, setBuscaProduto] = useState("");
 
   useEffect(() => {
     const load = async () => {
@@ -222,19 +221,7 @@ const Encomenda = () => {
     return <Navigate to="/login?redirect=/encomenda" replace />;
   }
 
-  const produtosFiltrados = useMemo(() => {
-    const termo = normalizarTexto(buscaProduto);
-    if (!termo) {
-      return produtos;
-    }
-
-    return produtos.filter((produto) =>
-      normalizarTexto(produto.nome).includes(termo),
-    );
-  }, [buscaProduto, produtos]);
-
   const hasProdutos = produtos.length > 0;
-  const hasProdutosFiltrados = produtosFiltrados.length > 0;
 
   const getProdutoVisual = (nomeProduto: string): ProdutoVisual => {
     const normalizedName = resolverChaveVisualProduto(nomeProduto);
@@ -374,29 +361,13 @@ const Encomenda = () => {
                 <h2 className="font-display text-xl font-semibold text-foreground">Produtos</h2>
               </div>
 
-              <label className="inline-flex w-full items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground">
-                <Search className="h-4 w-4 text-muted-foreground" />
-                <input
-                  type="text"
-                  value={buscaProduto}
-                  onChange={(event) => setBuscaProduto(event.target.value)}
-                  className="w-full bg-transparent outline-none"
-                  placeholder="Buscar produto por nome"
-                  aria-label="Buscar produto por nome"
-                />
-              </label>
-
               {!hasProdutos ? (
                 <p className="text-sm text-muted-foreground">
                   Cadastre produtos no back-end para habilitar encomendas.
                 </p>
-              ) : !hasProdutosFiltrados ? (
-                <p className="text-sm text-muted-foreground">
-                  Nenhum produto encontrado para "{buscaProduto}".
-                </p>
               ) : (
                 <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                  {produtosFiltrados.map((produto) => {
+                  {produtos.map((produto) => {
                     const visual = getProdutoVisual(produto.nome);
                     const imagemCard = resolverImagemProduto(produto.imagemUrl, visual.image);
                     const isAbacaxi = normalizarTexto(produto.nome).includes("abacaxi");

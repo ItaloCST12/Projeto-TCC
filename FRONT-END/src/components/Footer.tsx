@@ -1,5 +1,6 @@
 import { Clock3, Mail, MapPin, Phone } from "lucide-react";
 import logoAbacaxi from "@/assets/abacaxi-logo.svg";
+import { Link } from "react-router-dom";
 
 const Footer = () => {
   return (
@@ -22,14 +23,12 @@ const Footer = () => {
                 Produção local de frutas com qualidade e cuidado em cada etapa. Faça sua encomenda
                 com praticidade e receba atendimento rápido pelo WhatsApp.
               </p>
-              <a
-                href="https://wa.me/5596991583439?text=Ol%C3%A1%21%20Gostaria%20de%20fazer%20um%20pedido."
-                target="_blank"
-                rel="noopener noreferrer"
+              <Link
+                to="/login"
                 className="inline-flex items-center mt-4 rounded-xl border border-primary-foreground/25 px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary-foreground/10 transition-colors"
               >
                 Fazer pedido agora
-              </a>
+              </Link>
             </div>
 
             <div>

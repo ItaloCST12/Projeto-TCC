@@ -357,6 +357,12 @@ const MinhasEncomendas = () => {
                   (total, item) => total + (Number(item.quantidade) || 0),
                   0,
                 );
+                const etapasStatus = isRetirada(pedido)
+                  ? ETAPAS_STATUS_RETIRADA
+                  : ETAPAS_STATUS_ENTREGA;
+                const indiceStatusAtual = isRetirada(pedido)
+                  ? resolverIndiceStatusRetirada(pedido.status)
+                  : resolverIndiceStatusEntrega(pedido.status);
 
                 return (
                   <li
@@ -394,46 +400,87 @@ const MinhasEncomendas = () => {
                     </div>
 
                     {pedido.status !== "CANCELADO" && (
-                      <div className="mb-3 overflow-x-auto">
-                        <div className="flex items-start min-w-[560px] gap-2">
-                          {(isRetirada(pedido) ? ETAPAS_STATUS_RETIRADA : ETAPAS_STATUS_ENTREGA).map((etapa, index) => {
+                      <div className="mb-3 space-y-2">
+                        <p className="text-xs text-muted-foreground md:hidden">
+                          Etapa atual: <span className="font-semibold text-foreground">{formatarStatusPedido(pedido.status)}</span>
+                        </p>
+
+                        <div className="grid grid-cols-2 gap-2 md:hidden">
+                          {etapasStatus.map((etapa, index) => {
                             const Icone = etapa.icon;
-                            const indiceAtual = isRetirada(pedido)
-                              ? resolverIndiceStatusRetirada(pedido.status)
-                              : resolverIndiceStatusEntrega(pedido.status);
-                            const concluida = index < indiceAtual;
-                            const ativa = index === indiceAtual;
+                            const concluida = index < indiceStatusAtual;
+                            const ativa = index === indiceStatusAtual;
 
                             return (
-                              <div key={`${pedido.id}-${etapa.label}`} className="flex-1 flex items-center gap-2">
-                                <div
-                                  className={`h-8 w-8 rounded-full border inline-flex items-center justify-center shrink-0 ${
-                                    concluida || ativa
-                                      ? "border-primary bg-primary/15 text-primary"
-                                      : "border-border bg-muted/30 text-muted-foreground"
-                                  }`}
-                                >
-                                  <Icone className="h-4 w-4" />
-                                </div>
-                                <div className="min-w-0">
+                              <div
+                                key={`${pedido.id}-mobile-${etapa.label}`}
+                                className={`rounded-md border px-2.5 py-2 ${
+                                  concluida || ativa
+                                    ? "border-primary/30 bg-primary/10"
+                                    : "border-border bg-muted/20"
+                                }`}
+                              >
+                                <div className="flex items-center gap-2">
+                                  <div
+                                    className={`h-6 w-6 rounded-full border inline-flex items-center justify-center shrink-0 ${
+                                      concluida || ativa
+                                        ? "border-primary bg-primary/15 text-primary"
+                                        : "border-border bg-background text-muted-foreground"
+                                    }`}
+                                  >
+                                    <Icone className="h-3.5 w-3.5" />
+                                  </div>
                                   <p
-                                    className={`text-xs font-semibold ${
+                                    className={`text-[11px] leading-tight font-semibold ${
                                       ativa ? "text-foreground" : "text-muted-foreground"
                                     }`}
                                   >
                                     {etapa.label}
                                   </p>
-                                  <div className="mt-1 h-1.5 rounded-full bg-muted/60 overflow-hidden">
-                                    <div
-                                      className={`h-full rounded-full ${
-                                        concluida || ativa ? "bg-primary" : "bg-transparent"
-                                      }`}
-                                    />
-                                  </div>
                                 </div>
                               </div>
                             );
                           })}
+                        </div>
+
+                        <div className="hidden md:block overflow-x-auto">
+                          <div className="flex items-start min-w-[560px] gap-2">
+                            {etapasStatus.map((etapa, index) => {
+                              const Icone = etapa.icon;
+                              const concluida = index < indiceStatusAtual;
+                              const ativa = index === indiceStatusAtual;
+
+                              return (
+                                <div key={`${pedido.id}-${etapa.label}`} className="flex-1 flex items-center gap-2">
+                                  <div
+                                    className={`h-8 w-8 rounded-full border inline-flex items-center justify-center shrink-0 ${
+                                      concluida || ativa
+                                        ? "border-primary bg-primary/15 text-primary"
+                                        : "border-border bg-muted/30 text-muted-foreground"
+                                    }`}
+                                  >
+                                    <Icone className="h-4 w-4" />
+                                  </div>
+                                  <div className="min-w-0">
+                                    <p
+                                      className={`text-xs font-semibold ${
+                                        ativa ? "text-foreground" : "text-muted-foreground"
+                                      }`}
+                                    >
+                                      {etapa.label}
+                                    </p>
+                                    <div className="mt-1 h-1.5 rounded-full bg-muted/60 overflow-hidden">
+                                      <div
+                                        className={`h-full rounded-full ${
+                                          concluida || ativa ? "bg-primary" : "bg-transparent"
+                                        }`}
+                                      />
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
                         </div>
                       </div>
                     )}

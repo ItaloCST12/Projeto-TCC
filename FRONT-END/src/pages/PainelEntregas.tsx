@@ -438,7 +438,6 @@ const PainelEntregas = () => {
     Record<number, { grande: string; medio: string; pequeno: string }>
   >({});
   const [savingProduto, setSavingProduto] = useState(false);
-  const [buscaProduto, setBuscaProduto] = useState("");
   const [buscaUsuario, setBuscaUsuario] = useState("");
   const [filtroDisponibilidade, setFiltroDisponibilidade] = useState<
     "todos" | "disponiveis" | "indisponiveis"
@@ -696,8 +695,6 @@ const PainelEntregas = () => {
   };
 
   const produtosFiltrados = useMemo(() => {
-    const termo = buscaProduto.trim().toLowerCase();
-
     return produtos
       .filter((produto) => {
         if (filtroDisponibilidade === "disponiveis" && !produto.disponivel) {
@@ -706,13 +703,10 @@ const PainelEntregas = () => {
         if (filtroDisponibilidade === "indisponiveis" && produto.disponivel) {
           return false;
         }
-        if (termo && !produto.nome.toLowerCase().includes(termo)) {
-          return false;
-        }
         return true;
       })
       .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
-  }, [produtos, buscaProduto, filtroDisponibilidade]);
+  }, [produtos, filtroDisponibilidade]);
 
   const totalDisponiveis = useMemo(
     () => produtos.filter((produto) => produto.disponivel).length,
@@ -1292,6 +1286,13 @@ const PainelEntregas = () => {
     );
   }
 
+  const getClasseBotaoAba = (aba: "produtos" | "entregas" | "usuarios" | "vendas") =>
+    `px-4 py-2.5 rounded-lg text-sm font-bold transition-all duration-200 flex-1 min-w-[160px] border ${
+      abaAtiva === aba
+        ? "bg-primary text-primary-foreground border-primary shadow-lg ring-2 ring-primary/25"
+        : "bg-background text-foreground border-border hover:bg-muted hover:border-primary/35"
+    }`;
+
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
@@ -1300,29 +1301,23 @@ const PainelEntregas = () => {
         titleIcon={<BarChart3 className="h-5 w-5" />}
         subtitle="Gerencie entregas e produtos em um único lugar."
       >
-        <div className="bg-card border border-border rounded-xl p-2 mb-4 flex flex-wrap gap-2 w-full">
+        <div className="bg-card border-2 border-primary/20 rounded-xl p-2 mb-4 flex flex-wrap gap-2 w-full shadow-sm">
           <button
             type="button"
             onClick={() => {
               setAbaAtiva("produtos");
               void loadResumoEstoque();
             }}
-            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors flex-1 min-w-[160px] ${
-              abaAtiva === "produtos"
-                ? "bg-primary text-primary-foreground"
-                : "text-muted-foreground hover:bg-muted"
-            }`}
+            aria-pressed={abaAtiva === "produtos"}
+            className={getClasseBotaoAba("produtos")}
           >
             Gestão de Produtos
           </button>
           <button
             type="button"
             onClick={() => setAbaAtiva("entregas")}
-            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors flex-1 min-w-[160px] ${
-              abaAtiva === "entregas"
-                ? "bg-primary text-primary-foreground"
-                : "text-muted-foreground hover:bg-muted"
-            }`}
+            aria-pressed={abaAtiva === "entregas"}
+            className={getClasseBotaoAba("entregas")}
           >
             Gestão de Entregas
           </button>
@@ -1333,22 +1328,16 @@ const PainelEntregas = () => {
               setPaginaVendas(1);
               void loadControleVendas(1);
             }}
-            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors flex-1 min-w-[160px] ${
-              abaAtiva === "vendas"
-                ? "bg-primary text-primary-foreground"
-                : "text-muted-foreground hover:bg-muted"
-            }`}
+            aria-pressed={abaAtiva === "vendas"}
+            className={getClasseBotaoAba("vendas")}
           >
             Controle de Vendas
           </button>
           <button
             type="button"
             onClick={() => setAbaAtiva("usuarios")}
-            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors flex-1 min-w-[160px] ${
-              abaAtiva === "usuarios"
-                ? "bg-primary text-primary-foreground"
-                : "text-muted-foreground hover:bg-muted"
-            }`}
+            aria-pressed={abaAtiva === "usuarios"}
+            className={getClasseBotaoAba("usuarios")}
           >
             Perfis de Usuários
           </button>
@@ -2230,14 +2219,7 @@ const PainelEntregas = () => {
                 </div>
               </div>
 
-              <div className="grid md:grid-cols-[1fr_auto] gap-3 mb-4">
-                <input
-                  type="text"
-                  value={buscaProduto}
-                  onChange={(event) => setBuscaProduto(event.target.value)}
-                  className="w-full rounded-lg border border-border bg-background px-4 py-3 text-foreground"
-                  placeholder="Buscar produto por nome"
-                />
+              <div className="mb-4">
                 <select
                   value={filtroDisponibilidade}
                   onChange={(event) =>

@@ -56,14 +56,17 @@ const bootstrapVlibras = () => {
 	const widgetContainerId = "vlibras-plugin-container";
 	const scriptId = "vlibras-plugin-script";
 	const styleId = "vlibras-plugin-overrides";
+	const vlibrasScriptCdn =
+		"https://cdn.jsdelivr.net/gh/spbgovbr-vlibras/vlibras-portal@dev/app/vlibras-plugin.js";
 
 	if (!document.getElementById(styleId)) {
 		const style = document.createElement("style");
 		style.id = styleId;
 		style.textContent = `
-			#vlibras-plugin-container [vw-access-button],
-			#vlibras-plugin-container .vw-access-button {
-				z-index: 2147483000 !important;
+			#vlibras-plugin-container [vw-access-button]:hover,
+			#vlibras-plugin-container .vw-access-button:hover {
+				transform: none !important;
+				opacity: 1 !important;
 			}
 		`;
 		document.head.appendChild(style);
@@ -94,33 +97,48 @@ const bootstrapVlibras = () => {
 	const maybeInitWidget = () => {
 		const vlibrasWindow = window as Window & {
 			VLibras?: { Widget: new (url: string) => unknown };
+			__vlibrasWidgetInitialized?: boolean;
 		};
 
 		if (!vlibrasWindow.VLibras?.Widget) {
+			return false;
+		}
+
+		if (!vlibrasWindow.__vlibrasWidgetInitialized) {
+			new vlibrasWindow.VLibras.Widget("https://vlibras.gov.br/app");
+			vlibrasWindow.__vlibrasWidgetInitialized = true;
+		}
+
+		return true;
+	};
+
+	const loadVlibrasScript = () => {
+		const existingScript = document.getElementById(scriptId) as HTMLScriptElement | null;
+		if (existingScript) {
+			existingScript.addEventListener("load", () => {
+				void maybeInitWidget();
+			}, { once: true });
 			return;
 		}
 
-		if (!document.body.dataset.vlibrasInitialized) {
-			new vlibrasWindow.VLibras.Widget("https://vlibras.gov.br/app");
-			document.body.dataset.vlibrasInitialized = "true";
-		}
+		const script = document.createElement("script");
+		script.id = scriptId;
+		script.src = vlibrasScriptCdn;
+		script.async = true;
+		script.onload = () => {
+			void maybeInitWidget();
+		};
+		script.onerror = () => {
+			console.error("[A11Y] Falha ao carregar script do VLibras.");
+		};
+		document.body.appendChild(script);
 	};
 
-	const existingScript = document.getElementById(scriptId) as HTMLScriptElement | null;
-	if (existingScript) {
+	loadVlibrasScript();
+
+	window.setTimeout(() => {
 		maybeInitWidget();
-		return;
-	}
-
-	const script = document.createElement("script");
-	script.id = scriptId;
-	script.src = "https://vlibras.gov.br/app/vlibras-plugin.js";
-	script.async = true;
-	script.onload = maybeInitWidget;
-	script.onerror = () => {
-		console.error("[A11Y] Falha ao carregar script do VLibras.");
-	};
-	document.body.appendChild(script);
+	}, 2500);
 };
 
 const bootstrapAccessibilityWidget = () => {

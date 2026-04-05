@@ -3,7 +3,6 @@ import laranjaImg from "@/assets/laranja.jpg";
 import tangerinaImg from "@/assets/tangerina.jpg";
 import limaoImg from "@/assets/limao.jpg";
 import { useEffect, useMemo, useState } from "react";
-import { Search } from "lucide-react";
 import { apiRequest } from "@/lib/api";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -56,7 +55,6 @@ type ApiProduto = {
 const ProductsSection = () => {
   const [apiProducts, setApiProducts] = useState<ApiProduto[]>([]);
   const [loading, setLoading] = useState(true);
-  const [buscaProduto, setBuscaProduto] = useState("");
 
   useEffect(() => {
     const loadProducts = async () => {
@@ -97,17 +95,6 @@ const ProductsSection = () => {
     });
   }, [apiProducts, productLookup]);
 
-  const produtosFiltrados = useMemo(() => {
-    const termo = buscaProduto.trim().toLowerCase();
-    if (!termo) {
-      return productsToShow;
-    }
-
-    return productsToShow.filter((produto) =>
-      produto.name.toLowerCase().includes(termo),
-    );
-  }, [buscaProduto, productsToShow]);
-
   return (
     <section id="produtos" className="section-wrap bg-muted/45">
       <div className="container mx-auto px-4">
@@ -120,18 +107,6 @@ const ProductsSection = () => {
           </p>
         </div>
 
-        <label className="mb-6 mx-auto max-w-md inline-flex w-full items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground">
-          <Search className="h-4 w-4 text-muted-foreground" />
-          <input
-            type="text"
-            value={buscaProduto}
-            onChange={(event) => setBuscaProduto(event.target.value)}
-            className="w-full bg-transparent outline-none"
-            placeholder="Buscar produto por nome"
-            aria-label="Buscar produto por nome"
-          />
-        </label>
-
         {loading ? (
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {Array.from({ length: 4 }).map((_, index) => (
@@ -143,13 +118,13 @@ const ProductsSection = () => {
               </div>
             ))}
           </div>
-        ) : produtosFiltrados.length === 0 ? (
+        ) : productsToShow.length === 0 ? (
           <p className="text-center text-muted-foreground">
-            Nenhum produto encontrado para "{buscaProduto}".
+            Nenhum produto disponível no momento.
           </p>
         ) : (
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {produtosFiltrados.map((product) => (
+            {productsToShow.map((product) => (
             <div
               key={product.name}
               className="glass-card overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-card-hover group"

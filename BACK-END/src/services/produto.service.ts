@@ -1,5 +1,15 @@
 import prisma from "../models/client";
 
+const normalizarNomeProduto = (nome: string) => {
+  const nomeSemEspacosExtras = nome.trim().replace(/\s+/g, " ");
+  if (!nomeSemEspacosExtras) {
+    return "";
+  }
+
+  const nomeMinusculo = nomeSemEspacosExtras.toLocaleLowerCase("pt-BR");
+  return `${nomeMinusculo.charAt(0).toLocaleUpperCase("pt-BR")}${nomeMinusculo.slice(1)}`;
+};
+
 export class ProdutoService {
   async getProdutos() {
     return prisma.produto.findMany({
@@ -32,10 +42,15 @@ export class ProdutoService {
     imagemUrl?: string,
   ) {
     const estoqueNormalizado = Math.max(0, Math.trunc(estoque));
+    const nomeNormalizado = normalizarNomeProduto(nome);
+
+    if (!nomeNormalizado) {
+      throw new Error("Nome do produto é obrigatório");
+    }
 
     return await prisma.produto.create({
       data: {
-        nome,
+        nome: nomeNormalizado,
         preco,
         disponivel,
         estoque: estoqueNormalizado,
@@ -69,9 +84,19 @@ export class ProdutoService {
       throw new Error("Produto não encontrado");
     }
 
+    const nomeNormalizado =
+      data.nome !== undefined ? normalizarNomeProduto(data.nome) : undefined;
+
+    if (data.nome !== undefined && !nomeNormalizado) {
+      throw new Error("Nome do produto é obrigatório");
+    }
+
     return await prisma.produto.update({
       where: { id },
-      data,
+      data: {
+        ...data,
+        ...(nomeNormalizado !== undefined ? { nome: nomeNormalizado } : {}),
+      },
     });
   }
 

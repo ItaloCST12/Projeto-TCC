@@ -1,4 +1,4 @@
-import heroFarm from "@/assets/hero-farm.jpg";
+import heroFarm from "@/assets/img2.jpeg";
 
 const HeroSection = () => {
   return (
@@ -10,13 +10,13 @@ const HeroSection = () => {
       <img
         src={heroFarm}
         alt="Vista aérea da Fazenda Bispo com plantação de cítricos"
-        className="absolute inset-0 w-full h-full object-cover"
+        className="absolute inset-0 w-full h-full object-cover brightness-[0.95] contrast-[1.02] saturate-[1.03]"
         loading="eager"
       />
-      {/* Overlay */}
+      {/* Overlay suave para preservar aspecto natural e legibilidade */}
       <div
         className="absolute inset-0 hero-overlay"
-        style={{ background: "linear-gradient(180deg, rgba(0, 0, 0, 0.42) 0%, rgba(0, 0, 0, 0.24) 100%)" }}
+        style={{ background: "linear-gradient(180deg, rgba(0, 0, 0, 0.28) 0%, rgba(120, 53, 15, 0.16) 46%, rgba(0, 0, 0, 0.34) 100%)" }}
       />
 
       <div className="relative z-10 container mx-auto max-w-5xl px-4 text-center">
@@ -43,10 +43,10 @@ const HeroSection = () => {
             Ver Produtos
           </a>
           <a
-            href="#contato"
-            className="inline-flex items-center justify-center min-w-52 px-8 py-3 rounded-xl border border-white/65 text-white font-bold text-lg bg-black/20 hover:bg-black/30 hover:-translate-y-[1px] transition-all"
+            href="/login"
+            className="inline-flex items-center justify-center min-w-52 px-8 py-3 rounded-xl border-2 border-primary bg-primary text-primary-foreground font-extrabold text-lg shadow-lg shadow-primary/35 hover:bg-primary/90 hover:border-primary/90 hover:-translate-y-[1px] transition-all"
           >
-            Entrar em Contato
+            Entrar
           </a>
         </div>
       </div>
