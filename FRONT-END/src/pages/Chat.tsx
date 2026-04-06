@@ -297,18 +297,18 @@ const Chat = () => {
         title="Atendimento da Plataforma"
         titleIcon={<MessageCircle className="h-5 w-5" />}
         subtitle={isAdmin ? "Atenda clientes e acompanhe conversas." : "Converse com nosso suporte."}
-        containerClassName="max-w-5xl px-2 sm:px-4"
+        containerClassName="max-w-5xl px-2 sm:px-4 [&_h1]:flex-wrap [&_h1]:text-2xl sm:[&_h1]:text-4xl"
       >
 
-        <div className="grid min-w-0 grid-cols-1 gap-3 md:grid-cols-[280px_minmax(0,1fr)] md:gap-4">
-          <div className="hidden rounded-xl border border-border bg-card p-4 md:block">
+        <div className="grid min-w-0 gap-3 md:grid-cols-[280px_1fr] md:gap-4">
+          <div className="min-w-0 bg-card border border-border rounded-xl p-3 sm:p-4">
             <h2 className="font-semibold text-foreground mb-3">Conversas</h2>
             {!isAdmin ? (
               <p className="text-sm text-muted-foreground">Conversa com suporte</p>
             ) : conversas.length === 0 ? (
               <p className="text-sm text-muted-foreground">Nenhuma conversa iniciada.</p>
             ) : (
-              <ul className="space-y-2">
+              <ul className="space-y-2 max-h-[34vh] overflow-y-auto pr-1 md:max-h-none md:overflow-visible md:pr-0">
                 {conversas.map((conversa) => (
                   <li key={conversa.usuarioId}>
                     <button
@@ -329,32 +329,8 @@ const Chat = () => {
             )}
           </div>
 
-          <div className="min-w-0 rounded-xl border border-border bg-card p-3 sm:p-4">
+          <div className="min-w-0 bg-card border border-border rounded-xl p-3 sm:p-4">
             <h2 className="font-semibold text-foreground mb-3">Mensagens</h2>
-            {isAdmin && conversas.length > 0 && (
-              <div className="mb-3 md:hidden">
-                <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  Conversas
-                </p>
-                <div className="flex gap-2 overflow-x-auto pb-1">
-                  {conversas.map((conversa) => (
-                    <button
-                      key={conversa.usuarioId}
-                      type="button"
-                      onClick={() => setUsuarioSelecionado(conversa.usuarioId)}
-                      className={`max-w-[65vw] shrink-0 truncate rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
-                        usuarioSelecionado === conversa.usuarioId
-                          ? "border-primary bg-primary/10 text-foreground"
-                          : "border-border text-muted-foreground"
-                      }`}
-                      title={conversa.nome}
-                    >
-                      {conversa.nome}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
             {loading ? (
               <div className="space-y-3">
                 <Skeleton className="h-16 w-3/4" />
@@ -364,7 +340,7 @@ const Chat = () => {
               </div>
             ) : (
               <>
-                <div className="mb-4 h-[45dvh] min-h-[240px] w-full overflow-y-auto rounded-lg border border-border p-3 md:h-auto md:min-h-[280px] md:max-h-[420px] space-y-2">
+                <div className="border border-border rounded-lg p-3 h-[45dvh] min-h-[250px] max-h-[420px] overflow-y-auto mb-4 space-y-2 md:h-auto md:min-h-[280px]">
                   {mensagens.length === 0 ? (
                     <p className="text-sm text-muted-foreground">Nenhuma mensagem ainda.</p>
                   ) : (
@@ -413,11 +389,11 @@ const Chat = () => {
                   )}
                 </div>
 
-                <form onSubmit={sendMessage} className="w-full space-y-2">
+                <form onSubmit={sendMessage} className="space-y-2">
                   <textarea
                     value={texto}
                     onChange={(event) => setTexto(event.target.value)}
-                    className="w-full min-h-[80px] rounded-lg border border-border bg-background px-3 py-2 text-foreground md:min-h-[90px]"
+                    className="w-full min-h-[90px] rounded-lg border border-border bg-background px-3 py-2 text-foreground"
                     placeholder="Digite sua mensagem"
                     maxLength={300}
                     required
