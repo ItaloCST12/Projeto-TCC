@@ -1,3 +1,5 @@
+import { getAuthUser } from "@/lib/auth";
+
 export type CartItem = {
   produtoId: number;
   nome: string;
@@ -5,7 +7,8 @@ export type CartItem = {
   unidade: string;
 };
 
-const CART_STORAGE_KEY = "fazenda-verde:cart";
+const CART_STORAGE_KEY_LEGACY = "fazenda-verde:cart";
+const CART_STORAGE_KEY_PREFIX = "fazenda-verde:cart:user";
 const CART_UPDATED_EVENT = "fazenda-verde:cart-updated";
 const MAX_QUANTIDADE_POR_ITEM = 1000;
 
@@ -33,6 +36,37 @@ const writeStorage = (key: string, value: string) => {
   } catch {
     // Silencia erro de storage indisponivel para nao quebrar o app.
   }
+};
+
+const removeStorage = (key: string) => {
+  if (!isBrowser()) {
+    return;
+  }
+
+  try {
+    window.localStorage.removeItem(key);
+  } catch {
+    // Silencia erro de storage indisponivel para nao quebrar o app.
+  }
+};
+
+const getCartStorageKeyForCurrentUser = () => {
+  const authUser = getAuthUser();
+  const userId = authUser?.id;
+
+  if (Number.isInteger(userId) && userId > 0) {
+    return `${CART_STORAGE_KEY_PREFIX}:${userId}`;
+  }
+
+  return `${CART_STORAGE_KEY_PREFIX}:guest`;
+};
+
+const cleanupLegacySharedCart = () => {
+  if (!isBrowser()) {
+    return;
+  }
+
+  removeStorage(CART_STORAGE_KEY_LEGACY);
 };
 
 const normalizeQuantidade = (quantidade: number) => {
@@ -94,7 +128,8 @@ const writeCart = (items: CartItem[]) => {
     return;
   }
 
-  writeStorage(CART_STORAGE_KEY, JSON.stringify(items));
+  cleanupLegacySharedCart();
+  writeStorage(getCartStorageKeyForCurrentUser(), JSON.stringify(items));
   notifyCartUpdated();
 };
 
@@ -103,7 +138,8 @@ export const getCartItems = (): CartItem[] => {
     return [];
   }
 
-  const raw = readStorage(CART_STORAGE_KEY);
+  cleanupLegacySharedCart();
+  const raw = readStorage(getCartStorageKeyForCurrentUser());
   if (!raw) {
     return [];
   }

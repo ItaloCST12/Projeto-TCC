@@ -59,6 +59,9 @@ Plataforma web completa voltada para a **venda e gestão de pedidos de frutas**,
 - **Notificações Push** — Web Push com VAPID para avisos fora do site
 - **Painel administrativo** — Gestão de entregas, pedidos e usuários
 - **Acessibilidade** — Integração com VLibras (Libras), controles de acessibilidade e design responsivo
+- **Gestão de estoque** — Controle de movimentações, ajustes e resumo de estoque por produto (admin)
+- **Carrinho isolado por usuário** — Cada conta mantém seu próprio carrinho via localStorage
+- **Controle de acesso admin** — Administradores visualizam produtos mas não criam pedidos
 - **Geração de PDF** — Exportação de relatórios e comprovantes (jsPDF)
 
 ---
@@ -199,6 +202,12 @@ Copie o `.env.example` e preencha os valores. **Nunca versione o arquivo `.env`.
 | `VAPID_PRIVATE_KEY` | Chave privada VAPID                     |  ✅ (push)  |
 | `VAPID_SUBJECT`     | E-mail de contato para VAPID            |  ✅ (push)  |
 
+**Frontend (`FRONT-END/.env`):**
+
+| Variável               | Descrição                                  | Obrigatória |
+| ---------------------- | ------------------------------------------ | :---------: |
+| `VITE_VAPID_PUBLIC_KEY`| Chave pública VAPID para push no frontend  |  ✅ (push)  |
+
 **Docker local (apenas desenvolvimento):**
 
 | Variável            | Descrição                   |
@@ -296,6 +305,14 @@ O comando `build` compila o frontend e o serve via Express na mesma porta do bac
 | `PATCH` | `/notificacoes/:id/lida`       | Marcar como lida    |
 | `POST`  | `/notificacoes/push/subscribe` | Inscrever para push |
 
+### Estoque (`/produtos/.../estoque`)
+
+| Método | Rota                                    | Descrição                          |
+| ------ | --------------------------------------- | ---------------------------------- |
+| `POST` | `/produtos/:id/estoque`                 | Ajustar estoque do produto (admin) |
+| `GET`  | `/produtos/:id/estoque/movimentacoes`   | Movimentações do produto (admin)   |
+| `GET`  | `/produtos/estoque/resumo`              | Resumo geral de estoque (admin)    |
+
 ---
 
 ## 🧪 Testes
@@ -360,7 +377,6 @@ Projeto-TCC/
 │       ├── App.tsx           # Roteamento principal
 │       └── main.tsx          # Entry point
 ├── docker/                   # Scripts de inicialização do banco
-├── docs/                     # Documentação adicional
 ├── docker-compose.yml        # Infraestrutura local
 ├── render.yaml               # Configuração de deploy
 └── package.json              # Scripts raiz (monorepo)

@@ -157,6 +157,7 @@ const resolverIndiceStatusRetirada = (status?: string) => {
 const MinhasEncomendas = () => {
   const authenticated = isAuthenticated();
   const user = getAuthUser();
+  const isAdmin = user?.role === "ADMIN";
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
   const [loading, setLoading] = useState(true);
   const [cancelandoPedidoId, setCancelandoPedidoId] = useState<number | null>(null);
@@ -257,6 +258,10 @@ const MinhasEncomendas = () => {
 
   if (!authenticated) {
     return <Navigate to="/login?redirect=/minhas-encomendas" replace />;
+  }
+
+  if (isAdmin) {
+    return <Navigate to="/painel-entregas" replace />;
   }
 
   return (

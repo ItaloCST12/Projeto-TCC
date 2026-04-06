@@ -32,10 +32,11 @@ const Navbar = () => {
   const location = useLocation();
   const loggedIn = isAuthenticated();
   const user = getAuthUser();
+  const userId = user?.id ?? null;
   const isAdmin = user?.role === "ADMIN";
 
   useEffect(() => {
-    if (!loggedIn) {
+    if (!loggedIn || isAdmin) {
       setCartTotalItems(0);
       return;
     }
@@ -46,7 +47,7 @@ const Navbar = () => {
 
     syncCartCount();
     return subscribeToCartUpdates(syncCartCount);
-  }, [loggedIn]);
+  }, [loggedIn, userId, isAdmin]);
 
   useEffect(() => {
     setMounted(true);
@@ -107,7 +108,7 @@ const Navbar = () => {
 
   const ctaTo = loggedIn ? "/encomenda" : "/login?redirect=/encomenda";
   const profileLink = isAdmin ? "/painel-entregas" : "/perfil";
-  const mobileCartTo = loggedIn ? "/carrinho" : "/login?redirect=/carrinho";
+  const mobileCartTo = "/carrinho";
   const cartBadgeCount = cartTotalItems > 99 ? "99+" : String(cartTotalItems);
 
   const handleLogout = () => {
@@ -203,15 +204,17 @@ const Navbar = () => {
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground px-1 pb-2">
                   Conta
                 </p>
-                <div className="grid grid-cols-2 gap-2">
-                  <Link
-                    to="/carrinho"
-                    className="inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border border-primary/25 bg-primary/5 text-foreground text-sm font-semibold"
-                    onClick={() => setMobileOpen(false)}
-                  >
-                    <ShoppingCart className="h-4 w-4" />
-                    {cartTotalItems}
-                  </Link>
+                <div className={`grid gap-2 ${isAdmin ? "grid-cols-1" : "grid-cols-2"}`}>
+                  {!isAdmin && (
+                    <Link
+                      to="/carrinho"
+                      className="inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border border-primary/25 bg-primary/5 text-foreground text-sm font-semibold"
+                      onClick={() => setMobileOpen(false)}
+                    >
+                      <ShoppingCart className="h-4 w-4" />
+                      {cartTotalItems}
+                    </Link>
+                  )}
                   <Link
                     to={profileLink}
                     aria-label="Abrir perfil"
@@ -283,20 +286,22 @@ const Navbar = () => {
 
           <div className="flex items-center gap-2">
             {loggedIn && <NotificationBell mobile />}
-            <Link
-              to={mobileCartTo}
-              className="relative inline-flex items-center justify-center h-10 w-10 rounded-xl border border-border/80 bg-card text-foreground hover:bg-muted/70 transition-colors"
-              aria-label="Carrinho"
-              title="Carrinho"
-              onClick={() => setMobileOpen(false)}
-            >
-              <ShoppingCart className="h-5 w-5" />
-              {loggedIn && cartTotalItems > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 inline-flex items-center justify-center min-w-5 h-5 px-1 rounded-full bg-secondary text-secondary-foreground text-[10px] font-bold leading-none shadow-sm">
-                  {cartBadgeCount}
-                </span>
-              )}
-            </Link>
+            {!isAdmin && (
+              <Link
+                to={mobileCartTo}
+                className="relative inline-flex items-center justify-center h-10 w-10 rounded-xl border border-border/80 bg-card text-foreground hover:bg-muted/70 transition-colors"
+                aria-label="Carrinho"
+                title="Carrinho"
+                onClick={() => setMobileOpen(false)}
+              >
+                <ShoppingCart className="h-5 w-5" />
+                {loggedIn && cartTotalItems > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 inline-flex items-center justify-center min-w-5 h-5 px-1 rounded-full bg-secondary text-secondary-foreground text-[10px] font-bold leading-none shadow-sm">
+                    {cartBadgeCount}
+                  </span>
+                )}
+              </Link>
+            )}
           </div>
         </div>
 
@@ -338,7 +343,7 @@ const Navbar = () => {
                 </Link>
               ))}
 
-              {loggedIn && (
+              {loggedIn && !isAdmin && (
                 <Link
                   to="/carrinho"
                   className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border border-primary/25 bg-primary/5 text-foreground text-sm font-semibold hover:bg-primary/10 transition-colors"

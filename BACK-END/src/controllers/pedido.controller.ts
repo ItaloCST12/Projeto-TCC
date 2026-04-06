@@ -70,6 +70,13 @@ export const criarPedido = async (req: Request, res: Response) => {
     if (!usuarioId) {
       return res.status(401).json({ error: "Usuário não autenticado" });
     }
+
+    if (req.usuario?.role === "ADMIN") {
+      return res
+        .status(403)
+        .json({ error: "Administradores podem apenas visualizar produtos." });
+    }
+
     const {
       produtoId,
       enderecoId,

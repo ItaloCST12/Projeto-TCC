@@ -52,9 +52,9 @@ const PRODUTOS_VISUAIS = new Map<string, ProdutoVisual>([
       image: abacaxiImg,
       description: "Doce e suculento, perfeito para sucos e sobremesas.",
       opcoesVenda: [
-        { value: "kg (grande)", label: "Grande", price: "R$ 7,00", unit: "unidade" },
-        { value: "kg (médio)", label: "Médio", price: "R$ 5,00", unit: "unidade" },
-        { value: "kg (pequeno)", label: "Pequeno", price: "R$ 3,00", unit: "unidade" },
+        { value: "unidade (grande)", label: "Grande", price: "R$ 7,00", unit: "unidade" },
+        { value: "unidade (médio)", label: "Médio", price: "R$ 5,00", unit: "unidade" },
+        { value: "unidade (pequeno)", label: "Pequeno", price: "R$ 3,00", unit: "unidade" },
       ],
     },
   ],
@@ -62,7 +62,7 @@ const PRODUTOS_VISUAIS = new Map<string, ProdutoVisual>([
     "laranja",
     {
       image: laranjaImg,
-      description: "Rica em vitamina C, ideal para suco natural.",
+      description: "Rica em vitamina C, ideal para suco natural e refrescante no dia a dia.",
       opcoesVenda: [
         { value: "saca", label: "Saca", price: "R$ 50,00", unit: "saca" },
       ],
@@ -185,6 +185,7 @@ const resolverImagemProduto = (imagemUrl: string | null | undefined, fallback: s
 const Encomenda = () => {
   const authenticated = isAuthenticated();
   const user = getAuthUser();
+  const isAdmin = user?.role === "ADMIN";
   const navigate = useNavigate();
 
   const [produtos, setProdutos] = useState<Produto[]>([]);
@@ -298,6 +299,11 @@ const Encomenda = () => {
   };
 
   const adicionarProdutoViaCard = (produto: Produto) => {
+    if (isAdmin) {
+      setError("Perfil administrador possui acesso somente para visualização de produtos.");
+      return;
+    }
+
     if (!produto.disponivel) {
       setError(`${produto.nome} está indisponível no momento.`);
       return;
@@ -336,7 +342,7 @@ const Encomenda = () => {
       <PageShell
         title="Produtos"
         titleIcon={<Package className="h-5 w-5" />}
-        subtitle={`${user?.nome ? `Olá, ${user.nome}.` : "Você está logado."} Escolha os produtos nos cards e adicione ao carrinho.`}
+        subtitle={`${user?.nome ? `Olá, ${user.nome}.` : "Você está logado."} ${isAdmin ? "Você está em modo de visualização de catálogo." : "Escolha os produtos nos cards e adicione ao carrinho."}`}
         containerClassName="max-w-6xl"
       >
         <div className="bg-card border border-border rounded-xl p-6 mb-6">
@@ -360,6 +366,12 @@ const Encomenda = () => {
               <div className="flex items-center justify-between gap-3">
                 <h2 className="font-display text-xl font-semibold text-foreground">Produtos</h2>
               </div>
+
+              {isAdmin && (
+                <p className="text-sm rounded-lg border border-border bg-muted/40 px-3 py-2 text-muted-foreground">
+                  Perfil administrador: visualização habilitada. A criação de encomendas está disponível apenas para clientes.
+                </p>
+              )}
 
               {!hasProdutos ? (
                 <p className="text-sm text-muted-foreground">
@@ -386,7 +398,7 @@ const Encomenda = () => {
                     return (
                       <div
                         key={produto.id}
-                        className="bg-card rounded-xl overflow-hidden shadow-card hover:shadow-card-hover hover:-translate-y-1 transition-all duration-300 group border border-border"
+                        className="bg-card rounded-xl overflow-hidden shadow-card hover:shadow-card-hover hover:-translate-y-1 transition-all duration-300 group border border-border flex h-full flex-col"
                       >
                         <div className="aspect-square overflow-hidden bg-background">
                           <img
@@ -397,7 +409,7 @@ const Encomenda = () => {
                           />
                         </div>
 
-                        <div className="p-4 space-y-3">
+                        <div className="p-4 flex flex-1 flex-col gap-3">
                           <div>
                             <h3 className="font-display text-lg font-semibold text-foreground">
                               {produto.nome}
@@ -424,7 +436,7 @@ const Encomenda = () => {
                                     <button
                                       key={`${produto.id}-${opcao.value}`}
                                       type="button"
-                                      disabled={!produto.disponivel}
+                                      disabled={!produto.disponivel || isAdmin}
                                       onClick={() =>
                                         setUnidadePorProduto((current) => ({
                                           ...current,
@@ -445,7 +457,7 @@ const Encomenda = () => {
                             ) : visual.opcoesVenda.length > 1 ? (
                               <select
                                 value={unidadeSelecionada}
-                                disabled={!produto.disponivel}
+                                disabled={!produto.disponivel || isAdmin}
                                 onChange={(event) =>
                                   setUnidadePorProduto((current) => ({
                                     ...current,
@@ -482,7 +494,7 @@ const Encomenda = () => {
                             <div className="flex items-center rounded-lg border border-border overflow-hidden">
                               <button
                                 type="button"
-                                disabled={!produto.disponivel}
+                                disabled={!produto.disponivel || isAdmin}
                                 onClick={() => {
                                   limparEdicaoQuantidade(produto.id);
                                   setQuantidadePorProduto((current) => ({
@@ -498,7 +510,7 @@ const Encomenda = () => {
                                 type="text"
                                 inputMode="numeric"
                                 pattern="[0-9]*"
-                                disabled={!produto.disponivel}
+                                disabled={!produto.disponivel || isAdmin}
                                 value={getQuantidadeExibidaNoInput(produto.id)}
                                 onChange={(event) => {
                                   const valorSomenteNumeros = event.target.value.replace(/\D/g, "");
@@ -545,7 +557,7 @@ const Encomenda = () => {
                               />
                               <button
                                 type="button"
-                                disabled={!produto.disponivel}
+                                disabled={!produto.disponivel || isAdmin}
                                 onClick={() => {
                                   limparEdicaoQuantidade(produto.id);
                                   setQuantidadePorProduto((current) => ({
@@ -562,19 +574,23 @@ const Encomenda = () => {
 
                           <button
                             type="button"
-                            disabled={!produto.disponivel}
+                            disabled={!produto.disponivel || isAdmin}
                             onClick={() => adicionarProdutoViaCard(produto)}
-                            className={`w-full inline-flex items-center justify-center px-4 py-2 rounded-lg text-base font-semibold transition-all ${
-                              produto.disponivel
-                                ? `bg-primary text-primary-foreground hover:bg-primary/90 ${animandoAdicaoPorProduto[produto.id] ? "animate-pulse scale-[0.98]" : ""}`
-                                : "bg-muted text-muted-foreground cursor-not-allowed"
+                            className={`mt-auto w-full inline-flex items-center justify-center px-4 py-2 rounded-lg text-base font-semibold transition-all ${
+                              !produto.disponivel
+                                ? "bg-muted text-muted-foreground cursor-not-allowed"
+                                : isAdmin
+                                  ? "bg-muted text-muted-foreground cursor-not-allowed"
+                                  : `bg-primary text-primary-foreground hover:bg-primary/90 ${animandoAdicaoPorProduto[produto.id] ? "animate-pulse scale-[0.98]" : ""}`
                             }`}
                           >
-                            {produto.disponivel
-                              ? animandoAdicaoPorProduto[produto.id]
-                                ? "Adicionado ✓"
-                                : "Adicionar ao carrinho"
-                              : "Indisponível"}
+                            {!produto.disponivel
+                              ? "Indisponível"
+                              : isAdmin
+                                ? "Visualização apenas"
+                                : animandoAdicaoPorProduto[produto.id]
+                                  ? "Adicionado ✓"
+                                  : "Adicionar ao carrinho"}
                           </button>
                         </div>
                       </div>

@@ -28,7 +28,7 @@ const productCards: ProductCard[] = [
     price: "R$ 50,00",
     unit: "saca",
     image: laranjaImg,
-    description: "Rica em vitamina C, ideal para suco natural.",
+    description: "Rica em vitamina C, ideal para suco natural e refrescante no dia a dia.",
   },
   {
     name: "Tangerina",

@@ -189,6 +189,7 @@ type ViaCepResponse = {
 const Carrinho = () => {
   const authenticated = isAuthenticated();
   const user = getAuthUser();
+  const isAdmin = user?.role === "ADMIN";
   const navigate = useNavigate();
 
   const [loading, setLoading] = useState(true);
@@ -444,7 +445,7 @@ const Carrinho = () => {
       setSuccess(
         `Encomenda finalizada com sucesso! Pedido #${pedidoCriado.id} criado com forma de pagamento ${pedidoCriado.formaPagamento}.`,
       );
-      navigate("/minhas-encomendas", { replace: true });
+      navigate(isAdmin ? "/painel-entregas" : "/minhas-encomendas", { replace: true });
     } catch (submitError) {
       setError(
         submitError instanceof Error
@@ -675,6 +676,10 @@ const Carrinho = () => {
 
   if (!authenticated) {
     return <Navigate to="/login?redirect=/carrinho" replace />;
+  }
+
+  if (isAdmin) {
+    return <Navigate to="/encomenda" replace />;
   }
 
   return (
