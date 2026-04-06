@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Navigate } from "react-router-dom";
+import { Navigate, useSearchParams } from "react-router-dom";
 import { BarChart3, CalendarDays, Receipt, TrendingUp, Wallet } from "lucide-react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -347,6 +347,9 @@ const obterItensVenda = (venda: VendaControle) => {
   return [];
 };
 
+const ordenarPedidosMaisRecentes = (lista: PedidoAdmin[]) =>
+  [...lista].sort((a, b) => b.id - a.id);
+
 const totalQuantidadeVenda = (venda: VendaControle) =>
   obterItensVenda(venda).reduce((total, item) => total + (Number(item.quantidade) || 0), 0);
 
@@ -405,6 +408,7 @@ const PainelEntregas = () => {
   const authenticated = isAuthenticated();
   const user = getAuthUser();
   const isAdmin = user?.role === "ADMIN";
+  const [searchParams] = useSearchParams();
 
   const [pedidos, setPedidos] = useState<PedidoAdmin[]>([]);
   const [produtos, setProdutos] = useState<ProdutoAdmin[]>([]);
@@ -470,6 +474,25 @@ const PainelEntregas = () => {
   const [updatingEstoqueId, setUpdatingEstoqueId] = useState<number | null>(null);
   const inputImagemRef = useRef<HTMLInputElement | null>(null);
 
+  const pedidoIdAlvo = useMemo(() => {
+    const valor = searchParams.get("pedidoId");
+    if (!valor) {
+      return null;
+    }
+
+    const parsed = Number.parseInt(valor, 10);
+    if (!Number.isFinite(parsed) || parsed < 1) {
+      return null;
+    }
+
+    return parsed;
+  }, [searchParams]);
+
+  const abaSolicitada = useMemo(() => {
+    const aba = searchParams.get("aba");
+    return aba === "entregas" ? "entregas" : null;
+  }, [searchParams]);
+
   const loadPedidos = async (page = paginaPedidos) => {
     setLoadingPedidos(true);
     setErrorPedidos("");
@@ -484,7 +507,7 @@ const PainelEntregas = () => {
       const response = await apiRequest<RespostaPaginada<PedidoAdmin>>(
         `/pedidos?${params.toString()}`,
       );
-      setPedidos(response.data);
+      setPedidos(ordenarPedidosMaisRecentes(response.data));
       setPaginaPedidos(response.pagination.page);
       setTotalPaginasPedidos(response.pagination.totalPages);
       setTotalPedidos(response.pagination.total);
@@ -663,6 +686,17 @@ const PainelEntregas = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    if (!pedidoIdAlvo && abaSolicitada !== "entregas") {
+      return;
+    }
+
+    setAbaAtiva("entregas");
+    setPaginaPedidos(1);
+    void loadPedidos(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pedidoIdAlvo, abaSolicitada]);
+
   const aplicarFiltroPedidos = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setPaginaPedidos(1);
@@ -679,7 +713,7 @@ const PainelEntregas = () => {
       const response = await apiRequest<RespostaPaginada<PedidoAdmin>>(
         "/pedidos?page=1",
       );
-      setPedidos(response.data);
+      setPedidos(ordenarPedidosMaisRecentes(response.data));
       setPaginaPedidos(response.pagination.page);
       setTotalPaginasPedidos(response.pagination.totalPages);
       setTotalPedidos(response.pagination.total);
@@ -749,6 +783,19 @@ const PainelEntregas = () => {
     () => pedidosFiltradosPorTipo.filter((pedido) => isRetirada(pedido)),
     [pedidosFiltradosPorTipo],
   );
+
+  useEffect(() => {
+    if (abaAtiva !== "entregas" || loadingPedidos || !pedidoIdAlvo) {
+      return;
+    }
+
+    const elemento = document.getElementById(`pedido-${pedidoIdAlvo}`);
+    if (!elemento) {
+      return;
+    }
+
+    elemento.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [abaAtiva, loadingPedidos, pedidoIdAlvo, pedidosFiltradosPorTipo]);
 
   const resumoVendasPorPagamento = useMemo(() => {
     const acumulado: Record<string, { quantidade: number; valor: number }> = {};
@@ -1426,7 +1473,15 @@ const PainelEntregas = () => {
                       ) : (
                         <div className="space-y-3">
                           {pedidosEntregaDomicilio.map((pedido) => (
-                            <article key={pedido.id} className="rounded-lg border border-border/80 p-3 sm:p-4">
+                            <article
+                              id={`pedido-${pedido.id}`}
+                              key={pedido.id}
+                              className={`rounded-lg border p-3 sm:p-4 transition-colors ${
+                                pedidoIdAlvo === pedido.id
+                                  ? "border-primary ring-2 ring-primary/30"
+                                  : "border-border/80"
+                              }`}
+                            >
                               <div className="flex flex-wrap items-center justify-between gap-2">
                                 <p className="font-semibold text-foreground">Pedido #{pedido.id}</p>
                                 <span className="text-xs rounded-full bg-muted px-2 py-1 text-foreground">
@@ -1530,7 +1585,15 @@ const PainelEntregas = () => {
                       ) : (
                         <div className="space-y-3">
                           {pedidosRetirada.map((pedido) => (
-                            <article key={pedido.id} className="rounded-lg border border-border/80 p-3 sm:p-4">
+                            <article
+                              id={`pedido-${pedido.id}`}
+                              key={pedido.id}
+                              className={`rounded-lg border p-3 sm:p-4 transition-colors ${
+                                pedidoIdAlvo === pedido.id
+                                  ? "border-primary ring-2 ring-primary/30"
+                                  : "border-border/80"
+                              }`}
+                            >
                               <div className="flex flex-wrap items-center justify-between gap-2">
                                 <p className="font-semibold text-foreground">Pedido #{pedido.id}</p>
                                 <span className="text-xs rounded-full bg-muted px-2 py-1 text-foreground">

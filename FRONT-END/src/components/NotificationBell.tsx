@@ -230,6 +230,18 @@ const NotificationBell = ({ mobile = false }: Props) => {
     }
   };
 
+  const resolverDestinoNotificacao = (item: Notificacao) => {
+    if (!item.pedidoId) {
+      return isAdmin ? "/painel-entregas" : "/minhas-encomendas";
+    }
+
+    if (isAdmin) {
+      return `/painel-entregas?aba=entregas&pedidoId=${item.pedidoId}`;
+    }
+
+    return `/minhas-encomendas?pedidoId=${item.pedidoId}`;
+  };
+
   const abrirDestinoDaNotificacao = async (item: Notificacao) => {
     if (!item.lida) {
       try {
@@ -239,7 +251,7 @@ const NotificationBell = ({ mobile = false }: Props) => {
       }
     }
 
-    navigate(isAdmin ? "/painel-entregas" : "/minhas-encomendas");
+    navigate(resolverDestinoNotificacao(item));
   };
 
   return (

@@ -19,6 +19,7 @@ const executarNotificacaoSemFalhar = async (callback: () => Promise<unknown>) =>
 type FiltroPedidos = {
   page: number;
   pageSize: number;
+  pedidoId?: number;
   dataInicio?: Date;
   dataFim?: Date;
 };
@@ -399,7 +400,7 @@ export class PedidoService {
   }
 
   async getMinhasEncomendas(usuarioId: number, filtros: FiltroPedidos) {
-    const { page, pageSize, dataInicio, dataFim } = filtros;
+    const { page, pageSize, pedidoId, dataInicio, dataFim } = filtros;
     const skip = (page - 1) * pageSize;
 
     const createdAt: Prisma.DateTimeFilter = {};
@@ -412,6 +413,7 @@ export class PedidoService {
 
     const where: Prisma.PedidoWhereInput = {
       usuarioId,
+      ...(pedidoId ? { id: pedidoId } : {}),
       ...(Object.keys(createdAt).length > 0 ? { createdAt } : {}),
     };
 
@@ -442,7 +444,7 @@ export class PedidoService {
   }
 
   async getTodosPedidos(filtros: FiltroPedidos) {
-    const { page, pageSize, dataInicio, dataFim } = filtros;
+    const { page, pageSize, pedidoId, dataInicio, dataFim } = filtros;
     const skip = (page - 1) * pageSize;
 
     const createdAt: Prisma.DateTimeFilter = {};
@@ -453,8 +455,10 @@ export class PedidoService {
       createdAt.lte = dataFim;
     }
 
-    const where: Prisma.PedidoWhereInput =
-      Object.keys(createdAt).length > 0 ? { createdAt } : {};
+    const where: Prisma.PedidoWhereInput = {
+      ...(pedidoId ? { id: pedidoId } : {}),
+      ...(Object.keys(createdAt).length > 0 ? { createdAt } : {}),
+    };
 
     const [total, pedidos] = await Promise.all([
       prisma.pedido.count({ where }),

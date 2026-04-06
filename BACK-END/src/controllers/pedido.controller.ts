@@ -11,6 +11,19 @@ const parsePagina = (value: unknown) => {
   return parsed;
 };
 
+const parsePedidoId = (value: unknown) => {
+  if (value === undefined || value === null || String(value).trim() === "") {
+    return undefined;
+  }
+
+  const parsed = Number.parseInt(String(value), 10);
+  if (!Number.isFinite(parsed) || parsed < 1) {
+    throw new Error("pedidoId inválido");
+  }
+
+  return parsed;
+};
+
 const parseData = (value: unknown, tipo: "inicio" | "fim") => {
   if (!value) {
     return undefined;
@@ -123,6 +136,7 @@ export const getMinhasEncomendas = async (req: Request, res: Response) => {
     }
 
     const page = parsePagina(req.query.page);
+    const pedidoId = parsePedidoId(req.query.pedidoId);
     const dataInicio = parseData(req.query.dataInicio, "inicio");
     const dataFim = parseData(req.query.dataFim, "fim");
 
@@ -133,6 +147,7 @@ export const getMinhasEncomendas = async (req: Request, res: Response) => {
     const encomendas = await pedidoService.getMinhasEncomendas(usuarioId, {
       page,
       pageSize: 15,
+      ...(pedidoId ? { pedidoId } : {}),
       ...(dataInicio ? { dataInicio } : {}),
       ...(dataFim ? { dataFim } : {}),
     });
@@ -145,6 +160,7 @@ export const getMinhasEncomendas = async (req: Request, res: Response) => {
 export const getTodosPedidos = async (req: Request, res: Response) => {
   try {
     const page = parsePagina(req.query.page);
+    const pedidoId = parsePedidoId(req.query.pedidoId);
     const dataInicio = parseData(req.query.dataInicio, "inicio");
     const dataFim = parseData(req.query.dataFim, "fim");
 
@@ -155,6 +171,7 @@ export const getTodosPedidos = async (req: Request, res: Response) => {
     const pedidos = await pedidoService.getTodosPedidos({
       page,
       pageSize: 15,
+      ...(pedidoId ? { pedidoId } : {}),
       ...(dataInicio ? { dataInicio } : {}),
       ...(dataFim ? { dataFim } : {}),
     });

@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Link, Navigate } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { Link, Navigate, useSearchParams } from "react-router-dom";
 import { CalendarDays, CheckCircle2, Clock3, PackageCheck, Truck } from "lucide-react";
 import { apiRequest } from "@/lib/api";
 import { getAuthUser, isAuthenticated } from "@/lib/auth";
@@ -154,10 +154,14 @@ const resolverIndiceStatusRetirada = (status?: string) => {
   return 0;
 };
 
+const ordenarPedidosMaisRecentes = (lista: Pedido[]) =>
+  [...lista].sort((a, b) => b.id - a.id);
+
 const MinhasEncomendas = () => {
   const authenticated = isAuthenticated();
   const user = getAuthUser();
   const isAdmin = user?.role === "ADMIN";
+  const [searchParams] = useSearchParams();
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
   const [loading, setLoading] = useState(true);
   const [cancelandoPedidoId, setCancelandoPedidoId] = useState<number | null>(null);
@@ -167,6 +171,20 @@ const MinhasEncomendas = () => {
   const [totalPaginas, setTotalPaginas] = useState(1);
   const [totalPedidos, setTotalPedidos] = useState(0);
   const [dataFiltro, setDataFiltro] = useState("");
+
+  const pedidoIdAlvo = useMemo(() => {
+    const valor = searchParams.get("pedidoId");
+    if (!valor) {
+      return null;
+    }
+
+    const parsed = Number.parseInt(valor, 10);
+    if (!Number.isFinite(parsed) || parsed < 1) {
+      return null;
+    }
+
+    return parsed;
+  }, [searchParams]);
 
   const carregarPedidos = async (page = paginaAtual) => {
     setLoading(true);
@@ -184,7 +202,7 @@ const MinhasEncomendas = () => {
         `/pedidos/minhas-encomendas?${params.toString()}`,
       );
 
-      setPedidos(response.data);
+      setPedidos(ordenarPedidosMaisRecentes(response.data));
       setPaginaAtual(response.pagination.page);
       setTotalPaginas(response.pagination.totalPages);
       setTotalPedidos(response.pagination.total);
@@ -202,7 +220,20 @@ const MinhasEncomendas = () => {
   useEffect(() => {
     void carregarPedidos(1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [pedidoIdAlvo]);
+
+  useEffect(() => {
+    if (loading || !pedidoIdAlvo || pedidos.length === 0) {
+      return;
+    }
+
+    const elemento = document.getElementById(`pedido-${pedidoIdAlvo}`);
+    if (!elemento) {
+      return;
+    }
+
+    elemento.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [loading, pedidoIdAlvo, pedidos]);
 
   const aplicarFiltroData = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -220,7 +251,7 @@ const MinhasEncomendas = () => {
       const response = await apiRequest<RespostaPaginada<Pedido>>(
         "/pedidos/minhas-encomendas?page=1",
       );
-      setPedidos(response.data);
+      setPedidos(ordenarPedidosMaisRecentes(response.data));
       setPaginaAtual(response.pagination.page);
       setTotalPaginas(response.pagination.totalPages);
       setTotalPedidos(response.pagination.total);
@@ -372,7 +403,12 @@ const MinhasEncomendas = () => {
                 return (
                   <li
                     key={pedido.id}
-                    className="rounded-lg border border-border bg-background p-4"
+                    id={`pedido-${pedido.id}`}
+                    className={`rounded-lg border bg-background p-4 transition-colors ${
+                      pedidoIdAlvo === pedido.id
+                        ? "border-primary ring-2 ring-primary/30"
+                        : "border-border"
+                    }`}
                   >
                     <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
                       <p className="text-sm font-semibold text-foreground">
