@@ -204,9 +204,9 @@ Copie o `.env.example` e preencha os valores. **Nunca versione o arquivo `.env`.
 
 **Frontend (`FRONT-END/.env`):**
 
-| Variável               | Descrição                                  | Obrigatória |
-| ---------------------- | ------------------------------------------ | :---------: |
-| `VITE_VAPID_PUBLIC_KEY`| Chave pública VAPID para push no frontend  |  ✅ (push)  |
+| Variável                | Descrição                                 | Obrigatória |
+| ----------------------- | ----------------------------------------- | :---------: |
+| `VITE_VAPID_PUBLIC_KEY` | Chave pública VAPID para push no frontend |  ✅ (push)  |
 
 **Docker local (apenas desenvolvimento):**
 
@@ -307,11 +307,11 @@ O comando `build` compila o frontend e o serve via Express na mesma porta do bac
 
 ### Estoque (`/produtos/.../estoque`)
 
-| Método | Rota                                    | Descrição                          |
-| ------ | --------------------------------------- | ---------------------------------- |
-| `POST` | `/produtos/:id/estoque`                 | Ajustar estoque do produto (admin) |
-| `GET`  | `/produtos/:id/estoque/movimentacoes`   | Movimentações do produto (admin)   |
-| `GET`  | `/produtos/estoque/resumo`              | Resumo geral de estoque (admin)    |
+| Método | Rota                                  | Descrição                          |
+| ------ | ------------------------------------- | ---------------------------------- |
+| `POST` | `/produtos/:id/estoque`               | Ajustar estoque do produto (admin) |
+| `GET`  | `/produtos/:id/estoque/movimentacoes` | Movimentações do produto (admin)   |
+| `GET`  | `/produtos/estoque/resumo`            | Resumo geral de estoque (admin)    |
 
 ---
 
