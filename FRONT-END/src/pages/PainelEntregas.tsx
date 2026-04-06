@@ -775,14 +775,31 @@ const PainelEntregas = () => {
   }, [pedidos, filtroTipoEntrega]);
 
   const pedidosEntregaDomicilio = useMemo(
-    () => pedidosFiltradosPorTipo.filter((pedido) => isEntregaDomicilio(pedido)),
+    () =>
+      ordenarPedidosMaisRecentes(
+        pedidosFiltradosPorTipo.filter((pedido) => isEntregaDomicilio(pedido)),
+      ),
     [pedidosFiltradosPorTipo],
   );
 
   const pedidosRetirada = useMemo(
-    () => pedidosFiltradosPorTipo.filter((pedido) => isRetirada(pedido)),
+    () =>
+      ordenarPedidosMaisRecentes(
+        pedidosFiltradosPorTipo.filter((pedido) => isRetirada(pedido)),
+      ),
     [pedidosFiltradosPorTipo],
   );
+
+  const mostrarRetiradaAntesEntrega = useMemo(() => {
+    if (filtroTipoEntrega !== "todos") {
+      return false;
+    }
+
+    const idMaisNovoEntrega = pedidosEntregaDomicilio[0]?.id ?? -1;
+    const idMaisNovoRetirada = pedidosRetirada[0]?.id ?? -1;
+
+    return idMaisNovoRetirada > idMaisNovoEntrega;
+  }, [filtroTipoEntrega, pedidosEntregaDomicilio, pedidosRetirada]);
 
   useEffect(() => {
     if (abaAtiva !== "entregas" || loadingPedidos || !pedidoIdAlvo) {
@@ -1362,7 +1379,11 @@ const PainelEntregas = () => {
           </button>
           <button
             type="button"
-            onClick={() => setAbaAtiva("entregas")}
+            onClick={() => {
+              setAbaAtiva("entregas");
+              setPaginaPedidos(1);
+              void loadPedidos(1);
+            }}
             aria-pressed={abaAtiva === "entregas"}
             className={getClasseBotaoAba("entregas")}
           >
@@ -1458,9 +1479,17 @@ const PainelEntregas = () => {
                 {pedidosFiltradosPorTipo.length === 0 ? (
                   <p className="text-muted-foreground">Nenhum pedido encontrado.</p>
                 ) : (
-                  <div className="space-y-4">
+                  <div className="flex flex-col gap-4">
                     {(filtroTipoEntrega === "todos" || filtroTipoEntrega === "entrega") && (
-                    <div className="rounded-xl border border-border bg-background p-3 sm:p-4">
+                    <div
+                      className={`rounded-xl border border-border bg-background p-3 sm:p-4 ${
+                        filtroTipoEntrega === "todos"
+                          ? mostrarRetiradaAntesEntrega
+                            ? "order-2"
+                            : "order-1"
+                          : ""
+                      }`}
+                    >
                       <div className="flex items-center justify-between gap-2 mb-3">
                         <h3 className="text-lg font-semibold text-foreground">Entrega em domicílio</h3>
                         <span className="text-xs rounded-full border border-border px-2 py-1 text-muted-foreground">
@@ -1572,7 +1601,15 @@ const PainelEntregas = () => {
                     )}
 
                     {(filtroTipoEntrega === "todos" || filtroTipoEntrega === "retirada") && (
-                    <div className="rounded-xl border border-border bg-background p-3 sm:p-4">
+                    <div
+                      className={`rounded-xl border border-border bg-background p-3 sm:p-4 ${
+                        filtroTipoEntrega === "todos"
+                          ? mostrarRetiradaAntesEntrega
+                            ? "order-1"
+                            : "order-2"
+                          : ""
+                      }`}
+                    >
                       <div className="flex items-center justify-between gap-2 mb-3">
                         <h3 className="text-lg font-semibold text-foreground">Retirada no local</h3>
                         <span className="text-xs rounded-full border border-border px-2 py-1 text-muted-foreground">
