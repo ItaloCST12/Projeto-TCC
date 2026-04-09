@@ -50,6 +50,59 @@ type ApiProduto = {
   id: number;
   nome: string;
   disponivel: boolean;
+  imagemUrl?: string | null;
+};
+
+type ProductCardView = {
+  name: string;
+  price: string;
+  unit: string;
+  image: string;
+  fallbackImage: string;
+  description: string;
+  disponivel?: boolean;
+};
+
+const API_BASE_URL = (import.meta.env.VITE_API_URL as string | undefined)?.trim() || "";
+
+const normalizarTexto = (valor: string) =>
+  valor
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+
+const resolverChaveVisualProduto = (nomeProduto: string) => {
+  const nome = normalizarTexto(nomeProduto);
+
+  if (nome.includes("abacaxi")) return "abacaxi";
+  if (nome.includes("laranja")) return "laranja";
+  if (nome.includes("tangerina")) return "tangerina";
+  if (nome.includes("limao")) return "limao";
+
+  return nome;
+};
+
+const resolverImagemProduto = (imagemUrl: string | null | undefined, fallback: string) => {
+  if (!imagemUrl?.trim()) {
+    return fallback;
+  }
+
+  if (imagemUrl.startsWith("http://") || imagemUrl.startsWith("https://")) {
+    return imagemUrl;
+  }
+
+  const normalizedPath = imagemUrl.startsWith("/") ? imagemUrl : `/${imagemUrl}`;
+
+  if (!API_BASE_URL) {
+    return normalizedPath;
+  }
+
+  const normalizedBase = API_BASE_URL.endsWith("/")
+    ? API_BASE_URL.slice(0, -1)
+    : API_BASE_URL;
+
+  return `${normalizedBase}${normalizedPath}`;
 };
 
 const ProductsSection = () => {
@@ -71,24 +124,30 @@ const ProductsSection = () => {
     void loadProducts();
   }, []);
 
-  const productLookup = useMemo(() => {
-    return new Map(productCards.map((item) => [item.name.toLowerCase(), item]));
-  }, []);
+  const productLookup = useMemo(
+    () => new Map(productCards.map((item) => [resolverChaveVisualProduto(item.name), item])),
+    [],
+  );
 
-  const productsToShow = useMemo(() => {
+  const productsToShow = useMemo<ProductCardView[]>(() => {
     if (apiProducts.length === 0) {
-      return productCards;
+      return productCards.map((item) => ({
+        ...item,
+        fallbackImage: item.image,
+      }));
     }
 
     return apiProducts.map((apiProduct) => {
-      const mapped = productLookup.get(apiProduct.nome.toLowerCase());
+      const mapped = productLookup.get(resolverChaveVisualProduto(apiProduct.nome));
+      const fallbackImage = mapped?.image ?? abacaxiImg;
 
       return {
         name: apiProduct.nome,
         disponivel: apiProduct.disponivel,
         price: mapped?.price ?? "Consulte",
         unit: mapped?.unit ?? "unidade",
-        image: mapped?.image ?? abacaxiImg,
+        image: resolverImagemProduto(apiProduct.imagemUrl, fallbackImage),
+        fallbackImage,
         description:
           mapped?.description ?? "Produto fresco vendido na fazenda.",
       };
@@ -135,6 +194,15 @@ const ProductsSection = () => {
                   alt={product.name}
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                   loading="lazy"
+                  onError={(event) => {
+                    const target = event.currentTarget;
+                    if (target.dataset.fallbackApplied === "true") {
+                      return;
+                    }
+
+                    target.dataset.fallbackApplied = "true";
+                    target.src = product.fallbackImage;
+                  }}
                 />
               </div>
               <div className="p-5">
