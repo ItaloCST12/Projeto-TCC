@@ -170,14 +170,15 @@ const resolverImagemProduto = (imagemUrl: string | null | undefined, fallback: s
     return imagemUrl;
   }
 
+  const normalizedPath = imagemUrl.startsWith("/") ? imagemUrl : `/${imagemUrl}`;
+
   if (!API_BASE_URL) {
-    return imagemUrl;
+    return normalizedPath;
   }
 
   const normalizedBase = API_BASE_URL.endsWith("/")
     ? API_BASE_URL.slice(0, -1)
     : API_BASE_URL;
-  const normalizedPath = imagemUrl.startsWith("/") ? imagemUrl : `/${imagemUrl}`;
 
   return `${normalizedBase}${normalizedPath}`;
 };
@@ -406,6 +407,15 @@ const Encomenda = () => {
                             alt={produto.nome}
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                             loading="lazy"
+                            onError={(event) => {
+                              const target = event.currentTarget;
+                              if (target.dataset.fallbackApplied === "true") {
+                                return;
+                              }
+
+                              target.dataset.fallbackApplied = "true";
+                              target.src = visual.image;
+                            }}
                           />
                         </div>
 
