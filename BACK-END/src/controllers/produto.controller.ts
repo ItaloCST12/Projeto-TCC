@@ -26,6 +26,12 @@ const getImagemUrlFromFile = (req: Request) => {
     return undefined;
   }
 
+  const cloudinaryPath =
+    (req.file as Express.Multer.File & { path?: string }).path?.trim() || "";
+  if (cloudinaryPath.startsWith("http://") || cloudinaryPath.startsWith("https://")) {
+    return cloudinaryPath;
+  }
+
   return `/uploads/produtos/${req.file.filename}`;
 };
 

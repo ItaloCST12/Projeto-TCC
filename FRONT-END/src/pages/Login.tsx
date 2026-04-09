@@ -76,6 +76,11 @@ const Login = () => {
             return;
           }
 
+          if (codigoRedefinicao.trim().length !== 8) {
+            setError("Informe um código de redefinição com 8 dígitos.");
+            return;
+          }
+
           if (!novaSenha || !confirmarNovaSenha) {
             setError("Preencha a nova senha e a confirmação.");
             return;
@@ -160,6 +165,10 @@ const Login = () => {
 
   const handleConfirmarNovaSenhaChange = (valor: string) => {
     setConfirmarNovaSenha(valor.slice(0, 128));
+  };
+
+  const handleCodigoRedefinicaoChange = (valor: string) => {
+    setCodigoRedefinicao(valor.replace(/\D/g, "").slice(0, 8));
   };
 
   const formatarTelefone = (valor: string) => {
@@ -354,7 +363,7 @@ const Login = () => {
                 <>
                   {forgotStep === "request" ? (
                     <p className="text-sm text-muted-foreground rounded-lg border border-border/70 bg-muted/30 px-3 py-2">
-                      Informe seu e-mail para solicitar um código temporário de redefinição.
+                      Informe seu e-mail para solicitar um código temporário de 8 dígitos.
                     </p>
                   ) : (
                     <>
@@ -366,9 +375,11 @@ const Login = () => {
                           id="codigoRedefinicao"
                           type="text"
                           value={codigoRedefinicao}
-                          onChange={(event) => setCodigoRedefinicao(event.target.value.trim())}
+                          onChange={(event) => handleCodigoRedefinicaoChange(event.target.value)}
                           className="w-full rounded-xl border border-border/80 bg-background px-3 py-2.5 text-foreground outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/30"
-                          placeholder="Cole o código recebido"
+                          placeholder="Digite o código de 8 dígitos"
+                          inputMode="numeric"
+                          maxLength={8}
                           required
                         />
                       </div>

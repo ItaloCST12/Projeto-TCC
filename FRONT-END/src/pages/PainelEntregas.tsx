@@ -452,7 +452,9 @@ const PainelEntregas = () => {
   const [totalPaginasPedidos, setTotalPaginasPedidos] = useState(1);
   const [totalPedidos, setTotalPedidos] = useState(0);
   const [dataFiltroPedidos, setDataFiltroPedidos] = useState("");
-  const [filtroTipoEntrega, setFiltroTipoEntrega] = useState<"todos" | "entrega" | "retirada">("todos");
+  const [filtroTipoEntrega, setFiltroTipoEntrega] = useState<
+    "todos" | "entrega" | "retirada" | "cancelados"
+  >("todos");
   const [loadingVendas, setLoadingVendas] = useState(false);
   const [errorVendas, setErrorVendas] = useState("");
   const [vendas, setVendas] = useState<VendaControle[]>([]);
@@ -763,6 +765,10 @@ const PainelEntregas = () => {
   }, [usuarios, buscaUsuario]);
 
   const pedidosFiltradosPorTipo = useMemo(() => {
+    if (filtroTipoEntrega === "cancelados") {
+      return pedidos.filter((pedido) => pedido.status === "CANCELADO");
+    }
+
     if (filtroTipoEntrega === "entrega") {
       return pedidos.filter((pedido) => isEntregaDomicilio(pedido));
     }
@@ -1453,13 +1459,16 @@ const PainelEntregas = () => {
               <select
                 value={filtroTipoEntrega}
                 onChange={(event) =>
-                  setFiltroTipoEntrega(event.target.value as "todos" | "entrega" | "retirada")
+                  setFiltroTipoEntrega(
+                    event.target.value as "todos" | "entrega" | "retirada" | "cancelados",
+                  )
                 }
                 className="w-full rounded-lg border border-border bg-background px-3 py-2 text-foreground"
               >
                 <option value="todos">Todos os pedidos</option>
                 <option value="entrega">Apenas entrega em domicílio</option>
                 <option value="retirada">Apenas retirada no local</option>
+                <option value="cancelados">Somente pedidos cancelados</option>
               </select>
             </div>
 

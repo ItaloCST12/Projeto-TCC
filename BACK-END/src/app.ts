@@ -22,6 +22,7 @@ for (const envPath of envPaths) {
 }
 
 const app = express();
+app.set("trust proxy", 1);
 const portaInicial = Number.parseInt((process.env.PORT || "3333").trim(), 10);
 const PORT = Number.isFinite(portaInicial) && portaInicial > 0 ? portaInicial : 3333;
 const fallbackStaticDir = path.resolve(process.cwd(), "public");

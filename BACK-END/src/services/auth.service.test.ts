@@ -12,6 +12,7 @@ vi.mock("../models/client", () => ({
       updateMany: vi.fn(),
       create: vi.fn(),
       findFirst: vi.fn(),
+      update: vi.fn(),
     },
     $transaction: vi.fn(),
   },
@@ -30,6 +31,8 @@ vi.mock("../utils/auth-secret", () => ({
 import prisma from "../models/client";
 import * as AuthService from "./auth.service";
 import bcrypt from "bcryptjs";
+import { sendResetPasswordEmail } from "./email.service";
+import crypto from "crypto";
 
 describe("AuthService", () => {
   beforeEach(() => {
@@ -214,6 +217,73 @@ describe("AuthService", () => {
       });
 
       expect(result.message).toContain("Se o e-mail estiver cadastrado");
+    });
+
+    it("deve gerar código numérico de 8 dígitos para redefinição", async () => {
+      vi.mocked(prisma.usuario.findUnique).mockResolvedValue({
+        id: 1,
+        email: "cliente@email.com",
+      } as any);
+      vi.mocked(prisma.passwordResetToken.findFirst).mockResolvedValue(null);
+      vi.mocked(prisma.passwordResetToken.updateMany).mockResolvedValue({ count: 0 } as any);
+      vi.mocked(prisma.passwordResetToken.create).mockResolvedValue({ id: 10 } as any);
+      vi.mocked(prisma.$transaction).mockResolvedValue([] as any);
+      vi.mocked(sendResetPasswordEmail).mockResolvedValue({ delivered: false, skipped: true });
+
+      const result = await AuthService.solicitarRedefinicaoSenha({
+        email: "cliente@email.com",
+      });
+
+      expect(result.message).toContain("Se o e-mail estiver cadastrado");
+      expect(result.resetToken).toMatch(/^\d{8}$/);
+      expect(sendResetPasswordEmail).toHaveBeenCalledWith(
+        expect.objectContaining({
+          toEmail: "cliente@email.com",
+          resetCode: expect.stringMatching(/^\d{8}$/),
+        }),
+      );
+    });
+
+    it("deve gerar novo código quando o sorteado inicialmente coincide com o último emitido", async () => {
+      vi.mocked(prisma.usuario.findUnique).mockResolvedValue({
+        id: 1,
+        email: "cliente@email.com",
+      } as any);
+
+      const codigoAnterior = "12345678";
+      const hashCodigoAnterior = crypto.createHash("sha256").update(codigoAnterior).digest("hex");
+
+      vi.mocked(prisma.passwordResetToken.findFirst).mockResolvedValue({
+        tokenHash: hashCodigoAnterior,
+      } as any);
+      vi.mocked(prisma.passwordResetToken.updateMany).mockResolvedValue({ count: 0 } as any);
+      vi.mocked(prisma.passwordResetToken.create).mockResolvedValue({ id: 11 } as any);
+      vi.mocked(prisma.$transaction).mockResolvedValue([] as any);
+      vi.mocked(sendResetPasswordEmail).mockResolvedValue({ delivered: false, skipped: true });
+
+      const randomSpy = vi
+        .spyOn(crypto, "randomInt")
+        .mockReturnValueOnce(12345678)
+        .mockReturnValueOnce(87654321);
+
+      const result = await AuthService.solicitarRedefinicaoSenha({
+        email: "cliente@email.com",
+      });
+
+      expect(result.resetToken).toBe("87654321");
+      randomSpy.mockRestore();
+    });
+  });
+
+  describe("redefinirSenhaComCodigo", () => {
+    it("deve lançar erro quando o código não tiver 8 dígitos numéricos", async () => {
+      await expect(
+        AuthService.redefinirSenhaComCodigo({
+          email: "cliente@email.com",
+          codigo: "abc123",
+          novaSenhaHash: "hash",
+        }),
+      ).rejects.toThrow("Código de redefinição deve conter 8 dígitos numéricos");
     });
   });
 

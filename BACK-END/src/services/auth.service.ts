@@ -7,9 +7,36 @@ import { sendResetPasswordEmail } from "./email.service";
 import { AUTH_SECRET } from "../utils/auth-secret";
 
 const RESET_TOKEN_EXPIRATION_MINUTES = 15;
+const RESET_CODE_LENGTH = 8;
+const RESET_CODE_MAX_VALUE = 10 ** RESET_CODE_LENGTH;
+const MAX_RESET_CODE_GENERATION_ATTEMPTS = 10;
+
+const generateResetCode = () =>
+  crypto.randomInt(0, RESET_CODE_MAX_VALUE).toString().padStart(RESET_CODE_LENGTH, "0");
 
 const hashResetToken = (token: string) =>
   crypto.createHash("sha256").update(token).digest("hex");
+
+const generateUniqueResetCode = async (usuarioId: number) => {
+  const ultimoToken = await prisma.passwordResetToken.findFirst({
+    where: { usuarioId },
+    orderBy: { createdAt: "desc" },
+    select: { tokenHash: true },
+  });
+
+  if (!ultimoToken) {
+    return generateResetCode();
+  }
+
+  for (let tentativa = 0; tentativa < MAX_RESET_CODE_GENERATION_ATTEMPTS; tentativa += 1) {
+    const codigo = generateResetCode();
+    if (hashResetToken(codigo) !== ultimoToken.tokenHash) {
+      return codigo;
+    }
+  }
+
+  throw new Error("Não foi possível gerar um novo código de redefinição");
+};
 
 export const login = async (data: { email: string; password?: string }) => {
   if (!data.email || !data.password) {
@@ -136,7 +163,7 @@ export const solicitarRedefinicaoSenha = async (data: { email: string }) => {
     };
   }
 
-  const token = crypto.randomBytes(24).toString("hex");
+  const token = await generateUniqueResetCode(usuario.id);
   const tokenHash = hashResetToken(token);
   const expiresAt = new Date(Date.now() + RESET_TOKEN_EXPIRATION_MINUTES * 60 * 1000);
 
@@ -204,6 +231,11 @@ export const redefinirSenhaComCodigo = async (data: {
     throw new Error("Nova senha é obrigatória");
   }
 
+  const codigo = data.codigo.trim();
+  if (!/^\d{8}$/.test(codigo)) {
+    throw new Error("Código de redefinição deve conter 8 dígitos numéricos");
+  }
+
   const usuario = await prisma.usuario.findUnique({
     where: { email: data.email.trim() },
   });
@@ -212,7 +244,7 @@ export const redefinirSenhaComCodigo = async (data: {
     throw new Error("Código de redefinição inválido ou expirado");
   }
 
-  const codigoHash = hashResetToken(data.codigo.trim());
+  const codigoHash = hashResetToken(codigo);
   const agora = new Date();
 
   const resetToken = await prisma.passwordResetToken.findFirst({
