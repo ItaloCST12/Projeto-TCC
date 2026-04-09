@@ -59,8 +59,6 @@ export const enviarMensagemUsuario = async (req: Request, res: Response) => {
       { texto, imagemUrl: imagemUrl ?? null },
     );
 
-    emitMensagemNova(mensagem);
-
     const identificacaoUsuario = req.usuario?.email?.trim() || `Cliente #${usuarioId}`;
     await executarNotificacaoSemFalhar(() =>
       notificacaoService.criarParaAdmins({
@@ -71,6 +69,8 @@ export const enviarMensagemUsuario = async (req: Request, res: Response) => {
         conversaUsuarioId: usuarioId,
       }),
     );
+
+    emitMensagemNova(mensagem);
 
     return res.status(201).json(mensagem);
   } catch (error) {
@@ -136,8 +136,6 @@ export const responderComoSuporte = async (req: Request, res: Response) => {
       { texto, imagemUrl: imagemUrl ?? null },
     );
 
-    emitMensagemNova(mensagem);
-
     await executarNotificacaoSemFalhar(() =>
       notificacaoService.criarParaCliente(usuarioId, {
         tipo: "CHAT_NOVA_MENSAGEM",
@@ -146,6 +144,8 @@ export const responderComoSuporte = async (req: Request, res: Response) => {
         url: "/chat",
       }),
     );
+
+    emitMensagemNova(mensagem);
 
     return res.status(201).json(mensagem);
   } catch (error) {

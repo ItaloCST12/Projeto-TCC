@@ -146,6 +146,7 @@ const NotificationBell = ({ mobile = false }: Props) => {
   const estaNaTelaDeChat = location.pathname.startsWith("/chat");
   const socketRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<number | null>(null);
+  const refreshTimeoutRef = useRef<number | null>(null);
   const [itens, setItens] = useState<Notificacao[]>([]);
   const [naoLidas, setNaoLidas] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -257,6 +258,9 @@ const NotificationBell = ({ mobile = false }: Props) => {
 
   useEffect(() => {
     if (!usuario?.id || !authToken || estaNaTelaDeChat) {
+      if (refreshTimeoutRef.current) {
+        window.clearTimeout(refreshTimeoutRef.current);
+      }
       if (reconnectTimeoutRef.current) {
         window.clearTimeout(reconnectTimeoutRef.current);
       }
@@ -270,12 +274,25 @@ const NotificationBell = ({ mobile = false }: Props) => {
       const socket = new WebSocket(buildWsUrl(authToken));
       socketRef.current = socket;
 
+      socket.onopen = () => {
+        void carregar();
+      };
+
       socket.onmessage = (event) => {
         try {
           const parsed = JSON.parse(event.data as string) as EventoSocketAtendimento;
 
           if (parsed.type === "mensagem_nova" && "id" in parsed.payload) {
             void carregar();
+
+            // Segundo refresh curto para evitar corrida entre evento WS e persistência da notificação.
+            if (refreshTimeoutRef.current) {
+              window.clearTimeout(refreshTimeoutRef.current);
+            }
+            refreshTimeoutRef.current = window.setTimeout(() => {
+              void carregar();
+              refreshTimeoutRef.current = null;
+            }, 500);
           }
         } catch {
           return;
@@ -294,6 +311,9 @@ const NotificationBell = ({ mobile = false }: Props) => {
 
     return () => {
       shouldReconnect = false;
+      if (refreshTimeoutRef.current) {
+        window.clearTimeout(refreshTimeoutRef.current);
+      }
       if (reconnectTimeoutRef.current) {
         window.clearTimeout(reconnectTimeoutRef.current);
       }

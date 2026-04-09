@@ -693,7 +693,7 @@ const Chat = () => {
             )}
           </div>
 
-          <div className="min-w-0 bg-card border border-border rounded-xl p-3 sm:p-4 flex min-h-[420px] max-h-[78vh] flex-col overflow-hidden">
+          <div className="min-w-0 bg-card border border-border rounded-xl p-3 sm:p-4 flex min-h-[420px] flex-col overflow-y-auto md:max-h-[78vh] md:overflow-hidden">
             <h2 className="font-semibold text-foreground mb-3">Mensagens</h2>
             <div className="mb-3 inline-flex items-center gap-2 self-start rounded-full border border-border px-3 py-1 text-xs text-muted-foreground">
               <span className={`h-2 w-2 rounded-full ${wsStatusConfig.dotClassName}`} />
