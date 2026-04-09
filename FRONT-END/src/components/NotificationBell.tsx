@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertCircle,
   Bell,
@@ -6,13 +6,15 @@ import {
   Clock3,
   Inbox,
   Loader2,
+  MessageCircle,
   Package,
   Settings2,
   Trash2,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import { apiRequest } from "@/lib/api";
-import { getAuthUser } from "@/lib/auth";
+import { getAuthToken, getAuthUser } from "@/lib/auth";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -46,6 +48,36 @@ type PushPublicKeyResponse = {
   publicKey: string | null;
 };
 
+type EventoSocketAtendimento =
+  | {
+      type: "mensagem_nova";
+      payload:
+        | {
+            id: number;
+            usuarioId: number;
+          }
+        | { ready: true };
+    }
+  | {
+      type: "conversa_limpada";
+      payload: { usuarioId: number };
+    };
+
+const WS_BASE_URL = (import.meta.env.VITE_API_URL as string | undefined)?.trim() || "";
+
+const buildWsUrl = (token: string) => {
+  if (WS_BASE_URL) {
+    const normalizedBase = WS_BASE_URL.endsWith("/")
+      ? WS_BASE_URL.slice(0, -1)
+      : WS_BASE_URL;
+    const wsBase = normalizedBase.replace(/^http/i, "ws");
+    return `${wsBase}/atendimentos/ws?token=${encodeURIComponent(token)}`;
+  }
+
+  const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+  return `${wsProtocol}//${window.location.host}/atendimentos/ws?token=${encodeURIComponent(token)}`;
+};
+
 const urlBase64ToUint8Array = (base64String: string) => {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
   const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
@@ -74,6 +106,10 @@ const formatarData = (valor: string) => {
 const obterIconeNotificacao = (item: Notificacao) => {
   const tipo = String(item.tipo ?? "").toLowerCase();
 
+  if (tipo.includes("chat")) {
+    return MessageCircle;
+  }
+
   if (item.pedidoId || tipo.includes("pedido") || tipo.includes("entrega")) {
     return Package;
   }
@@ -85,10 +121,31 @@ const obterIconeNotificacao = (item: Notificacao) => {
   return Bell;
 };
 
+const extrairUsuarioIdConversa = (tipo: string | undefined) => {
+  const valorTipo = String(tipo ?? "").trim();
+  const match = valorTipo.match(/^CHAT_NOVA_MENSAGEM:(\d+)$/i);
+
+  if (!match) {
+    return null;
+  }
+
+  const usuarioId = Number(match[1]);
+  if (!Number.isInteger(usuarioId) || usuarioId <= 0) {
+    return null;
+  }
+
+  return usuarioId;
+};
+
 const NotificationBell = ({ mobile = false }: Props) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const usuario = getAuthUser();
+  const authToken = getAuthToken();
   const isAdmin = usuario?.role === "ADMIN";
+  const estaNaTelaDeChat = location.pathname.startsWith("/chat");
+  const socketRef = useRef<WebSocket | null>(null);
+  const reconnectTimeoutRef = useRef<number | null>(null);
   const [itens, setItens] = useState<Notificacao[]>([]);
   const [naoLidas, setNaoLidas] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -97,7 +154,7 @@ const NotificationBell = ({ mobile = false }: Props) => {
 
   const temNotificacoes = itens.length > 0;
 
-  const carregar = async () => {
+  const carregar = useCallback(async () => {
     setErro("");
     try {
       const resposta = await apiRequest<RespostaNotificacoes>(
@@ -108,7 +165,7 @@ const NotificationBell = ({ mobile = false }: Props) => {
     } catch (error) {
       setErro(error instanceof Error ? error.message : "Falha ao carregar notificações.");
     }
-  };
+  }, []);
 
   const obterChavePublicaPush = async () => {
     const envKey = String(import.meta.env.VITE_VAPID_PUBLIC_KEY ?? "").trim();
@@ -196,7 +253,53 @@ const NotificationBell = ({ mobile = false }: Props) => {
       ativo = false;
       window.clearInterval(intervalo);
     };
-  }, []);
+  }, [carregar]);
+
+  useEffect(() => {
+    if (!usuario?.id || !authToken || estaNaTelaDeChat) {
+      if (reconnectTimeoutRef.current) {
+        window.clearTimeout(reconnectTimeoutRef.current);
+      }
+      socketRef.current?.close();
+      return;
+    }
+
+    let shouldReconnect = true;
+
+    const conectar = () => {
+      const socket = new WebSocket(buildWsUrl(authToken));
+      socketRef.current = socket;
+
+      socket.onmessage = (event) => {
+        try {
+          const parsed = JSON.parse(event.data as string) as EventoSocketAtendimento;
+
+          if (parsed.type === "mensagem_nova" && "id" in parsed.payload) {
+            void carregar();
+          }
+        } catch {
+          return;
+        }
+      };
+
+      socket.onclose = () => {
+        if (!shouldReconnect) {
+          return;
+        }
+        reconnectTimeoutRef.current = window.setTimeout(conectar, 1500);
+      };
+    };
+
+    conectar();
+
+    return () => {
+      shouldReconnect = false;
+      if (reconnectTimeoutRef.current) {
+        window.clearTimeout(reconnectTimeoutRef.current);
+      }
+      socketRef.current?.close();
+    };
+  }, [authToken, carregar, estaNaTelaDeChat, usuario?.id]);
 
   useEffect(() => {
     void inscreverPushNoDispositivo();
@@ -231,6 +334,18 @@ const NotificationBell = ({ mobile = false }: Props) => {
   };
 
   const resolverDestinoNotificacao = (item: Notificacao) => {
+    const tipo = String(item.tipo ?? "").trim().toUpperCase();
+
+    if (tipo.startsWith("CHAT_NOVA_MENSAGEM")) {
+      const usuarioConversaId = extrairUsuarioIdConversa(item.tipo);
+
+      if (isAdmin && usuarioConversaId) {
+        return `/chat?usuarioId=${usuarioConversaId}`;
+      }
+
+      return "/chat";
+    }
+
     if (!item.pedidoId) {
       return isAdmin ? "/painel-entregas" : "/minhas-encomendas";
     }
@@ -253,6 +368,10 @@ const NotificationBell = ({ mobile = false }: Props) => {
 
     navigate(resolverDestinoNotificacao(item));
   };
+
+  if (estaNaTelaDeChat) {
+    return null;
+  }
 
   return (
     <DropdownMenu>
@@ -353,6 +472,11 @@ const NotificationBell = ({ mobile = false }: Props) => {
                             <span className="text-xs text-foreground font-medium inline-flex items-center gap-1">
                               <Package className="h-3.5 w-3.5" />
                               Pedido #{item.pedidoId}
+                            </span>
+                          ) : String(item.tipo ?? "").toUpperCase().startsWith("CHAT_NOVA_MENSAGEM") ? (
+                            <span className="text-xs text-foreground font-medium inline-flex items-center gap-1">
+                              <MessageCircle className="h-3.5 w-3.5" />
+                              Atendimento
                             </span>
                           ) : (
                             <span className="text-xs text-muted-foreground inline-flex items-center gap-1">

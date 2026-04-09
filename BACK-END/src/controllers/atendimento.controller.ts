@@ -4,6 +4,17 @@ import {
   emitConversaLimpada,
   emitMensagemNova,
 } from "../socket/atendimento.socket";
+import { NotificacaoService } from "../services/notificacao.service";
+
+const notificacaoService = new NotificacaoService();
+
+const executarNotificacaoSemFalhar = async (callback: () => Promise<unknown>) => {
+  try {
+    await callback();
+  } catch (error) {
+    console.error("[NOTIFICACOES] Falha ao criar notificação de atendimento:", error);
+  }
+};
 
 const getImagemUrlFromFile = (req: Request, localFolderName: string) => {
   if (!req.file) {
@@ -45,10 +56,21 @@ export const enviarMensagemUsuario = async (req: Request, res: Response) => {
     const mensagem = await AtendimentoService.enviarMensagem(
       usuarioId,
       "USUARIO",
-      { texto, imagemUrl },
+      { texto, imagemUrl: imagemUrl ?? null },
     );
 
     emitMensagemNova(mensagem);
+
+    const identificacaoUsuario = req.usuario?.email?.trim() || `Cliente #${usuarioId}`;
+    await executarNotificacaoSemFalhar(() =>
+      notificacaoService.criarParaAdmins({
+        tipo: "CHAT_NOVA_MENSAGEM",
+        titulo: "Você tem uma nova mensagem",
+        mensagem: `${identificacaoUsuario} enviou uma nova mensagem no atendimento.`,
+        url: `/chat?usuarioId=${usuarioId}`,
+        conversaUsuarioId: usuarioId,
+      }),
+    );
 
     return res.status(201).json(mensagem);
   } catch (error) {
@@ -111,10 +133,19 @@ export const responderComoSuporte = async (req: Request, res: Response) => {
     const mensagem = await AtendimentoService.enviarMensagem(
       usuarioId,
       "SUPORTE",
-      { texto, imagemUrl },
+      { texto, imagemUrl: imagemUrl ?? null },
     );
 
     emitMensagemNova(mensagem);
+
+    await executarNotificacaoSemFalhar(() =>
+      notificacaoService.criarParaCliente(usuarioId, {
+        tipo: "CHAT_NOVA_MENSAGEM",
+        titulo: "Você tem uma nova mensagem",
+        mensagem: "O suporte enviou uma nova mensagem no atendimento.",
+        url: "/chat",
+      }),
+    );
 
     return res.status(201).json(mensagem);
   } catch (error) {

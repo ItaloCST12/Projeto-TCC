@@ -1,6 +1,15 @@
-import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Navigate } from "react-router-dom";
-import { MessageCircle, Paperclip, X } from "lucide-react";
+import {
+  ChangeEvent,
+  FormEvent,
+  KeyboardEvent as ReactKeyboardEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { Navigate, useSearchParams } from "react-router-dom";
+import { MessageCircle, Paperclip, Search, X } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import PageShell from "@/components/PageShell";
 import { apiRequest } from "@/lib/api";
@@ -38,6 +47,7 @@ type EventoSocket =
 const WS_BASE_URL = (import.meta.env.VITE_API_URL as string | undefined)?.trim() || "";
 const MAX_CHAT_IMAGE_SIZE = 5 * 1024 * 1024;
 const ALLOWED_CHAT_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const MAX_BADGE_NAO_LIDAS = 99;
 
 const buildWsUrl = (token: string) => {
   if (WS_BASE_URL) {
@@ -85,7 +95,48 @@ const upsertMensagem = (lista: Mensagem[], nova: Mensagem) => {
   );
 };
 
+const formatarTempoRelativo = (valor: string) => {
+  const data = new Date(valor);
+  if (Number.isNaN(data.getTime())) {
+    return "Data inválida";
+  }
+
+  const agora = Date.now();
+  const diferencaMs = data.getTime() - agora;
+  const diferencaAbsMs = Math.abs(diferencaMs);
+  const minutoMs = 60 * 1000;
+  const horaMs = 60 * minutoMs;
+  const diaMs = 24 * horaMs;
+  const rtf = new Intl.RelativeTimeFormat("pt-BR", { numeric: "auto" });
+
+  if (diferencaAbsMs < horaMs) {
+    return rtf.format(Math.round(diferencaMs / minutoMs), "minute");
+  }
+
+  if (diferencaAbsMs < diaMs) {
+    return rtf.format(Math.round(diferencaMs / horaMs), "hour");
+  }
+
+  if (diferencaAbsMs < 7 * diaMs) {
+    return rtf.format(Math.round(diferencaMs / diaMs), "day");
+  }
+
+  return new Intl.DateTimeFormat("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+  }).format(data);
+};
+
+const formatarBadgeNaoLidas = (quantidade: number) => {
+  if (quantidade > MAX_BADGE_NAO_LIDAS) {
+    return `${MAX_BADGE_NAO_LIDAS}...`;
+  }
+
+  return String(quantidade);
+};
+
 const Chat = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
   const authenticated = isAuthenticated();
   const user = getAuthUser();
   const isAdmin = user?.role === "ADMIN";
@@ -94,13 +145,18 @@ const Chat = () => {
   const reconnectTimeoutRef = useRef<number | null>(null);
   const usuarioSelecionadoRef = useRef<number | null>(null);
   const imagemInputRef = useRef<HTMLInputElement | null>(null);
+  const mensagensEndRef = useRef<HTMLDivElement | null>(null);
 
   const [mensagens, setMensagens] = useState<Mensagem[]>([]);
   const [conversas, setConversas] = useState<ConversaResumo[]>([]);
+  const [mensagensNaoLidas, setMensagensNaoLidas] = useState<Record<number, number>>({});
+  const [buscaConversa, setBuscaConversa] = useState("");
   const [usuarioSelecionado, setUsuarioSelecionado] = useState<number | null>(null);
   const [texto, setTexto] = useState("");
   const [imagemSelecionada, setImagemSelecionada] = useState<File | null>(null);
   const [previewImagem, setPreviewImagem] = useState<string | null>(null);
+  const [imagemExpandida, setImagemExpandida] = useState<string | null>(null);
+  const [wsStatus, setWsStatus] = useState<"conectado" | "reconectando" | "desconectado">("desconectado");
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
@@ -147,17 +203,119 @@ const Chat = () => {
       : null;
   }, [isAdmin, usuarioSelecionado]);
 
+  const usuarioSelecionadoViaQuery = useMemo(() => {
+    const rawValue = searchParams.get("usuarioId");
+    if (!rawValue) {
+      return null;
+    }
+
+    const parsed = Number(rawValue);
+    if (!Number.isInteger(parsed) || parsed <= 0) {
+      return null;
+    }
+
+    return parsed;
+  }, [searchParams]);
+
+  const conversasFiltradas = useMemo(() => {
+    if (!isAdmin) {
+      return [] as ConversaResumo[];
+    }
+
+    const termo = buscaConversa.trim().toLowerCase();
+    if (!termo) {
+      return conversas;
+    }
+
+    return conversas.filter((conversa) => {
+      const nome = conversa.nome?.toLowerCase() || "";
+      const usuarioId = String(conversa.usuarioId);
+
+      return (
+        nome.includes(termo) ||
+        usuarioId.includes(termo)
+      );
+    });
+  }, [buscaConversa, conversas, isAdmin]);
+
   useEffect(() => {
     usuarioSelecionadoRef.current = usuarioSelecionado;
   }, [usuarioSelecionado]);
 
+  useEffect(() => {
+    if (!usuarioSelecionado) {
+      return;
+    }
+
+    setMensagensNaoLidas((prev) => {
+      if (!prev[usuarioSelecionado]) {
+        return prev;
+      }
+      const next = { ...prev };
+      delete next[usuarioSelecionado];
+      return next;
+    });
+  }, [usuarioSelecionado]);
+
+  useEffect(() => {
+    if (!error) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      setError("");
+    }, 5000);
+
+    return () => {
+      window.clearTimeout(timeout);
+    };
+  }, [error]);
+
+  useEffect(() => {
+    if (!imagemExpandida) {
+      return;
+    }
+
+    const handleEsc = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setImagemExpandida(null);
+      }
+    };
+
+    window.addEventListener("keydown", handleEsc);
+    return () => {
+      window.removeEventListener("keydown", handleEsc);
+    };
+  }, [imagemExpandida]);
+
+  useEffect(() => {
+    mensagensEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [mensagens]);
+
   const loadConversasAdmin = useCallback(async () => {
     const response = await apiRequest<ConversaResumo[]>("/atendimentos/admin/conversas");
     setConversas(response);
-    if (!usuarioSelecionado && response.length > 0) {
+
+    if (response.length === 0) {
+      setUsuarioSelecionado(null);
+      return;
+    }
+
+    if (
+      usuarioSelecionadoViaQuery &&
+      response.some((item) => item.usuarioId === usuarioSelecionadoViaQuery)
+    ) {
+      setUsuarioSelecionado(usuarioSelecionadoViaQuery);
+      return;
+    }
+
+    if (
+      !usuarioSelecionado ||
+      !response.some((item) => item.usuarioId === usuarioSelecionado)
+    ) {
       setUsuarioSelecionado(response[0].usuarioId);
     }
-  }, [usuarioSelecionado]);
+  }, [usuarioSelecionado, usuarioSelecionadoViaQuery]);
 
   const loadMensagens = useCallback(async () => {
     if (!endpointMensagens) {
@@ -212,6 +370,7 @@ const Chat = () => {
 
   useEffect(() => {
     if (!authenticated || !authToken || !user?.id) {
+      setWsStatus("desconectado");
       return;
     }
 
@@ -220,6 +379,10 @@ const Chat = () => {
     const connect = () => {
       const socket = new WebSocket(buildWsUrl(authToken));
       socketRef.current = socket;
+
+      socket.onopen = () => {
+        setWsStatus("conectado");
+      };
 
       socket.onmessage = (event) => {
         try {
@@ -253,6 +416,11 @@ const Chat = () => {
 
               if (usuarioSelecionadoRef.current === mensagem.usuarioId) {
                 setMensagens((prev) => upsertMensagem(prev, mensagem));
+              } else {
+                setMensagensNaoLidas((prev) => ({
+                  ...prev,
+                  [mensagem.usuarioId]: (prev[mensagem.usuarioId] ?? 0) + 1,
+                }));
               }
               return;
             }
@@ -268,6 +436,14 @@ const Chat = () => {
 
             if (isAdmin) {
               setConversas((prev) => prev.filter((item) => item.usuarioId !== usuarioId));
+              setMensagensNaoLidas((prev) => {
+                if (!prev[usuarioId]) {
+                  return prev;
+                }
+                const next = { ...prev };
+                delete next[usuarioId];
+                return next;
+              });
               if (usuarioSelecionadoRef.current === usuarioId) {
                 setMensagens([]);
               }
@@ -284,6 +460,7 @@ const Chat = () => {
       };
 
       socket.onclose = () => {
+        setWsStatus(shouldReconnect ? "reconectando" : "desconectado");
         if (!shouldReconnect) {
           return;
         }
@@ -299,11 +476,42 @@ const Chat = () => {
         window.clearTimeout(reconnectTimeoutRef.current);
       }
       socketRef.current?.close();
+      setWsStatus("desconectado");
     };
   }, [authenticated, authToken, isAdmin, user?.id]);
 
-  const sendMessage = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  useEffect(() => {
+    if (!isAdmin || !usuarioSelecionadoViaQuery) {
+      return;
+    }
+
+    if (!conversas.some((item) => item.usuarioId === usuarioSelecionadoViaQuery)) {
+      return;
+    }
+
+    setUsuarioSelecionado(usuarioSelecionadoViaQuery);
+    setMensagensNaoLidas((prev) => {
+      if (!prev[usuarioSelecionadoViaQuery]) {
+        return prev;
+      }
+
+      const next = { ...prev };
+      delete next[usuarioSelecionadoViaQuery];
+      return next;
+    });
+
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete("usuarioId");
+    setSearchParams(nextParams, { replace: true });
+  }, [
+    conversas,
+    isAdmin,
+    searchParams,
+    setSearchParams,
+    usuarioSelecionadoViaQuery,
+  ]);
+
+  const enviarMensagem = useCallback(async () => {
     const textoNormalizado = texto.trim();
 
     if (!textoNormalizado && !imagemSelecionada) {
@@ -347,6 +555,11 @@ const Chat = () => {
     } finally {
       setSending(false);
     }
+  }, [imagemSelecionada, isAdmin, loadConversasAdmin, texto, usuarioSelecionado]);
+
+  const sendMessage = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    await enviarMensagem();
   };
 
   if (!authenticated) {
@@ -377,6 +590,39 @@ const Chat = () => {
     setImagemSelecionada(file);
   };
 
+  const handleTextareaKeyDown = (event: ReactKeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key !== "Enter" || event.shiftKey) {
+      return;
+    }
+
+    event.preventDefault();
+
+    if (sending || (isAdmin && !usuarioSelecionado) || (!texto.trim() && !imagemSelecionada)) {
+      return;
+    }
+
+    void enviarMensagem();
+  };
+
+  const selecionarConversa = (idUsuario: number) => {
+    setUsuarioSelecionado(idUsuario);
+    setMensagensNaoLidas((prev) => {
+      if (!prev[idUsuario]) {
+        return prev;
+      }
+      const next = { ...prev };
+      delete next[idUsuario];
+      return next;
+    });
+  };
+
+  const wsStatusConfig =
+    wsStatus === "conectado"
+      ? { label: "Conectado", dotClassName: "bg-emerald-500" }
+      : wsStatus === "reconectando"
+        ? { label: "Reconectando...", dotClassName: "bg-amber-500" }
+        : { label: "Desconectado", dotClassName: "bg-red-500" };
+
   return (
     <div className="min-h-screen overflow-x-hidden bg-background">
       <Navbar />
@@ -395,31 +641,64 @@ const Chat = () => {
             ) : conversas.length === 0 ? (
               <p className="text-sm text-muted-foreground">Nenhuma conversa iniciada.</p>
             ) : (
-              <ul className="space-y-2 max-h-[34vh] overflow-y-auto pr-1 md:max-h-none md:overflow-visible md:pr-0">
-                {conversas.map((conversa) => (
+              <>
+                <label className="mb-3 flex items-center gap-2 rounded-lg border border-border bg-background px-2.5 py-2">
+                  <Search className="h-4 w-4 text-muted-foreground" />
+                  <input
+                    type="text"
+                    value={buscaConversa}
+                    onChange={(event) => setBuscaConversa(event.target.value)}
+                    className="w-full bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
+                    placeholder="Buscar por nome ou ID"
+                  />
+                </label>
+
+                {conversasFiltradas.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Nenhuma conversa encontrada.</p>
+                ) : (
+                  <ul className="space-y-2 max-h-[34vh] overflow-y-auto pr-1 md:max-h-none md:overflow-visible md:pr-0">
+                    {conversasFiltradas.map((conversa) => (
                   <li key={conversa.usuarioId}>
                     <button
                       type="button"
-                      onClick={() => setUsuarioSelecionado(conversa.usuarioId)}
+                      onClick={() => selecionarConversa(conversa.usuarioId)}
                       className={`w-full text-left rounded-lg border px-3 py-2 text-sm transition-colors ${
                         usuarioSelecionado === conversa.usuarioId
                           ? "border-primary bg-primary/10"
                           : "border-border hover:bg-muted"
                       }`}
                     >
-                      <p className="font-semibold text-foreground truncate">{conversa.nome}</p>
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="font-semibold text-foreground truncate">{conversa.nome}</p>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-muted-foreground whitespace-nowrap">
+                            {formatarTempoRelativo(conversa.ultimaAtualizacao)}
+                          </span>
+                          {(mensagensNaoLidas[conversa.usuarioId] ?? 0) > 0 ? (
+                            <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-primary px-1.5 py-0.5 text-[11px] font-semibold text-primary-foreground">
+                              {formatarBadgeNaoLidas(mensagensNaoLidas[conversa.usuarioId])}
+                            </span>
+                          ) : null}
+                        </div>
+                      </div>
                       <p className="text-muted-foreground truncate">
                         {conversa.ultimaMensagem?.trim() || "Imagem enviada"}
                       </p>
                     </button>
                   </li>
-                ))}
-              </ul>
+                    ))}
+                  </ul>
+                )}
+              </>
             )}
           </div>
 
-          <div className="min-w-0 bg-card border border-border rounded-xl p-3 sm:p-4">
+          <div className="min-w-0 bg-card border border-border rounded-xl p-3 sm:p-4 flex min-h-[420px] max-h-[78vh] flex-col overflow-hidden">
             <h2 className="font-semibold text-foreground mb-3">Mensagens</h2>
+            <div className="mb-3 inline-flex items-center gap-2 self-start rounded-full border border-border px-3 py-1 text-xs text-muted-foreground">
+              <span className={`h-2 w-2 rounded-full ${wsStatusConfig.dotClassName}`} />
+              {wsStatusConfig.label}
+            </div>
             {loading ? (
               <div className="space-y-3">
                 <Skeleton className="h-16 w-3/4" />
@@ -428,8 +707,8 @@ const Chat = () => {
                 <Skeleton className="h-24 w-full" />
               </div>
             ) : (
-              <>
-                <div className="border border-border rounded-lg p-3 h-[45dvh] min-h-[250px] max-h-[420px] overflow-y-auto mb-4 space-y-2 md:h-auto md:min-h-[280px]">
+              <div className="flex min-h-0 flex-1 flex-col">
+                <div className="mb-4 min-h-[250px] max-h-[52vh] flex-1 overflow-y-auto rounded-lg border border-border p-3 space-y-2 scroll-smooth">
                   {mensagens.length === 0 ? (
                     <p className="text-sm text-muted-foreground">Nenhuma mensagem ainda.</p>
                   ) : (
@@ -445,6 +724,7 @@ const Chat = () => {
                         : mensagem.autor === "SUPORTE"
                           ? "Suporte"
                           : "Cliente";
+                      const inicialRemetente = remetente.charAt(0).toUpperCase();
 
                       return (
                         <div
@@ -455,31 +735,41 @@ const Chat = () => {
                               : "bg-muted text-foreground"
                           }`}
                         >
-                          <p
-                            className={`mb-1 text-[11px] font-semibold uppercase tracking-wide ${
-                              minhaMensagem
-                                ? "text-primary-foreground/80"
-                                : "text-muted-foreground"
-                            }`}
-                          >
-                            {remetente}
-                          </p>
+                          <div className="mb-1 flex items-center gap-2">
+                            <span
+                              className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold ${
+                                minhaMensagem
+                                  ? "bg-primary-foreground/20 text-primary-foreground"
+                                  : "bg-primary/20 text-primary"
+                              }`}
+                            >
+                              {inicialRemetente}
+                            </span>
+                            <p
+                              className={`text-[11px] font-semibold uppercase tracking-wide ${
+                                minhaMensagem
+                                  ? "text-primary-foreground/80"
+                                  : "text-muted-foreground"
+                              }`}
+                            >
+                              {remetente}
+                            </p>
+                          </div>
                           {textoMensagem ? (
                             <p className="whitespace-pre-wrap break-words">{textoMensagem}</p>
                           ) : null}
                           {imagemMensagem ? (
-                            <a
-                              href={imagemMensagem}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="block mt-2"
+                            <button
+                              type="button"
+                              onClick={() => setImagemExpandida(imagemMensagem)}
+                              className="mt-2 block"
                             >
                               <img
                                 src={imagemMensagem}
                                 alt="Imagem enviada no chat"
                                 className="max-h-60 w-auto rounded-md border border-border/30"
                               />
-                            </a>
+                            </button>
                           ) : null}
                           <p
                             className={`mt-1 text-[11px] ${
@@ -494,16 +784,25 @@ const Chat = () => {
                       );
                     })
                   )}
+                  <div ref={mensagensEndRef} />
                 </div>
 
                 <form onSubmit={sendMessage} className="space-y-2">
                   <textarea
                     value={texto}
                     onChange={(event) => setTexto(event.target.value)}
+                    onKeyDown={handleTextareaKeyDown}
                     className="w-full min-h-[90px] rounded-lg border border-border bg-background px-3 py-2 text-foreground"
                     placeholder="Digite sua mensagem (opcional ao enviar foto)"
                     maxLength={300}
                   />
+                  <p
+                    className={`text-right text-xs ${
+                      texto.length > 270 ? "text-destructive" : "text-muted-foreground"
+                    }`}
+                  >
+                    {texto.length}/300
+                  </p>
 
                   <div className="flex flex-wrap items-center gap-2">
                     <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-semibold text-foreground hover:bg-muted">
@@ -541,7 +840,19 @@ const Chat = () => {
                     </div>
                   ) : null}
 
-                  {error && <p className="text-sm text-destructive">{error}</p>}
+                  {error ? (
+                    <div className="flex items-start justify-between gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                      <p>{error}</p>
+                      <button
+                        type="button"
+                        onClick={() => setError("")}
+                        className="inline-flex h-6 w-6 items-center justify-center rounded-md hover:bg-destructive/20"
+                        aria-label="Fechar erro"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ) : null}
                   <button
                     type="submit"
                     disabled={
@@ -554,11 +865,35 @@ const Chat = () => {
                     {sending ? "Enviando..." : "Enviar mensagem"}
                   </button>
                 </form>
-              </>
+              </div>
             )}
           </div>
         </div>
       </PageShell>
+
+      {imagemExpandida ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+          onClick={() => setImagemExpandida(null)}
+        >
+          <button
+            type="button"
+            onClick={() => setImagemExpandida(null)}
+            className="absolute right-4 top-4 inline-flex h-10 w-10 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80"
+            aria-label="Fechar imagem"
+          >
+            <X className="h-5 w-5" />
+          </button>
+
+          <div className="max-h-full max-w-5xl" onClick={(event) => event.stopPropagation()}>
+            <img
+              src={imagemExpandida}
+              alt="Imagem expandida"
+              className="max-h-[90vh] w-auto rounded-lg object-contain"
+            />
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 };

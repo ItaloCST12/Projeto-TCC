@@ -8,6 +8,8 @@ type CriarNotificacaoInput = {
   titulo: string;
   mensagem: string;
   pedidoId?: number;
+  url?: string;
+  conversaUsuarioId?: number;
 };
 
 type ListarRecentesInput = {
@@ -66,6 +68,14 @@ const garantirWebPushConfigurado = () => {
 };
 
 export class NotificacaoService {
+  private resolverTipoPersistido(input: CriarNotificacaoInput) {
+    if (input.conversaUsuarioId && Number.isInteger(input.conversaUsuarioId)) {
+      return `${input.tipo}:${input.conversaUsuarioId}`;
+    }
+
+    return input.tipo;
+  }
+
   private async enviarPush(destinoRole: DestinoRole, payload: Record<string, unknown>, usuarioId?: number) {
     if (!garantirWebPushConfigurado().disponivel) {
       return;
@@ -180,10 +190,13 @@ export class NotificacaoService {
   }
 
   async criarParaAdmins(input: CriarNotificacaoInput) {
+    const tipoPersistido = this.resolverTipoPersistido(input);
+    const urlDestino = input.url || "/painel-entregas";
+
     const notificacao = await prisma.notificacao.create({
       data: {
         destinoRole: "ADMIN",
-        tipo: input.tipo,
+        tipo: tipoPersistido,
         titulo: input.titulo,
         mensagem: input.mensagem,
         ...(input.pedidoId !== undefined ? { pedidoId: input.pedidoId } : {}),
@@ -193,9 +206,9 @@ export class NotificacaoService {
     await this.enviarPush("ADMIN", {
       title: input.titulo,
       body: input.mensagem,
-      tipo: input.tipo,
+      tipo: tipoPersistido,
       pedidoId: input.pedidoId ?? null,
-      url: "/painel-entregas",
+      url: urlDestino,
       createdAt: new Date().toISOString(),
     });
 
@@ -203,11 +216,14 @@ export class NotificacaoService {
   }
 
   async criarParaCliente(usuarioId: number, input: CriarNotificacaoInput) {
+    const tipoPersistido = this.resolverTipoPersistido(input);
+    const urlDestino = input.url || "/minhas-encomendas";
+
     const notificacao = await prisma.notificacao.create({
       data: {
         usuarioId,
         destinoRole: "CLIENTE",
-        tipo: input.tipo,
+        tipo: tipoPersistido,
         titulo: input.titulo,
         mensagem: input.mensagem,
         ...(input.pedidoId !== undefined ? { pedidoId: input.pedidoId } : {}),
@@ -219,9 +235,9 @@ export class NotificacaoService {
       {
         title: input.titulo,
         body: input.mensagem,
-        tipo: input.tipo,
+        tipo: tipoPersistido,
         pedidoId: input.pedidoId ?? null,
-        url: "/minhas-encomendas",
+        url: urlDestino,
         createdAt: new Date().toISOString(),
       },
       usuarioId,
