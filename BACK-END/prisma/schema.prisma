@@ -149,6 +149,7 @@ model AtendimentoMensagem {
   usuarioId Int
   autor     String
   texto     String
+  imagemUrl String?
   createdAt DateTime @default(now())
   usuario   Usuario  @relation(fields: [usuarioId], references: [id])
 }

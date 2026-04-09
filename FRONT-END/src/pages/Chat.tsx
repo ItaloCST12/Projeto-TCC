@@ -1,6 +1,6 @@
-import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Navigate } from "react-router-dom";
-import { MessageCircle } from "lucide-react";
+import { MessageCircle, Paperclip, X } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import PageShell from "@/components/PageShell";
 import { apiRequest } from "@/lib/api";
@@ -12,6 +12,7 @@ type Mensagem = {
   usuarioId: number;
   autor: "USUARIO" | "SUPORTE";
   texto: string;
+  imagemUrl?: string | null;
   createdAt: string;
 };
 
@@ -35,6 +36,8 @@ type EventoSocket =
     };
 
 const WS_BASE_URL = (import.meta.env.VITE_API_URL as string | undefined)?.trim() || "";
+const MAX_CHAT_IMAGE_SIZE = 5 * 1024 * 1024;
+const ALLOWED_CHAT_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
 const buildWsUrl = (token: string) => {
   if (WS_BASE_URL) {
@@ -47,6 +50,28 @@ const buildWsUrl = (token: string) => {
 
   const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
   return `${wsProtocol}//${window.location.host}/atendimentos/ws?token=${encodeURIComponent(token)}`;
+};
+
+const resolverImagemMensagem = (imagemUrl: string | null | undefined) => {
+  if (!imagemUrl?.trim()) {
+    return null;
+  }
+
+  if (imagemUrl.startsWith("http://") || imagemUrl.startsWith("https://")) {
+    return imagemUrl;
+  }
+
+  const normalizedPath = imagemUrl.startsWith("/") ? imagemUrl : `/${imagemUrl}`;
+
+  if (!WS_BASE_URL) {
+    return normalizedPath;
+  }
+
+  const normalizedBase = WS_BASE_URL.endsWith("/")
+    ? WS_BASE_URL.slice(0, -1)
+    : WS_BASE_URL;
+
+  return `${normalizedBase}${normalizedPath}`;
 };
 
 const upsertMensagem = (lista: Mensagem[], nova: Mensagem) => {
@@ -68,14 +93,38 @@ const Chat = () => {
   const socketRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<number | null>(null);
   const usuarioSelecionadoRef = useRef<number | null>(null);
+  const imagemInputRef = useRef<HTMLInputElement | null>(null);
 
   const [mensagens, setMensagens] = useState<Mensagem[]>([]);
   const [conversas, setConversas] = useState<ConversaResumo[]>([]);
   const [usuarioSelecionado, setUsuarioSelecionado] = useState<number | null>(null);
   const [texto, setTexto] = useState("");
+  const [imagemSelecionada, setImagemSelecionada] = useState<File | null>(null);
+  const [previewImagem, setPreviewImagem] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!imagemSelecionada) {
+      setPreviewImagem(null);
+      return;
+    }
+
+    const localUrl = URL.createObjectURL(imagemSelecionada);
+    setPreviewImagem(localUrl);
+
+    return () => {
+      URL.revokeObjectURL(localUrl);
+    };
+  }, [imagemSelecionada]);
+
+  const limparImagemSelecionada = () => {
+    setImagemSelecionada(null);
+    if (imagemInputRef.current) {
+      imagemInputRef.current.value = "";
+    }
+  };
 
   const formatarDataHoraMensagem = (valor: string) => {
     const data = new Date(valor);
@@ -184,12 +233,14 @@ const Chat = () => {
                 const nomeAtual = prev.find((item) => item.usuarioId === mensagem.usuarioId)?.nome ?? "Cliente";
                 const emailAtual = prev.find((item) => item.usuarioId === mensagem.usuarioId)?.email ?? "";
                 const existente = prev.find((item) => item.usuarioId === mensagem.usuarioId);
+                const resumoMensagem =
+                  mensagem.texto?.trim() || (mensagem.imagemUrl ? "Imagem enviada" : "Nova mensagem");
 
                 const novaConversa: ConversaResumo = {
                   usuarioId: mensagem.usuarioId,
                   nome: nomeAtual,
                   email: emailAtual,
-                  ultimaMensagem: mensagem.texto,
+                  ultimaMensagem: resumoMensagem,
                   ultimaAtualizacao: mensagem.createdAt,
                   totalMensagens: existente ? existente.totalMensagens + 1 : 1,
                 };
@@ -253,9 +304,20 @@ const Chat = () => {
 
   const sendMessage = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!texto.trim()) {
+    const textoNormalizado = texto.trim();
+
+    if (!textoNormalizado && !imagemSelecionada) {
       return;
     }
+
+    const payload: FormData | { texto: string } = imagemSelecionada
+      ? (() => {
+          const formData = new FormData();
+          formData.append("texto", textoNormalizado);
+          formData.append("imagem", imagemSelecionada);
+          return formData;
+        })()
+      : { texto: textoNormalizado };
 
     setSending(true);
     setError("");
@@ -266,17 +328,18 @@ const Chat = () => {
         }
         await apiRequest(`/atendimentos/admin/conversas/${usuarioSelecionado}/responder`, {
           method: "POST",
-          body: { texto },
+          body: payload,
         });
         await loadConversasAdmin();
       } else {
         await apiRequest("/atendimentos/me", {
           method: "POST",
-          body: { texto },
+          body: payload,
         });
       }
 
       setTexto("");
+      limparImagemSelecionada();
     } catch (sendError) {
       setError(
         sendError instanceof Error ? sendError.message : "Não foi possível enviar mensagem.",
@@ -289,6 +352,30 @@ const Chat = () => {
   if (!authenticated) {
     return <Navigate to="/login?redirect=/chat" replace />;
   }
+
+  const handleImagemSelecionada = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0] ?? null;
+
+    if (!file) {
+      setImagemSelecionada(null);
+      return;
+    }
+
+    if (!ALLOWED_CHAT_IMAGE_TYPES.includes(file.type)) {
+      setError("Formato de imagem inválido. Use JPG, PNG ou WEBP.");
+      limparImagemSelecionada();
+      return;
+    }
+
+    if (file.size > MAX_CHAT_IMAGE_SIZE) {
+      setError("A imagem deve ter no máximo 5 MB.");
+      limparImagemSelecionada();
+      return;
+    }
+
+    setError("");
+    setImagemSelecionada(file);
+  };
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-background">
@@ -321,7 +408,9 @@ const Chat = () => {
                       }`}
                     >
                       <p className="font-semibold text-foreground truncate">{conversa.nome}</p>
-                      <p className="text-muted-foreground truncate">{conversa.ultimaMensagem}</p>
+                      <p className="text-muted-foreground truncate">
+                        {conversa.ultimaMensagem?.trim() || "Imagem enviada"}
+                      </p>
                     </button>
                   </li>
                 ))}
@@ -348,6 +437,8 @@ const Chat = () => {
                       const minhaMensagem = isAdmin
                         ? mensagem.autor === "SUPORTE"
                         : mensagem.autor === "USUARIO";
+                      const textoMensagem = mensagem.texto?.trim() || "";
+                      const imagemMensagem = resolverImagemMensagem(mensagem.imagemUrl);
 
                       const remetente = minhaMensagem
                         ? "Você"
@@ -373,7 +464,23 @@ const Chat = () => {
                           >
                             {remetente}
                           </p>
-                          <p className="whitespace-pre-wrap break-words">{mensagem.texto}</p>
+                          {textoMensagem ? (
+                            <p className="whitespace-pre-wrap break-words">{textoMensagem}</p>
+                          ) : null}
+                          {imagemMensagem ? (
+                            <a
+                              href={imagemMensagem}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="block mt-2"
+                            >
+                              <img
+                                src={imagemMensagem}
+                                alt="Imagem enviada no chat"
+                                className="max-h-60 w-auto rounded-md border border-border/30"
+                              />
+                            </a>
+                          ) : null}
                           <p
                             className={`mt-1 text-[11px] ${
                               minhaMensagem
@@ -394,14 +501,54 @@ const Chat = () => {
                     value={texto}
                     onChange={(event) => setTexto(event.target.value)}
                     className="w-full min-h-[90px] rounded-lg border border-border bg-background px-3 py-2 text-foreground"
-                    placeholder="Digite sua mensagem"
+                    placeholder="Digite sua mensagem (opcional ao enviar foto)"
                     maxLength={300}
-                    required
                   />
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-semibold text-foreground hover:bg-muted">
+                      <Paperclip className="h-4 w-4" />
+                      Anexar foto
+                      <input
+                        ref={imagemInputRef}
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp"
+                        onChange={handleImagemSelecionada}
+                        className="hidden"
+                      />
+                    </label>
+
+                    {imagemSelecionada ? (
+                      <button
+                        type="button"
+                        onClick={limparImagemSelecionada}
+                        className="inline-flex items-center gap-1 rounded-lg border border-border px-3 py-2 text-sm font-semibold text-foreground hover:bg-muted"
+                      >
+                        <X className="h-4 w-4" />
+                        Remover foto
+                      </button>
+                    ) : null}
+                  </div>
+
+                  {previewImagem ? (
+                    <div className="rounded-lg border border-border p-2">
+                      <p className="mb-2 text-xs text-muted-foreground">Pré-visualização</p>
+                      <img
+                        src={previewImagem}
+                        alt="Pré-visualização da imagem"
+                        className="max-h-48 w-auto rounded-md"
+                      />
+                    </div>
+                  ) : null}
+
                   {error && <p className="text-sm text-destructive">{error}</p>}
                   <button
                     type="submit"
-                    disabled={sending || (isAdmin && !usuarioSelecionado)}
+                    disabled={
+                      sending ||
+                      (isAdmin && !usuarioSelecionado) ||
+                      (!texto.trim() && !imagemSelecionada)
+                    }
                     className="inline-flex w-full items-center justify-center rounded-lg bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 sm:w-auto"
                   >
                     {sending ? "Enviando..." : "Enviar mensagem"}

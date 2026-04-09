@@ -8,11 +8,12 @@ import {
   responderComoSuporte,
 } from "../controllers/atendimento.controller";
 import { adminMiddleware, authMiddleware } from "../middlewares/auth.middleware";
+import { uploadAtendimentoImagem } from "../middlewares/upload.middleware";
 
 const router = Router();
 
 router.get("/me", authMiddleware, listarMinhasMensagens);
-router.post("/me", authMiddleware, enviarMensagemUsuario);
+router.post("/me", authMiddleware, uploadAtendimentoImagem.single("imagem"), enviarMensagemUsuario);
 router.delete("/me", authMiddleware, limparMinhaConversa);
 
 router.get("/admin/conversas", authMiddleware, adminMiddleware, listarConversasAdmin);
@@ -26,6 +27,7 @@ router.post(
   "/admin/conversas/:usuarioId/responder",
   authMiddleware,
   adminMiddleware,
+  uploadAtendimentoImagem.single("imagem"),
   responderComoSuporte,
 );
 

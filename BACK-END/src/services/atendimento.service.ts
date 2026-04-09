@@ -7,6 +7,7 @@ type AtendimentoMensagem = {
   usuarioId: number;
   autor: AutorMensagem;
   texto: string;
+  imagemUrl: string | null;
   createdAt: Date;
 };
 
@@ -15,29 +16,58 @@ type AtendimentoMensagemAdmin = AtendimentoMensagem & {
   email: string;
 };
 
-const validarTexto = (texto: string) => {
-  if (!texto?.trim()) {
-    throw new Error("Mensagem é obrigatória");
-  }
+const validarTexto = (texto: string | undefined) => {
+  const textoNormalizado = texto?.trim() || "";
 
-  if (texto.trim().length > 300) {
+  if (textoNormalizado.length > 300) {
     throw new Error("Mensagem deve ter no máximo 300 caracteres");
   }
 
-  return texto.trim();
+  return textoNormalizado;
+};
+
+const validarImagemUrl = (imagemUrl: string | null | undefined) => {
+  const imagemNormalizada = imagemUrl?.trim() || "";
+
+  if (!imagemNormalizada) {
+    return null;
+  }
+
+  if (imagemNormalizada.length > 2048) {
+    throw new Error("URL da imagem inválida");
+  }
+
+  return imagemNormalizada;
+};
+
+const validarConteudoMensagem = (texto: string | undefined, imagemUrl: string | null | undefined) => {
+  const textoValido = validarTexto(texto);
+  const imagemUrlValida = validarImagemUrl(imagemUrl);
+
+  if (!textoValido && !imagemUrlValida) {
+    throw new Error("Mensagem ou imagem é obrigatória");
+  }
+
+  return {
+    textoValido,
+    imagemUrlValida,
+  };
 };
 
 export const enviarMensagem = async (
   usuarioId: number,
   autor: AutorMensagem,
-  texto: string,
+  conteudo: { texto?: string; imagemUrl?: string | null },
 ) => {
-  const textoValido = validarTexto(texto);
+  const { textoValido, imagemUrlValida } = validarConteudoMensagem(
+    conteudo.texto,
+    conteudo.imagemUrl,
+  );
 
   const rows = await prisma.$queryRaw<AtendimentoMensagem[]>`
-    INSERT INTO "AtendimentoMensagem" ("usuarioId", "autor", "texto")
-    VALUES (${usuarioId}, ${autor}, ${textoValido})
-    RETURNING "id", "usuarioId", "autor", "texto", "createdAt"
+    INSERT INTO "AtendimentoMensagem" ("usuarioId", "autor", "texto", "imagemUrl")
+    VALUES (${usuarioId}, ${autor}, ${textoValido}, ${imagemUrlValida})
+    RETURNING "id", "usuarioId", "autor", "texto", "imagemUrl", "createdAt"
   `;
 
   const mensagem = rows[0];
@@ -50,7 +80,7 @@ export const enviarMensagem = async (
 
 export const listarMensagensDoUsuario = async (usuarioId: number) => {
   return prisma.$queryRaw<AtendimentoMensagem[]>`
-    SELECT "id", "usuarioId", "autor", "texto", "createdAt"
+    SELECT "id", "usuarioId", "autor", "texto", "imagemUrl", "createdAt"
     FROM "AtendimentoMensagem"
     WHERE "usuarioId" = ${usuarioId}
     ORDER BY "createdAt" ASC
@@ -73,6 +103,7 @@ export const listarConversasAdmin = async () => {
       m."usuarioId",
       m."autor",
       m."texto",
+      m."imagemUrl",
       m."createdAt",
       COALESCE(u."nome", 'Cliente') AS "nome",
       u."email"
@@ -101,7 +132,7 @@ export const listarConversasAdmin = async () => {
         usuarioId: mensagem.usuarioId,
         nome: mensagem.nome || "Cliente",
         email: mensagem.email,
-        ultimaMensagem: mensagem.texto,
+        ultimaMensagem: mensagem.texto?.trim() || (mensagem.imagemUrl ? "Imagem enviada" : "Mensagem"),
         ultimaAtualizacao: mensagem.createdAt,
         totalMensagens: 1,
       });
@@ -123,6 +154,7 @@ export const listarMensagensPorUsuarioAdmin = async (usuarioId: number) => {
       m."usuarioId",
       m."autor",
       m."texto",
+      m."imagemUrl",
       m."createdAt",
       COALESCE(u."nome", 'Cliente') AS "nome",
       u."email"

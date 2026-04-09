@@ -5,6 +5,20 @@ import {
   emitMensagemNova,
 } from "../socket/atendimento.socket";
 
+const getImagemUrlFromFile = (req: Request, localFolderName: string) => {
+  if (!req.file) {
+    return undefined;
+  }
+
+  const cloudinaryPath =
+    (req.file as Express.Multer.File & { path?: string }).path?.trim() || "";
+  if (cloudinaryPath.startsWith("http://") || cloudinaryPath.startsWith("https://")) {
+    return cloudinaryPath;
+  }
+
+  return `/uploads/${localFolderName}/${req.file.filename}`;
+};
+
 export const listarMinhasMensagens = async (req: Request, res: Response) => {
   try {
     const usuarioId = req.usuario?.usuarioId;
@@ -26,11 +40,12 @@ export const enviarMensagemUsuario = async (req: Request, res: Response) => {
       return res.status(401).json({ error: "Usuário não autenticado" });
     }
 
-    const { texto } = req.body;
+    const texto = typeof req.body?.texto === "string" ? req.body.texto : "";
+    const imagemUrl = getImagemUrlFromFile(req, "atendimento");
     const mensagem = await AtendimentoService.enviarMensagem(
       usuarioId,
       "USUARIO",
-      texto,
+      { texto, imagemUrl },
     );
 
     emitMensagemNova(mensagem);
@@ -91,11 +106,12 @@ export const responderComoSuporte = async (req: Request, res: Response) => {
       return res.status(400).json({ error: "ID de usuário inválido" });
     }
 
-    const { texto } = req.body;
+    const texto = typeof req.body?.texto === "string" ? req.body.texto : "";
+    const imagemUrl = getImagemUrlFromFile(req, "atendimento");
     const mensagem = await AtendimentoService.enviarMensagem(
       usuarioId,
       "SUPORTE",
-      texto,
+      { texto, imagemUrl },
     );
 
     emitMensagemNova(mensagem);

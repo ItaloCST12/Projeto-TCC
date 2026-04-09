@@ -21,6 +21,7 @@ type AtendimentoMensagemEvento = {
   usuarioId: number;
   autor: "USUARIO" | "SUPORTE";
   texto: string;
+  imagemUrl?: string | null;
   createdAt: Date | string;
 };
 
