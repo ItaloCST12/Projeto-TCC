@@ -186,6 +186,8 @@ npx prisma migrate deploy --schema BACK-END/prisma/schema.prisma
 
 ### 6. (Opcional) Popule com dados iniciais
 
+> ⚠️ **Somente para ambiente de desenvolvimento local.** Não execute estes scripts em produção.
+
 ```bash
 # Cria o usuário administrador padrão
 node BACK-END/scripts/create-admin.js
@@ -193,6 +195,17 @@ node BACK-END/scripts/create-admin.js
 # Importa o catálogo de produtos
 node BACK-END/scripts/seed-produtos.js
 ```
+
+---
+
+## Segurança
+
+- **Nunca versione credenciais.** Os arquivos `.env` estão no `.gitignore`; nunca os adicione ao repositório.
+- **Rotacione segredos regularmente.** `JWT_SECRET`, chaves VAPID e API keys de terceiros devem ser substituídas periodicamente e imediatamente em caso de exposição.
+- **Restrinja o CORS em produção.** Defina `CORS_ORIGIN` com o domínio exato do frontend; evite usar `*`.
+- **Use HTTPS em produção.** Tokens JWT e cookies de sessão nunca devem trafegar em texto plano.
+- **Não exponha detalhes de erros ao cliente.** O backend retorna mensagens genéricas; logs detalhados ficam apenas no servidor.
+- **Reporte vulnerabilidades** abrindo uma [issue privada](https://github.com/ItaloCST12/Projeto-TCC/issues) ou entrando em contato diretamente com o mantenedor.
 
 ---
 
@@ -258,7 +271,7 @@ npm --prefix FRONT-END run dev
 | -------- | ----------------------------- |
 | Frontend | http://localhost:8080         |
 | Backend  | http://localhost:3333         |
-| pgAdmin  | http://localhost:PGADMIN_PORT |
+| pgAdmin  | http://localhost:`<PGADMIN_PORT>` |
 
 > O frontend possui proxy configurado no Vite: todas as chamadas para `/auth`, `/produtos`, `/pedidos`, `/atendimentos`, etc., são redirecionadas automaticamente para `http://localhost:3333`.
 
@@ -336,7 +349,7 @@ Endpoints marcados com **(admin)** também requerem o papel `ADMIN`.
 | `GET`    | `/atendimentos/admin/conversas`               |  ✅ (admin)  | Listar todas as conversas             |
 | `GET`    | `/atendimentos/admin/conversas/:id`           |  ✅ (admin)  | Mensagens de um usuário específico    |
 | `POST`   | `/atendimentos/admin/conversas/:id/responder` |  ✅ (admin)  | Responder como suporte                |
-| `WS`     | `ws://…/atendimentos/ws?token=JWT`            |      ✅      | Canal WebSocket em tempo real         |
+| `WS`     | `ws://…/atendimentos/ws`                      |      ✅      | Canal WebSocket em tempo real         |
 
 ### Notificações — `/notificacoes`
 
