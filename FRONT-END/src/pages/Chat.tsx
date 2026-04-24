@@ -575,7 +575,7 @@ const Chat = () => {
     }
 
     if (!ALLOWED_CHAT_IMAGE_TYPES.includes(file.type)) {
-      setError("Formato de imagem inválido. Use JPG, PNG ou WEBP.");
+      setError("Formato de imagem inválido.");
       limparImagemSelecionada();
       return;
     }
@@ -622,6 +622,10 @@ const Chat = () => {
       : wsStatus === "reconectando"
         ? { label: "Reconectando...", dotClassName: "bg-amber-500" }
         : { label: "Desconectado", dotClassName: "bg-red-500" };
+
+  const percentualTamanhoImagem = imagemSelecionada
+    ? Math.min(100, Math.round((imagemSelecionada.size / MAX_CHAT_IMAGE_SIZE) * 100))
+    : 0;
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-background">
@@ -693,7 +697,7 @@ const Chat = () => {
             )}
           </div>
 
-          <div className="min-w-0 bg-card border border-border rounded-xl p-3 sm:p-4 flex min-h-[420px] flex-col overflow-y-auto md:max-h-[78vh] md:overflow-hidden">
+          <div className="min-w-0 bg-card border border-border rounded-xl p-3 sm:p-4 flex min-h-[420px] flex-col overflow-y-auto md:max-h-[78vh] md:overflow-y-auto">
             <h2 className="font-semibold text-foreground mb-3">Mensagens</h2>
             <div className="mb-3 inline-flex items-center gap-2 self-start rounded-full border border-border px-3 py-1 text-xs text-muted-foreground">
               <span className={`h-2 w-2 rounded-full ${wsStatusConfig.dotClassName}`} />
@@ -829,14 +833,49 @@ const Chat = () => {
                     ) : null}
                   </div>
 
-                  {previewImagem ? (
-                    <div className="rounded-lg border border-border p-2">
-                      <p className="mb-2 text-xs text-muted-foreground">Pré-visualização</p>
-                      <img
-                        src={previewImagem}
-                        alt="Pré-visualização da imagem"
-                        className="max-h-48 w-auto rounded-md"
-                      />
+                  {previewImagem && imagemSelecionada ? (
+                    <div className="rounded-xl border border-border bg-muted/20 p-3">
+                      <div className="mb-2 flex items-center justify-between gap-2">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                          Pré-visualização
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => setImagemExpandida(previewImagem)}
+                          className="rounded-md border border-border px-2 py-1 text-xs font-semibold text-foreground hover:bg-muted"
+                        >
+                          Ampliar
+                        </button>
+                      </div>
+
+                      <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_220px]">
+                        <div className="rounded-lg border border-border/70 bg-background/70 p-2">
+                          <div className="max-h-[52vh] overflow-y-auto rounded-md border border-border/60 bg-background">
+                            <img
+                              src={previewImagem}
+                              alt="Pré-visualização da imagem"
+                              className="w-full h-auto rounded-md object-contain"
+                            />
+                          </div>
+                          <p className="mt-2 text-center text-[11px] text-muted-foreground">
+                            Arraste para baixo para ver a foto completa
+                          </p>
+                        </div>
+
+                        <div className="rounded-lg border border-border/70 bg-background/60 p-3">
+                          <p className="text-[11px] text-muted-foreground">
+                            Uso do limite: {percentualTamanhoImagem}% de 5 MB
+                          </p>
+                          <div className="mt-1 h-2 overflow-hidden rounded-full bg-muted">
+                            <div
+                              className={`h-full rounded-full transition-all ${
+                                percentualTamanhoImagem > 85 ? "bg-amber-500" : "bg-emerald-500"
+                              }`}
+                              style={{ width: `${percentualTamanhoImagem}%` }}
+                            />
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   ) : null}
 

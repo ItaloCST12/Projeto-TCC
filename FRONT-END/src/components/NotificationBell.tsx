@@ -12,7 +12,6 @@ import {
   Trash2,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { useLocation } from "react-router-dom";
 import { apiRequest } from "@/lib/api";
 import { getAuthToken, getAuthUser } from "@/lib/auth";
 import {
@@ -139,11 +138,9 @@ const extrairUsuarioIdConversa = (tipo: string | undefined) => {
 
 const NotificationBell = ({ mobile = false }: Props) => {
   const navigate = useNavigate();
-  const location = useLocation();
   const usuario = getAuthUser();
   const authToken = getAuthToken();
   const isAdmin = usuario?.role === "ADMIN";
-  const estaNaTelaDeChat = location.pathname.startsWith("/chat");
   const socketRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<number | null>(null);
   const refreshTimeoutRef = useRef<number | null>(null);
@@ -257,7 +254,7 @@ const NotificationBell = ({ mobile = false }: Props) => {
   }, [carregar]);
 
   useEffect(() => {
-    if (!usuario?.id || !authToken || estaNaTelaDeChat) {
+    if (!usuario?.id || !authToken) {
       if (refreshTimeoutRef.current) {
         window.clearTimeout(refreshTimeoutRef.current);
       }
@@ -319,7 +316,7 @@ const NotificationBell = ({ mobile = false }: Props) => {
       }
       socketRef.current?.close();
     };
-  }, [authToken, carregar, estaNaTelaDeChat, usuario?.id]);
+  }, [authToken, carregar, usuario?.id]);
 
   useEffect(() => {
     void inscreverPushNoDispositivo();
@@ -388,10 +385,6 @@ const NotificationBell = ({ mobile = false }: Props) => {
 
     navigate(resolverDestinoNotificacao(item));
   };
-
-  if (estaNaTelaDeChat) {
-    return null;
-  }
 
   return (
     <DropdownMenu>

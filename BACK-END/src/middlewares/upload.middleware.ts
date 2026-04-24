@@ -78,7 +78,7 @@ const createCloudinaryStorage = (config: UploadConfig) => {
 
 const fileFilter: multer.Options["fileFilter"] = (_req, file, cb) => {
   if (!allowedMimeTypes.includes(file.mimetype)) {
-    cb(new Error("Formato de imagem inválido. Use JPG, PNG ou WEBP."));
+    cb(new Error("Formato de imagem inválido."));
     return;
   }
 
