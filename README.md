@@ -1,141 +1,149 @@
 <div align="center">
 
-# 🍍 Projeto TCC — Plataforma de Pedidos Online
+<h1>🍍 Fazenda Bispo — Plataforma de Pedidos Online</h1>
 
-**Sistema fullstack para gestão de pedidos, catálogo de produtos e atendimento em tempo real.**
+<p>Sistema fullstack para venda de frutas, gestão de pedidos e atendimento ao cliente em tempo real.</p>
 
-![Node.js](https://img.shields.io/badge/Node.js-20+-339933?logo=nodedotjs&logoColor=white)
-![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white)
-![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)
-![Prisma](https://img.shields.io/badge/Prisma-ORM-2D3748?logo=prisma&logoColor=white)
-![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)
-![License](https://img.shields.io/badge/License-ISC-blue)
+<p>
+  <a href="https://github.com/ItaloCST12/Projeto-TCC/blob/main/LICENSE">
+    <img src="https://img.shields.io/badge/licença-ISC-blue?style=flat-square" alt="Licença ISC" />
+  </a>
+  <img src="https://img.shields.io/badge/Node.js-20+-339933?style=flat-square&logo=nodedotjs&logoColor=white" alt="Node.js" />
+  <img src="https://img.shields.io/badge/TypeScript-5.x-3178C6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript" />
+  <img src="https://img.shields.io/badge/React-18-61DAFB?style=flat-square&logo=react&logoColor=black" alt="React" />
+  <img src="https://img.shields.io/badge/PostgreSQL-16-4169E1?style=flat-square&logo=postgresql&logoColor=white" alt="PostgreSQL" />
+  <img src="https://img.shields.io/badge/Prisma-ORM-2D3748?style=flat-square&logo=prisma&logoColor=white" alt="Prisma" />
+  <img src="https://img.shields.io/badge/Docker-Compose-2496ED?style=flat-square&logo=docker&logoColor=white" alt="Docker" />
+</p>
 
 </div>
 
 ---
 
-## 📋 Sumário
+## Sumário
 
-- [Sobre o Projeto](#-sobre-o-projeto)
-- [Funcionalidades](#-funcionalidades)
-- [Arquitetura](#-arquitetura)
-- [Tech Stack](#-tech-stack)
-- [Pré-requisitos](#-pré-requisitos)
-- [Instalação](#-instalação)
-- [Variáveis de Ambiente](#-variáveis-de-ambiente)
-- [Executando o Projeto](#-executando-o-projeto)
-- [Endpoints da API](#-endpoints-da-api)
-- [Testes](#-testes)
-- [Deploy](#-deploy)
-- [Estrutura do Projeto](#-estrutura-do-projeto)
-- [Contribuindo](#-contribuindo)
-- [Licença](#-licença)
-
----
-
-## 🎯 Sobre o Projeto
-
-Plataforma web completa voltada para a **venda e gestão de pedidos de frutas**, com foco em abacaxis, laranjas, limões e tangerinas. O sistema integra catálogo de produtos, carrinho de compras, atendimento ao cliente em tempo real via WebSocket e notificações push.
-
-### Para quem é
-
-| Perfil              | Uso                                                                     |
-| ------------------- | ----------------------------------------------------------------------- |
-| **Clientes**        | Navegar no catálogo, montar pedidos e acompanhar entregas               |
-| **Administradores** | Gerenciar produtos, acompanhar pedidos, relatórios e painel de entregas |
-| **Suporte**         | Atender clientes em tempo real pelo chat integrado                      |
+- [Sobre o Projeto](#sobre-o-projeto)
+- [Funcionalidades](#funcionalidades)
+- [Arquitetura](#arquitetura)
+- [Tech Stack](#tech-stack)
+- [Pré-requisitos](#pré-requisitos)
+- [Instalação](#instalação)
+- [Variáveis de Ambiente](#variáveis-de-ambiente)
+- [Executando o Projeto](#executando-o-projeto)
+- [Endpoints da API](#endpoints-da-api)
+- [Testes](#testes)
+- [Estrutura do Projeto](#estrutura-do-projeto)
+- [Contribuindo](#contribuindo)
+- [Licença](#licença)
 
 ---
 
-## ✨ Funcionalidades
+## Sobre o Projeto
 
-- **Autenticação JWT** — Registro, login, recuperação de senha por e-mail (Resend)
-- **Catálogo de produtos** — CRUD completo com upload de imagens, soft delete e preços por tamanho
-- **Carrinho & Pedidos** — Criação de pedidos com múltiplos itens, seleção de endereço e acompanhamento de status
-- **Pagamento manual** — Escolha entre PIX ou dinheiro, sem processamento de pagamento na plataforma
-- **Chat em tempo real** — Atendimento via WebSocket com autenticação JWT
-- **Notificações Push** — Web Push com VAPID para avisos fora do site
-- **Painel administrativo** — Gestão de entregas, pedidos e usuários
-- **Acessibilidade** — Integração com VLibras (Libras), controles de acessibilidade e design responsivo
-- **Gestão de estoque** — Controle de movimentações, ajustes e resumo de estoque por produto (admin)
-- **Carrinho isolado por usuário** — Cada conta mantém seu próprio carrinho via localStorage
-- **Controle de acesso admin** — Administradores visualizam produtos mas não criam pedidos
-- **Geração de PDF** — Exportação de relatórios e comprovantes (jsPDF)
+A **Plataforma Fazenda Bispo** é uma aplicação web fullstack desenvolvida como Trabalho de Conclusão de Curso. O sistema permite que clientes naveguem em um catálogo de frutas (abacaxis, laranjas, limões e tangerinas), montem pedidos personalizados e acompanhem o status da entrega, enquanto administradores gerenciam o estoque, os pedidos e realizam atendimento em tempo real via chat.
+
+### Perfis de usuário
+
+| Perfil              | Acesso                                                                |
+| ------------------- | --------------------------------------------------------------------- |
+| **Cliente**         | Catálogo, carrinho, pedidos, histórico de entregas e chat com suporte |
+| **Administrador**   | Tudo do cliente + painel de entregas, gestão de produtos e estoque    |
+| **Suporte (admin)** | Chat em tempo real com todos os clientes, notificações e histórico    |
 
 ---
 
-## 🏗 Arquitetura
+## Funcionalidades
+
+- **Autenticação segura** — Registro, login com JWT, recuperação de senha por e-mail (Resend)
+- **Catálogo de produtos** — CRUD completo com upload de imagens, soft delete e preços por tamanho/unidade
+- **Carrinho & Pedidos** — Múltiplos itens por pedido, seleção de endereço e acompanhamento de status
+- **Pagamento manual** — Opções PIX ou dinheiro, sem processamento automático de pagamentos
+- **Chat em tempo real** — Atendimento via WebSocket com autenticação JWT e envio de imagens
+- **Notificações Push** — Web Push VAPID para alertas fora do site
+- **Painel administrativo** — Gestão de entregas, pedidos e visão geral da plataforma
+- **Gestão de estoque** — Movimentações, ajustes e resumo por produto (somente admin)
+- **Geração de PDF** — Exportação de relatórios e comprovantes via jsPDF
+- **Acessibilidade** — Integração com VLibras (Libras), design responsivo e mobile-first
+- **Segurança** — Helmet, CORS configurado, rate-limit, hash de senhas com bcryptjs
+
+---
+
+## Arquitetura
+
+O frontend é compilado para dentro de `BACK-END/public/` e servido como SPA pelo próprio Express, unificando frontend e backend na mesma porta.
 
 ```
-┌──────────────┐       ┌──────────────────┐       ┌──────────────┐
-│   Frontend   │──────▶│     Backend      │──────▶│  PostgreSQL  │
-│  React/Vite  │ HTTP  │  Express + WS    │Prisma │              │
-│  TailwindCSS │◀──────│  Node.js + TS    │◀──────│              │
-└──────────────┘       └──────────────────┘       └──────────────┘
+┌─────────────────────┐      HTTP/WS      ┌──────────────────────┐      Prisma      ┌──────────────┐
+│     Frontend        │ ────────────────► │      Backend         │ ───────────────► │  PostgreSQL  │
+│  React 18 + Vite    │                   │  Express 5 + ws      │                  │     16       │
+│  TailwindCSS        │ ◄──────────────── │  Node.js + TypeScript│ ◄─────────────── │              │
+└─────────────────────┘   JSON / Events   └──────────────────────┘     Queries      └──────────────┘
 ```
 
-- O **frontend** builda para dentro de `BACK-END/public/`, servido como SPA pelo Express
-- O **backend** expõe API REST + WebSocket na mesma porta
-- **Prisma** gerencia o schema e as migrations do PostgreSQL
+**Fluxo de dados:**
+
+1. O cliente faz requisições REST ou abre uma conexão WebSocket autenticada com JWT
+2. O backend valida, processa e persiste via Prisma no PostgreSQL
+3. Eventos em tempo real (chat, notificações) são emitidos via WebSocket para os clientes conectados
 
 ---
 
-## 🛠 Tech Stack
+## Tech Stack
 
 ### Backend
 
-| Tecnologia             | Função                      |
-| ---------------------- | --------------------------- |
-| **Node.js 20**         | Runtime                     |
-| **Express 5**          | Framework HTTP              |
-| **TypeScript**         | Tipagem estática            |
-| **Prisma**             | ORM e migrations            |
-| **WebSocket (ws)**     | Chat em tempo real          |
-| **JWT**                | Autenticação                |
-| **bcryptjs**           | Hash de senhas              |
-| **Helmet**             | Segurança HTTP              |
-| **express-rate-limit** | Proteção contra brute-force |
-| **Resend**             | Envio de e-mails            |
-| **web-push**           | Notificações push VAPID     |
-| **Multer**             | Upload de arquivos          |
+| Tecnologia             | Função                            |
+| ---------------------- | --------------------------------- |
+| **Node.js 20**         | Runtime                           |
+| **Express 5**          | Framework HTTP                    |
+| **TypeScript 5**       | Tipagem estática                  |
+| **Prisma**             | ORM e migrations                  |
+| **ws**                 | WebSocket — chat em tempo real    |
+| **jsonwebtoken**       | Autenticação JWT                  |
+| **bcryptjs**           | Hash de senhas                    |
+| **Helmet**             | Headers de segurança HTTP         |
+| **express-rate-limit** | Proteção contra brute-force       |
+| **Resend**             | Envio transacional de e-mails     |
+| **web-push**           | Notificações push VAPID           |
+| **Multer**             | Upload de arquivos (imagens)      |
+| **Cloudinary**         | Armazenamento de imagens em nuvem |
 
 ### Frontend
 
-| Tecnologia            | Função                     |
-| --------------------- | -------------------------- |
-| **React 18**          | UI Library                 |
-| **Vite**              | Build tool (SWC)           |
-| **TypeScript**        | Tipagem estática           |
-| **TailwindCSS**       | Estilização                |
-| **shadcn/ui + Radix** | Componentes acessíveis     |
-| **React Query**       | Cache e estado do servidor |
-| **React Router 6**    | Roteamento SPA             |
-| **Sonner**            | Notificações toast         |
-| **jsPDF**             | Geração de PDF             |
-| **Lucide React**      | Ícones                     |
+| Tecnologia            | Função                                |
+| --------------------- | ------------------------------------- |
+| **React 18**          | Biblioteca de UI                      |
+| **Vite + SWC**        | Build tool e dev server               |
+| **TypeScript 5**      | Tipagem estática                      |
+| **TailwindCSS 3**     | Estilização utility-first             |
+| **shadcn/ui + Radix** | Componentes acessíveis e estilizáveis |
+| **TanStack Query**    | Cache, sincronização e estado async   |
+| **React Router 6**    | Roteamento SPA                        |
+| **Sonner**            | Notificações toast                    |
+| **jsPDF**             | Geração de PDF no navegador           |
+| **Lucide React**      | Biblioteca de ícones                  |
 
 ### Infraestrutura
 
 | Tecnologia         | Função                          |
 | ------------------ | ------------------------------- |
-| **Docker Compose** | Banco e pgAdmin locais          |
-| **Render**         | Deploy em produção              |
-| **PostgreSQL**     | Banco de dados relacional       |
+| **Docker Compose** | Banco de dados e pgAdmin locais |
+| **PostgreSQL 16**  | Banco de dados relacional       |
 | **Vitest**         | Testes unitários (back + front) |
 
 ---
 
-## 📦 Pré-requisitos
+## Pré-requisitos
 
-- [Node.js](https://nodejs.org/) 20+
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (para banco de dados local)
-- npm ou outro gerenciador de pacotes
+Certifique-se de ter instalado:
+
+- [Node.js](https://nodejs.org/) **20 ou superior**
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) — necessário para o banco de dados local
+- `npm` (incluído com o Node.js)
 
 ---
 
-## 🚀 Instalação
+## Instalação
 
 ### 1. Clone o repositório
 
@@ -147,11 +155,12 @@ cd Projeto-TCC
 ### 2. Configure as variáveis de ambiente
 
 ```bash
+# Copie os arquivos de exemplo
 cp .env.example .env
 cp FRONT-END/.env.example FRONT-END/.env
 ```
 
-Edite o `.env` com suas credenciais (veja a seção [Variáveis de Ambiente](#-variáveis-de-ambiente)).
+> Preencha os valores no `.env` conforme a seção [Variáveis de Ambiente](#variáveis-de-ambiente).
 
 ### 3. Suba o banco de dados
 
@@ -175,250 +184,295 @@ npm --prefix FRONT-END install
 npx prisma migrate deploy --schema BACK-END/prisma/schema.prisma
 ```
 
-### 6. (Opcional) Seed de dados iniciais
+### 6. (Opcional) Popule com dados iniciais
 
 ```bash
+# Cria o usuário administrador padrão
 node BACK-END/scripts/create-admin.js
+
+# Importa o catálogo de produtos
 node BACK-END/scripts/seed-produtos.js
 ```
 
 ---
 
-## 🔐 Variáveis de Ambiente
+## Variáveis de Ambiente
 
-Copie o `.env.example` e preencha os valores. **Nunca versione o arquivo `.env`.**
+> **Importante:** nunca versione o arquivo `.env`. Ele já está listado no `.gitignore`.
 
-| Variável            | Descrição                               | Obrigatória |
-| ------------------- | --------------------------------------- | :---------: |
-| `DATABASE_URL`      | Connection string do PostgreSQL         |     ✅      |
-| `JWT_SECRET`        | Segredo para assinatura dos tokens JWT  |     ✅      |
-| `PORT`              | Porta do servidor (padrão: `3333`)      |      —      |
-| `NODE_ENV`          | Ambiente (`development` / `production`) |      —      |
-| `CORS_ORIGIN`       | URL(s) do frontend permitidas           |  ✅ (prod)  |
-| `RESEND_API_KEY`    | API key do Resend para envio de e-mails |  ✅ (prod)  |
-| `RESEND_FROM`       | Remetente dos e-mails                   |  ✅ (prod)  |
-| `APP_NAME`          | Nome exibido nos e-mails                |      —      |
-| `VAPID_PUBLIC_KEY`  | Chave pública VAPID para web push       |  ✅ (push)  |
-| `VAPID_PRIVATE_KEY` | Chave privada VAPID                     |  ✅ (push)  |
-| `VAPID_SUBJECT`     | E-mail de contato para VAPID            |  ✅ (push)  |
+### Backend — `.env`
 
-**Frontend (`FRONT-END/.env`):**
+| Variável                | Descrição                               |  Obrigatória  |
+| ----------------------- | --------------------------------------- | :-----------: |
+| `DATABASE_URL`          | Connection string do PostgreSQL         |      ✅       |
+| `JWT_SECRET`            | Segredo para assinatura dos tokens JWT  |      ✅       |
+| `PORT`                  | Porta do servidor (padrão: `3333`)      |       —       |
+| `NODE_ENV`              | `development` ou `production`           |       —       |
+| `CORS_ORIGIN`           | URLs do frontend separadas por vírgula  | ✅ (produção) |
+| `RESEND_API_KEY`        | API key do [Resend](https://resend.com) | ✅ (produção) |
+| `RESEND_FROM`           | E-mail remetente                        | ✅ (produção) |
+| `APP_NAME`              | Nome exibido nos e-mails                |       —       |
+| `VAPID_PUBLIC_KEY`      | Chave pública VAPID                     |   ✅ (push)   |
+| `VAPID_PRIVATE_KEY`     | Chave privada VAPID                     |   ✅ (push)   |
+| `VAPID_SUBJECT`         | E-mail de contato para VAPID            |   ✅ (push)   |
+| `CLOUDINARY_CLOUD_NAME` | Nome da conta Cloudinary                | ✅ (produção) |
+| `CLOUDINARY_API_KEY`    | API key do Cloudinary                   | ✅ (produção) |
+| `CLOUDINARY_API_SECRET` | API secret do Cloudinary                | ✅ (produção) |
 
-| Variável                | Descrição                                 | Obrigatória |
-| ----------------------- | ----------------------------------------- | :---------: |
-| `VITE_VAPID_PUBLIC_KEY` | Chave pública VAPID para push no frontend |  ✅ (push)  |
+### Frontend — `FRONT-END/.env`
 
-**Docker local (apenas desenvolvimento):**
+| Variável                | Descrição                                  |  Obrigatória  |
+| ----------------------- | ------------------------------------------ | :-----------: |
+| `VITE_API_URL`          | URL base da API (vazio em dev com proxy)   | ✅ (produção) |
+| `VITE_VAPID_PUBLIC_KEY` | Chave pública VAPID para notificações push |   ✅ (push)   |
+
+### Docker local — variáveis no `.env`
 
 | Variável            | Descrição                   |
 | ------------------- | --------------------------- |
 | `POSTGRES_USER`     | Usuário do PostgreSQL       |
 | `POSTGRES_PASSWORD` | Senha do PostgreSQL         |
-| `DB_NAME`           | Nome do banco               |
+| `DB_NAME`           | Nome do banco de dados      |
 | `PGPORT`            | Porta exposta do PostgreSQL |
 | `PGADMIN_PORT`      | Porta do pgAdmin            |
-| `PGADMIN_ROOT_USER` | E-mail do pgAdmin           |
+| `PGADMIN_ROOT_USER` | E-mail de acesso ao pgAdmin |
 | `PGADMIN_PASSWORD`  | Senha do pgAdmin            |
 
 ---
 
-## ▶️ Executando o Projeto
+## Executando o Projeto
 
-### Desenvolvimento
+### Modo desenvolvimento
+
+Abra dois terminais na raiz do projeto:
 
 ```bash
-# Terminal 1 — Backend (com hot-reload)
+# Terminal 1 — Backend com hot-reload (tsx watch)
 npm --prefix BACK-END run dev
 
-# Terminal 2 — Frontend (com HMR)
+# Terminal 2 — Frontend com HMR
 npm --prefix FRONT-END run dev
 ```
 
-O frontend roda em `http://localhost:8080` com proxy para o backend em `http://localhost:3333`.
+| Serviço  | URL                           |
+| -------- | ----------------------------- |
+| Frontend | http://localhost:8080         |
+| Backend  | http://localhost:3333         |
+| pgAdmin  | http://localhost:PGADMIN_PORT |
+
+> O frontend possui proxy configurado no Vite: todas as chamadas para `/auth`, `/produtos`, `/pedidos`, `/atendimentos`, etc., são redirecionadas automaticamente para `http://localhost:3333`.
 
 ### Build de produção
 
 ```bash
+# Compila o frontend (Vite → BACK-END/public/) e faz typecheck do backend
 npm run build
+
+# Inicia o servidor unificado
 npm run start
 ```
 
-O comando `build` compila o frontend e o serve via Express na mesma porta do backend.
+> Após o build, o Express serve o frontend compilado e a API REST na mesma porta.
 
 ---
 
-## 📡 Endpoints da API
+## Endpoints da API
 
-### Autenticação (`/auth`)
+Todos os endpoints protegidos exigem o header `Authorization: Bearer <token>`.  
+Endpoints marcados com **(admin)** também requerem o papel `ADMIN`.
 
-| Método | Rota                            | Descrição                |
-| ------ | ------------------------------- | ------------------------ |
-| `POST` | `/auth/register`                | Registrar novo usuário   |
-| `POST` | `/auth/login`                   | Login (retorna JWT)      |
-| `POST` | `/auth/forgot-password/request` | Solicitar reset de senha |
-| `POST` | `/auth/forgot-password`         | Confirmar reset de senha |
+### Autenticação — `/auth`
 
-### Usuários (`/usuarios`)
+| Método | Rota                            | Autenticação | Descrição               |
+| ------ | ------------------------------- | :----------: | ----------------------- |
+| `POST` | `/auth/register`                |      —       | Registrar novo usuário  |
+| `POST` | `/auth/login`                   |      —       | Login, retorna JWT      |
+| `POST` | `/auth/forgot-password/request` |      —       | Solicitar link de reset |
+| `POST` | `/auth/forgot-password`         |      —       | Confirmar nova senha    |
 
-| Método | Rota           | Descrição                    |
-| ------ | -------------- | ---------------------------- |
-| `GET`  | `/usuarios/me` | Dados do usuário autenticado |
-| `PUT`  | `/usuarios/me` | Atualizar perfil             |
+### Usuários — `/usuarios`
 
-### Produtos (`/produtos`)
+| Método  | Rota                 | Autenticação | Descrição                     |
+| ------- | -------------------- | :----------: | ----------------------------- |
+| `GET`   | `/usuarios/me`       |      ✅      | Perfil do usuário autenticado |
+| `PUT`   | `/usuarios/me`       |      ✅      | Atualizar nome e telefone     |
+| `PATCH` | `/usuarios/me/senha` |      ✅      | Alterar senha                 |
 
-| Método   | Rota            | Descrição                 |
-| -------- | --------------- | ------------------------- |
-| `GET`    | `/produtos`     | Listar produtos ativos    |
-| `POST`   | `/produtos`     | Criar produto (admin)     |
-| `PUT`    | `/produtos/:id` | Atualizar produto (admin) |
-| `DELETE` | `/produtos/:id` | Soft delete (admin)       |
+### Produtos — `/produtos`
 
-### Pedidos (`/pedidos`)
+| Método   | Rota                            | Autenticação | Descrição                |
+| -------- | ------------------------------- | :----------: | ------------------------ |
+| `GET`    | `/produtos`                     |      —       | Listar produtos ativos   |
+| `POST`   | `/produtos/cadastrarProduto`    |  ✅ (admin)  | Criar produto com imagem |
+| `PATCH`  | `/produtos/:id`                 |  ✅ (admin)  | Atualizar produto        |
+| `PATCH`  | `/produtos/:id/disponibilidade` |  ✅ (admin)  | Ativar/desativar produto |
+| `DELETE` | `/produtos/:id`                 |  ✅ (admin)  | Soft delete              |
 
-| Método  | Rota                  | Descrição                |
-| ------- | --------------------- | ------------------------ |
-| `POST`  | `/pedidos`            | Criar pedido             |
-| `GET`   | `/pedidos/me`         | Pedidos do usuário       |
-| `GET`   | `/pedidos`            | Listar todos (admin)     |
-| `PATCH` | `/pedidos/:id/status` | Atualizar status (admin) |
+### Pedidos — `/pedidos`
 
-### Endereços (`/enderecos`)
+| Método  | Rota                  | Autenticação | Descrição                      |
+| ------- | --------------------- | :----------: | ------------------------------ |
+| `POST`  | `/pedidos`            |      ✅      | Criar pedido                   |
+| `GET`   | `/pedidos/me`         |      ✅      | Pedidos do usuário autenticado |
+| `GET`   | `/pedidos`            |  ✅ (admin)  | Listar todos os pedidos        |
+| `PATCH` | `/pedidos/:id/status` |  ✅ (admin)  | Atualizar status do pedido     |
 
-| Método | Rota            | Descrição            |
-| ------ | --------------- | -------------------- |
-| `POST` | `/enderecos`    | Cadastrar endereço   |
-| `GET`  | `/enderecos/me` | Endereços do usuário |
+### Endereços — `/enderecos`
 
-### Atendimento (`/atendimentos`)
+| Método   | Rota             | Autenticação | Descrição            |
+| -------- | ---------------- | :----------: | -------------------- |
+| `POST`   | `/enderecos`     |      ✅      | Cadastrar endereço   |
+| `GET`    | `/enderecos/me`  |      ✅      | Endereços do usuário |
+| `PUT`    | `/enderecos/:id` |      ✅      | Atualizar endereço   |
+| `DELETE` | `/enderecos/:id` |      ✅      | Remover endereço     |
 
-| Método | Rota              | Descrição              |
-| ------ | ----------------- | ---------------------- |
-| `GET`  | `/atendimentos`   | Histórico de mensagens |
-| `WS`   | `ws://?token=JWT` | Chat em tempo real     |
+### Atendimento — `/atendimentos`
 
-### Notificações (`/notificacoes`)
+| Método   | Rota                                          | Autenticação | Descrição                             |
+| -------- | --------------------------------------------- | :----------: | ------------------------------------- |
+| `GET`    | `/atendimentos/me`                            |      ✅      | Histórico de mensagens do usuário     |
+| `POST`   | `/atendimentos/me`                            |      ✅      | Enviar mensagem (com imagem opcional) |
+| `DELETE` | `/atendimentos/me`                            |      ✅      | Limpar própria conversa               |
+| `GET`    | `/atendimentos/admin/conversas`               |  ✅ (admin)  | Listar todas as conversas             |
+| `GET`    | `/atendimentos/admin/conversas/:id`           |  ✅ (admin)  | Mensagens de um usuário específico    |
+| `POST`   | `/atendimentos/admin/conversas/:id/responder` |  ✅ (admin)  | Responder como suporte                |
+| `WS`     | `ws://…/atendimentos/ws?token=JWT`            |      ✅      | Canal WebSocket em tempo real         |
 
-| Método  | Rota                           | Descrição           |
-| ------- | ------------------------------ | ------------------- |
-| `GET`   | `/notificacoes`                | Listar notificações |
-| `PATCH` | `/notificacoes/:id/lida`       | Marcar como lida    |
-| `POST`  | `/notificacoes/push/subscribe` | Inscrever para push |
+### Notificações — `/notificacoes`
 
-### Estoque (`/produtos/.../estoque`)
+| Método   | Rota                             | Autenticação | Descrição                     |
+| -------- | -------------------------------- | :----------: | ----------------------------- |
+| `GET`    | `/notificacoes`                  |      ✅      | Listar notificações           |
+| `PATCH`  | `/notificacoes/lidas`            |      ✅      | Marcar todas como lidas       |
+| `DELETE` | `/notificacoes`                  |      ✅      | Limpar todas as notificações  |
+| `POST`   | `/notificacoes/push/subscribe`   |      ✅      | Inscrever dispositivo em push |
+| `DELETE` | `/notificacoes/push/unsubscribe` |      ✅      | Cancelar inscrição push       |
 
-| Método | Rota                                  | Descrição                          |
-| ------ | ------------------------------------- | ---------------------------------- |
-| `POST` | `/produtos/:id/estoque`               | Ajustar estoque do produto (admin) |
-| `GET`  | `/produtos/:id/estoque/movimentacoes` | Movimentações do produto (admin)   |
-| `GET`  | `/produtos/estoque/resumo`            | Resumo geral de estoque (admin)    |
+### Estoque — `/produtos`
+
+| Método | Rota                                  | Autenticação | Descrição                         |
+| ------ | ------------------------------------- | :----------: | --------------------------------- |
+| `POST` | `/produtos/:id/estoque`               |  ✅ (admin)  | Registrar movimentação de estoque |
+| `GET`  | `/produtos/:id/estoque/movimentacoes` |  ✅ (admin)  | Histórico de movimentações        |
+| `GET`  | `/produtos/estoque/resumo`            |  ✅ (admin)  | Resumo geral de estoque           |
 
 ---
 
-## 🧪 Testes
+## Testes
+
+O projeto usa **Vitest** no backend e no frontend.
 
 ```bash
-# Testes do backend
+# Rodar todos os testes (backend)
 npm --prefix BACK-END run test
 
-# Testes do frontend
+# Rodar todos os testes (frontend)
 npm --prefix FRONT-END run test
 
-# Modo watch
+# Modo watch — backend
 npm --prefix BACK-END run test:watch
+
+# Modo watch — frontend
 npm --prefix FRONT-END run test:watch
 ```
 
-Framework: **Vitest** com `jsdom` no frontend e `globals` habilitados.
+> O frontend usa `jsdom` como ambiente de testes e `@testing-library/react` para renderização de componentes.
 
 ---
 
-## 🌐 Deploy
-
-O projeto está configurado para deploy no **Render** via `render.yaml`.
-
-O pipeline de build no Render:
-
-1. Instala dependências do frontend e backend
-2. Builda o frontend (Vite → `BACK-END/public/`)
-3. Executa `prisma migrate deploy`
-4. Roda seeds iniciais (admin + produtos)
-5. Inicia o servidor com `npm run start`
-
----
-
-## 📁 Estrutura do Projeto
+## Estrutura do Projeto
 
 ```
 Projeto-TCC/
 ├── BACK-END/
-│   ├── prisma/               # Schema e migrations
-│   ├── public/               # Build do frontend (gerado)
-│   ├── scripts/              # Seeds e utilitários
+│   ├── prisma/
+│   │   ├── schema.prisma         # Schema do banco de dados
+│   │   └── migrations/           # Histórico de migrations
+│   ├── public/                   # Build do frontend (gerado pelo Vite)
+│   ├── scripts/                  # Seeds e utilitários de linha de comando
 │   └── src/
-│       ├── controllers/      # Lógica das rotas
-│       ├── middlewares/       # Auth, validação, rate-limit
-│       ├── models/           # Acesso ao banco (Prisma)
-│       ├── routes/           # Definição das rotas
-│       ├── services/         # Regras de negócio
-│       ├── socket/           # WebSocket (atendimento)
-│       ├── types/            # Tipos TypeScript
-│       ├── utils/            # Helpers e utilitários
-│       └── app.ts            # Entry point do servidor
+│       ├── controllers/          # Handlers das rotas (request → response)
+│       ├── middlewares/          # Auth JWT, upload, rate-limit
+│       ├── models/               # Cliente Prisma
+│       ├── routes/               # Definição e agrupamento de rotas
+│       ├── services/             # Regras de negócio
+│       ├── socket/               # WebSocket — atendimento em tempo real
+│       ├── types/                # Declarações de tipos TypeScript
+│       ├── utils/                # Helpers (e-mail, push, etc.)
+│       └── app.ts                # Entry point — servidor Express
+│
 ├── FRONT-END/
-│   ├── public/               # Assets estáticos
+│   ├── public/                   # Assets públicos (sw, robots.txt)
 │   └── src/
-│       ├── components/       # Componentes React
-│       │   └── ui/           # shadcn/ui components
-│       ├── hooks/            # Custom hooks
-│       ├── lib/              # Utilitários e API client
-│       ├── pages/            # Páginas da aplicação
-│       ├── test/             # Setup de testes
-│       ├── App.tsx           # Roteamento principal
-│       └── main.tsx          # Entry point
-├── docker/                   # Scripts de inicialização do banco
-├── docker-compose.yml        # Infraestrutura local
-├── render.yaml               # Configuração de deploy
-└── package.json              # Scripts raiz (monorepo)
+│       ├── assets/               # Imagens e recursos estáticos
+│       ├── components/
+│       │   └── ui/               # Componentes shadcn/ui
+│       ├── hooks/                # Custom hooks React
+│       ├── lib/                  # API client, auth e utilitários
+│       ├── pages/                # Páginas da aplicação (Chat, Home, etc.)
+│       ├── test/                 # Setup do ambiente de testes
+│       ├── App.tsx               # Roteamento principal
+│       └── main.tsx              # Entry point do React
+│
+├── docker/                       # Scripts de inicialização do banco
+├── docker-compose.yml            # Infraestrutura local (PostgreSQL + pgAdmin)
+└── package.json                  # Scripts raiz (monorepo)
 ```
 
 ---
 
-## 🤝 Contribuindo
+## Contribuindo
+
+Contribuições são bem-vindas! Siga os passos abaixo:
 
 1. Faça um fork do projeto
-2. Crie uma branch para sua feature (`git checkout -b feature/minha-feature`)
-3. Commit suas mudanças (`git commit -m 'feat: adiciona minha feature'`)
-4. Push para a branch (`git push origin feature/minha-feature`)
-5. Abra um Pull Request
+2. Crie uma branch para sua feature
+   ```bash
+   git checkout -b feature/minha-feature
+   ```
+3. Implemente e teste suas mudanças
+   ```bash
+   npm --prefix BACK-END run test
+   npm --prefix FRONT-END run test
+   ```
+4. Commit seguindo o padrão [Conventional Commits](https://www.conventionalcommits.org/)
+   ```bash
+   git commit -m "feat: adiciona minha feature"
+   ```
+5. Faça o push e abra um Pull Request
+   ```bash
+   git push origin feature/minha-feature
+   ```
 
-### Convenções
+### Convenções de código
 
-- **Commits**: use [Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`, `docs:`, `refactor:`)
-- **TypeScript**: tipagem explícita, sem `any`
-- **Arquitetura**: separação por camadas (routes → controllers → services → models)
-- **Testes**: rode `npm test` antes de abrir PR
+| Tema            | Regra                                                            |
+| --------------- | ---------------------------------------------------------------- |
+| **Commits**     | `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`         |
+| **TypeScript**  | Tipagem explícita, sem uso de `any`                              |
+| **Arquitetura** | Separação em camadas: `routes → controllers → services → models` |
+| **Segurança**   | Nunca versione `.env`; valide entradas nas bordas do sistema     |
 
-### Reportar Bugs
+### Reportar bugs
 
 Abra uma [issue](https://github.com/ItaloCST12/Projeto-TCC/issues) com:
 
-1. Descrição clara do problema
-2. Passos para reproduzir
-3. Comportamento esperado vs. atual
-4. Ambiente (SO, Node, navegador)
-5. Screenshots ou logs relevantes
+- Descrição clara e objetiva do problema
+- Passos para reproduzir
+- Comportamento esperado vs. comportamento atual
+- Ambiente (SO, versão do Node.js, navegador)
+- Logs ou screenshots relevantes
 
 ---
 
-## 📄 Licença
+## Licença
 
-Distribuído sob a licença ISC. Veja o arquivo `LICENSE` para mais informações.
+Distribuído sob a licença **ISC**. Consulte o arquivo [`LICENSE`](LICENSE) para mais detalhes.
 
 ---
 
 <div align="center">
 
-Feito por [Ítalo](https://github.com/ItaloCST12)
+Desenvolvido por [Ítalo](https://github.com/ItaloCST12)
 
 </div>
