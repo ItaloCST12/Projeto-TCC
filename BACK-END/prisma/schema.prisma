@@ -47,19 +47,22 @@ model Endereco {
 }
 
 model Produto {
-  id                  Int                   @id @default(autoincrement())
-  nome                String
-  preco               Decimal               @default(0) @db.Decimal(10, 2)
-  precoAbacaxiGrande  Decimal?              @db.Decimal(10, 2)
-  precoAbacaxiMedio   Decimal?              @db.Decimal(10, 2)
-  precoAbacaxiPequeno Decimal?              @db.Decimal(10, 2)
-  estoque             Int                   @default(0)
-  disponivel          Boolean               @default(true)
-  excluido            Boolean               @default(false)
-  imagemUrl           String?
-  pedidos             Pedido[]
-  itemPedidos         ItemPedido[]
-  movimentacoes       MovimentacaoEstoque[]
+  id                    Int                   @id @default(autoincrement())
+  nome                  String
+  preco                 Decimal               @default(0) @db.Decimal(10, 2)
+  precoAbacaxiGrande    Decimal?              @db.Decimal(10, 2)
+  precoAbacaxiMedio     Decimal?              @db.Decimal(10, 2)
+  precoAbacaxiPequeno   Decimal?              @db.Decimal(10, 2)
+  estoqueAbacaxiGrande  Int                   @default(0)
+  estoqueAbacaxiMedio   Int                   @default(0)
+  estoqueAbacaxiPequeno Int                   @default(0)
+  estoque               Int                   @default(0)
+  disponivel            Boolean               @default(true)
+  excluido              Boolean               @default(false)
+  imagemUrl             String?
+  pedidos               Pedido[]
+  itemPedidos           ItemPedido[]
+  movimentacoes         MovimentacaoEstoque[]
 }
 
 model Pedido {

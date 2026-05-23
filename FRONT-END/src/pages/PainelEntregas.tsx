@@ -1,12 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, useSearchParams } from "react-router-dom";
-import { BarChart3, CalendarDays, Receipt, TrendingUp, Wallet } from "lucide-react";
+import { BarChart3, Ban, CalendarDays, Receipt, Trash2, TrendingUp, Wallet } from "lucide-react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import Navbar from "@/components/Navbar";
 import PageShell from "@/components/PageShell";
 import { apiRequest } from "@/lib/api";
-import { getAuthUser, isAuthenticated } from "@/lib/auth";
+import { getAuthToken, getAuthUser, isAuthenticated } from "@/lib/auth";
 import logoAbacaxi from "@/assets/abacaxi-logo.svg";
 import {
   AlertDialog,
@@ -56,6 +56,9 @@ type ProdutoAdmin = {
   precoAbacaxiGrande?: number | string | null;
   precoAbacaxiMedio?: number | string | null;
   precoAbacaxiPequeno?: number | string | null;
+  estoqueAbacaxiGrande?: number;
+  estoqueAbacaxiMedio?: number;
+  estoqueAbacaxiPequeno?: number;
   estoque: number;
   disponivel: boolean;
   imagemUrl?: string | null;
@@ -65,6 +68,12 @@ type ProdutoEstoqueResumo = {
   id: number;
   nome: string;
   estoque: number;
+  precoAbacaxiGrande?: number | string | null;
+  precoAbacaxiMedio?: number | string | null;
+  precoAbacaxiPequeno?: number | string | null;
+  estoqueAbacaxiGrande?: number;
+  estoqueAbacaxiMedio?: number;
+  estoqueAbacaxiPequeno?: number;
   disponivel: boolean;
 };
 
@@ -146,6 +155,31 @@ type RespostaControleVendas = {
   };
 };
 
+type EventoSocketTempoReal = {
+  type: "pedido_atualizado";
+  payload: {
+    pedidoId: number;
+    usuarioId: number;
+    status: string;
+    origem: "NOVO_PEDIDO" | "STATUS_ATUALIZADO";
+  };
+};
+
+const WS_BASE_URL = (import.meta.env.VITE_API_URL as string | undefined)?.trim() || "";
+
+const buildWsUrl = (token: string) => {
+  if (WS_BASE_URL) {
+    const normalizedBase = WS_BASE_URL.endsWith("/")
+      ? WS_BASE_URL.slice(0, -1)
+      : WS_BASE_URL;
+    const wsBase = normalizedBase.replace(/^http/i, "ws");
+    return `${wsBase}/atendimentos/ws?token=${encodeURIComponent(token)}`;
+  }
+
+  const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+  return `${wsProtocol}//${window.location.host}/atendimentos/ws?token=${encodeURIComponent(token)}`;
+};
+
 const formatarData = (valor?: string) => {
   if (!valor) {
     return "-";
@@ -206,6 +240,32 @@ const formatarStatusPedido = (status?: string) => {
   return status || "-";
 };
 
+const classStatusPedido = (status?: string) => {
+  const statusNormalizado = (status ?? "").trim().toUpperCase();
+
+  if (statusNormalizado === "PENDENTE") {
+    return "border-yellow-300 bg-yellow-500/15 text-yellow-800";
+  }
+
+  if (statusNormalizado === "PRONTO_PARA_RETIRADA") {
+    return "border-sky-300 bg-sky-500/15 text-sky-800";
+  }
+
+  if (statusNormalizado === "SAIU_PARA_ENTREGA") {
+    return "border-indigo-300 bg-indigo-500/15 text-indigo-800";
+  }
+
+  if (statusNormalizado === "COMPLETADO") {
+    return "border-emerald-300 bg-emerald-500/15 text-emerald-800";
+  }
+
+  if (statusNormalizado === "CANCELADO") {
+    return "border-destructive/40 bg-destructive/15 text-destructive";
+  }
+
+  return "border-border bg-muted text-foreground";
+};
+
 const formatarEnderecoEntrega = (pedido: PedidoAdmin) => {
   const endereco = pedido.endereco;
 
@@ -257,6 +317,31 @@ const normalizarTexto = (valor: string) =>
     .toLowerCase()
     .trim();
 
+const isRoleAdmin = (role?: string | null) =>
+  (role ?? "").trim().toUpperCase() === "ADMIN";
+
+const produtoTemTamanhos = (produto: {
+  precoAbacaxiGrande?: number | string | null;
+  precoAbacaxiMedio?: number | string | null;
+  precoAbacaxiPequeno?: number | string | null;
+  estoqueAbacaxiGrande?: number;
+  estoqueAbacaxiMedio?: number;
+  estoqueAbacaxiPequeno?: number;
+}) => {
+  const possuiPrecoTamanhoConfigurado = [
+    produto.precoAbacaxiGrande,
+    produto.precoAbacaxiMedio,
+    produto.precoAbacaxiPequeno,
+  ].some((value) => value !== null && value !== undefined && String(value).trim() !== "");
+
+  return (
+    possuiPrecoTamanhoConfigurado ||
+    Number(produto.estoqueAbacaxiGrande ?? 0) > 0 ||
+    Number(produto.estoqueAbacaxiMedio ?? 0) > 0 ||
+    Number(produto.estoqueAbacaxiPequeno ?? 0) > 0
+  );
+};
+
 const parsePrecoParaExibicao = (valor: number | string | null | undefined, fallback = 0) => {
   if (typeof valor === "number") {
     return Number.isFinite(valor) ? valor : fallback;
@@ -278,6 +363,33 @@ const parsePrecoParaExibicao = (valor: number | string | null | undefined, fallb
   }
 
   return fallback;
+};
+
+const sanitizarTextoPreco = (valor: string) => valor.replace(/[^\d,.]/g, "");
+
+const formatarPrecoParaCampo = (valor: number) => valor.toFixed(2).replace(".", ",");
+
+const formatarPrecoDigitado = (valor: string) => {
+  const texto = sanitizarTextoPreco(valor).trim();
+  if (!texto) {
+    return "";
+  }
+
+  const numero = parsePrecoParaExibicao(texto, Number.NaN);
+  if (!Number.isFinite(numero) || numero < 0) {
+    return "";
+  }
+
+  return formatarPrecoParaCampo(numero);
+};
+
+const parseNumeroDigitado = (valor: string) => {
+  const texto = sanitizarTextoPreco(valor).trim();
+  if (!texto) {
+    return Number.NaN;
+  }
+
+  return parsePrecoParaExibicao(texto, Number.NaN);
 };
 
 const resolverPrecoAtualProduto = (produto: ProdutoAdmin) => {
@@ -407,6 +519,7 @@ const carregarImagemComoDataUrl = (src: string) =>
 const PainelEntregas = () => {
   const authenticated = isAuthenticated();
   const user = getAuthUser();
+  const authToken = getAuthToken();
   const isAdmin = user?.role === "ADMIN";
   const [searchParams] = useSearchParams();
 
@@ -432,12 +545,27 @@ const PainelEntregas = () => {
   const [abaAtiva, setAbaAtiva] = useState<"entregas" | "produtos" | "usuarios" | "vendas">("produtos");
 
   const [novoProdutoNome, setNovoProdutoNome] = useState("");
-  const [novoProdutoPreco, setNovoProdutoPreco] = useState(0);
+  const [novoProdutoPreco, setNovoProdutoPreco] = useState("");
+  const [novoProdutoControlaTamanhos, setNovoProdutoControlaTamanhos] = useState(false);
+  const [novoProdutoPrecosTamanho, setNovoProdutoPrecosTamanho] = useState({
+    grande: "",
+    medio: "",
+    pequeno: "",
+  });
+  const [novoProdutoEstoquesTamanho, setNovoProdutoEstoquesTamanho] = useState({
+    grande: "",
+    medio: "",
+    pequeno: "",
+  });
   const [novoProdutoDisponivel, setNovoProdutoDisponivel] = useState(true);
   const [novoProdutoEstoqueInicial, setNovoProdutoEstoqueInicial] = useState<string>("");
   const [novoProdutoImagem, setNovoProdutoImagem] = useState<File | null>(null);
+  const [ultimoProdutoCadastradoId, setUltimoProdutoCadastradoId] = useState<number | null>(null);
   const [precoEditadoPorProduto, setPrecoEditadoPorProduto] = useState<Record<number, string>>({});
   const [estoqueEditadoPorProduto, setEstoqueEditadoPorProduto] = useState<Record<number, string>>({});
+  const [estoqueAbacaxiEditadoPorProduto, setEstoqueAbacaxiEditadoPorProduto] = useState<
+    Record<number, { grande: string; medio: string; pequeno: string }>
+  >({});
   const [precoAbacaxiEditadoPorProduto, setPrecoAbacaxiEditadoPorProduto] = useState<
     Record<number, { grande: string; medio: string; pequeno: string }>
   >({});
@@ -452,6 +580,7 @@ const PainelEntregas = () => {
   const [totalPaginasPedidos, setTotalPaginasPedidos] = useState(1);
   const [totalPedidos, setTotalPedidos] = useState(0);
   const [dataFiltroPedidos, setDataFiltroPedidos] = useState("");
+  const [buscaClientePedidos, setBuscaClientePedidos] = useState("");
   const [filtroTipoEntrega, setFiltroTipoEntrega] = useState<
     "todos" | "entrega" | "retirada" | "cancelados"
   >("todos");
@@ -475,6 +604,12 @@ const PainelEntregas = () => {
   const [errorEstoque, setErrorEstoque] = useState("");
   const [updatingEstoqueId, setUpdatingEstoqueId] = useState<number | null>(null);
   const inputImagemRef = useRef<HTMLInputElement | null>(null);
+  const socketPedidosRef = useRef<WebSocket | null>(null);
+  const reconnectSocketPedidosTimeoutRef = useRef<number | null>(null);
+  const refreshPedidosTimeoutRef = useRef<number | null>(null);
+  const paginaPedidosRef = useRef(1);
+  const abaAtivaRef = useRef<"entregas" | "produtos" | "usuarios" | "vendas">("produtos");
+  const loadPedidosRef = useRef<(page?: number) => Promise<void>>(async () => {});
 
   const pedidoIdAlvo = useMemo(() => {
     const valor = searchParams.get("pedidoId");
@@ -495,7 +630,7 @@ const PainelEntregas = () => {
     return aba === "entregas" ? "entregas" : null;
   }, [searchParams]);
 
-  const loadPedidos = async (page = paginaPedidos) => {
+  const loadPedidos = useCallback(async (page = paginaPedidos) => {
     setLoadingPedidos(true);
     setErrorPedidos("");
     try {
@@ -522,7 +657,19 @@ const PainelEntregas = () => {
     } finally {
       setLoadingPedidos(false);
     }
-  };
+  }, [dataFiltroPedidos, paginaPedidos]);
+
+  useEffect(() => {
+    paginaPedidosRef.current = paginaPedidos;
+  }, [paginaPedidos]);
+
+  useEffect(() => {
+    abaAtivaRef.current = abaAtiva;
+  }, [abaAtiva]);
+
+  useEffect(() => {
+    loadPedidosRef.current = loadPedidos;
+  }, [loadPedidos]);
 
   const loadProdutos = async () => {
     setLoadingProdutos(true);
@@ -699,6 +846,92 @@ const PainelEntregas = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pedidoIdAlvo, abaSolicitada]);
 
+  useEffect(() => {
+    if (abaAtiva !== "produtos" || ultimoProdutoCadastradoId === null) {
+      return;
+    }
+
+    const cardProduto = document.getElementById(`produto-admin-${ultimoProdutoCadastradoId}`);
+    if (!cardProduto) {
+      return;
+    }
+
+    cardProduto.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [abaAtiva, ultimoProdutoCadastradoId, produtos]);
+
+  useEffect(() => {
+    if (!isAdmin || !user?.id || !authToken) {
+      if (refreshPedidosTimeoutRef.current) {
+        window.clearTimeout(refreshPedidosTimeoutRef.current);
+      }
+      if (reconnectSocketPedidosTimeoutRef.current) {
+        window.clearTimeout(reconnectSocketPedidosTimeoutRef.current);
+      }
+      socketPedidosRef.current?.close();
+      return;
+    }
+
+    let shouldReconnect = true;
+
+    const agendarAtualizacaoPedidos = (origem: "NOVO_PEDIDO" | "STATUS_ATUALIZADO") => {
+      if (abaAtivaRef.current !== "entregas") {
+        return;
+      }
+
+      if (refreshPedidosTimeoutRef.current) {
+        window.clearTimeout(refreshPedidosTimeoutRef.current);
+      }
+
+      refreshPedidosTimeoutRef.current = window.setTimeout(() => {
+        if (origem === "NOVO_PEDIDO") {
+          setPaginaPedidos(1);
+          void loadPedidosRef.current(1);
+        } else {
+          void loadPedidosRef.current(paginaPedidosRef.current || 1);
+        }
+        refreshPedidosTimeoutRef.current = null;
+      }, 200);
+    };
+
+    const conectar = () => {
+      const socket = new WebSocket(buildWsUrl(authToken));
+      socketPedidosRef.current = socket;
+
+      socket.onmessage = (event) => {
+        try {
+          const parsed = JSON.parse(event.data as string) as EventoSocketTempoReal;
+
+          if (parsed.type === "pedido_atualizado") {
+            agendarAtualizacaoPedidos(parsed.payload.origem);
+          }
+        } catch {
+          return;
+        }
+      };
+
+      socket.onclose = () => {
+        if (!shouldReconnect) {
+          return;
+        }
+
+        reconnectSocketPedidosTimeoutRef.current = window.setTimeout(conectar, 1500);
+      };
+    };
+
+    conectar();
+
+    return () => {
+      shouldReconnect = false;
+      if (refreshPedidosTimeoutRef.current) {
+        window.clearTimeout(refreshPedidosTimeoutRef.current);
+      }
+      if (reconnectSocketPedidosTimeoutRef.current) {
+        window.clearTimeout(reconnectSocketPedidosTimeoutRef.current);
+      }
+      socketPedidosRef.current?.close();
+    };
+  }, [authToken, isAdmin, user?.id]);
+
   const aplicarFiltroPedidos = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setPaginaPedidos(1);
@@ -707,6 +940,7 @@ const PainelEntregas = () => {
 
   const limparFiltroPedidos = async () => {
     setDataFiltroPedidos("");
+    setBuscaClientePedidos("");
     setPaginaPedidos(1);
     setLoadingPedidos(true);
     setErrorPedidos("");
@@ -780,20 +1014,39 @@ const PainelEntregas = () => {
     return pedidos;
   }, [pedidos, filtroTipoEntrega]);
 
+  const pedidosFiltrados = useMemo(() => {
+    const termoBusca = normalizarTexto(buscaClientePedidos);
+    const termoBuscaId = buscaClientePedidos.replace(/\D/g, "").trim();
+
+    if (!termoBusca) {
+      return pedidosFiltradosPorTipo;
+    }
+
+    return pedidosFiltradosPorTipo.filter((pedido) => {
+      const nomeCliente = pedido.usuario?.nome?.trim() ?? "";
+      const correspondeNome =
+        nomeCliente.length > 0 && normalizarTexto(nomeCliente).includes(termoBusca);
+      const correspondeId =
+        termoBuscaId.length > 0 && String(pedido.id).includes(termoBuscaId);
+
+      return correspondeNome || correspondeId;
+    });
+  }, [pedidosFiltradosPorTipo, buscaClientePedidos]);
+
   const pedidosEntregaDomicilio = useMemo(
     () =>
       ordenarPedidosMaisRecentes(
-        pedidosFiltradosPorTipo.filter((pedido) => isEntregaDomicilio(pedido)),
+        pedidosFiltrados.filter((pedido) => isEntregaDomicilio(pedido)),
       ),
-    [pedidosFiltradosPorTipo],
+    [pedidosFiltrados],
   );
 
   const pedidosRetirada = useMemo(
     () =>
       ordenarPedidosMaisRecentes(
-        pedidosFiltradosPorTipo.filter((pedido) => isRetirada(pedido)),
+        pedidosFiltrados.filter((pedido) => isRetirada(pedido)),
       ),
-    [pedidosFiltradosPorTipo],
+    [pedidosFiltrados],
   );
 
   const mostrarRetiradaAntesEntrega = useMemo(() => {
@@ -818,7 +1071,7 @@ const PainelEntregas = () => {
     }
 
     elemento.scrollIntoView({ behavior: "smooth", block: "center" });
-  }, [abaAtiva, loadingPedidos, pedidoIdAlvo, pedidosFiltradosPorTipo]);
+  }, [abaAtiva, loadingPedidos, pedidoIdAlvo, pedidosFiltrados]);
 
   const resumoVendasPorPagamento = useMemo(() => {
     const acumulado: Record<string, { quantidade: number; valor: number }> = {};
@@ -944,29 +1197,120 @@ const PainelEntregas = () => {
       return;
     }
 
+    const parseDecimalInput = (value: string, fieldLabel: string) => {
+      const parsed = parseNumeroDigitado(value);
+      if (!Number.isFinite(parsed)) {
+        throw new Error(`Informe ${fieldLabel}.`);
+      }
+
+      if (parsed < 0) {
+        throw new Error(`${fieldLabel} inválido.`);
+      }
+
+      return parsed;
+    };
+
+    const parseIntegerInput = (value: string, fieldLabel: string) => {
+      const parsed = parseNumeroDigitado(value);
+      if (!Number.isFinite(parsed)) {
+        throw new Error(`Informe ${fieldLabel}.`);
+      }
+
+      if (parsed < 0) {
+        throw new Error(`${fieldLabel} inválido.`);
+      }
+
+      return Math.trunc(parsed);
+    };
+
     setSavingProduto(true);
     setErrorProdutos("");
     setFeedbackProduto("");
     try {
       const formData = new FormData();
       formData.append("nome", novoProdutoNome.trim());
-      formData.append("preco", String(novoProdutoPreco));
       formData.append("disponivel", String(novoProdutoDisponivel));
-      if (novoProdutoEstoqueInicial.trim() === "") {
-        throw new Error("Informe o estoque inicial do produto");
+
+      if (novoProdutoControlaTamanhos) {
+        const precoGrande = parseDecimalInput(
+          novoProdutoPrecosTamanho.grande,
+          "o preço do tamanho grande",
+        );
+        const precoMedio = parseDecimalInput(
+          novoProdutoPrecosTamanho.medio,
+          "o preço do tamanho médio",
+        );
+        const precoPequeno = parseDecimalInput(
+          novoProdutoPrecosTamanho.pequeno,
+          "o preço do tamanho pequeno",
+        );
+
+        const estoqueGrande = parseIntegerInput(
+          novoProdutoEstoquesTamanho.grande,
+          "o estoque do tamanho grande",
+        );
+        const estoqueMedio = parseIntegerInput(
+          novoProdutoEstoquesTamanho.medio,
+          "o estoque do tamanho médio",
+        );
+        const estoquePequeno = parseIntegerInput(
+          novoProdutoEstoquesTamanho.pequeno,
+          "o estoque do tamanho pequeno",
+        );
+
+        formData.append("controlaTamanhos", "true");
+        formData.append("preco", String(precoMedio));
+        formData.append("estoque", String(estoqueGrande + estoqueMedio + estoquePequeno));
+        formData.append("precoAbacaxiGrande", String(precoGrande));
+        formData.append("precoAbacaxiMedio", String(precoMedio));
+        formData.append("precoAbacaxiPequeno", String(precoPequeno));
+        formData.append("estoqueAbacaxiGrande", String(estoqueGrande));
+        formData.append("estoqueAbacaxiMedio", String(estoqueMedio));
+        formData.append("estoqueAbacaxiPequeno", String(estoquePequeno));
+      } else {
+        const precoProduto = parseDecimalInput(novoProdutoPreco, "o preço do produto");
+
+        if (novoProdutoEstoqueInicial.trim() === "") {
+          throw new Error("Informe o estoque inicial do produto");
+        }
+
+        formData.append("controlaTamanhos", "false");
+        formData.append("preco", String(precoProduto));
+        formData.append(
+          "estoque",
+          String(parseIntegerInput(novoProdutoEstoqueInicial, "o estoque inicial")),
+        );
       }
-      formData.append("estoque", novoProdutoEstoqueInicial.trim());
+
       if (novoProdutoImagem) {
         formData.append("imagem", novoProdutoImagem);
       }
 
-      await apiRequest("/produtos/cadastrarProduto", {
+      const produtoCriado = await apiRequest<ProdutoAdmin>("/produtos/cadastrarProduto", {
         method: "POST",
         body: formData,
       });
 
+      setProdutos((current) => [
+        produtoCriado,
+        ...current.filter((produto) => produto.id !== produtoCriado.id),
+      ]);
+      setUltimoProdutoCadastradoId(produtoCriado.id);
+      setFiltroDisponibilidade("todos");
+
       setNovoProdutoNome("");
-      setNovoProdutoPreco(0);
+      setNovoProdutoPreco("");
+      setNovoProdutoControlaTamanhos(false);
+      setNovoProdutoPrecosTamanho({
+        grande: "",
+        medio: "",
+        pequeno: "",
+      });
+      setNovoProdutoEstoquesTamanho({
+        grande: "",
+        medio: "",
+        pequeno: "",
+      });
       setNovoProdutoDisponivel(true);
       setNovoProdutoEstoqueInicial("");
       setNovoProdutoImagem(null);
@@ -974,7 +1318,7 @@ const PainelEntregas = () => {
         inputImagemRef.current.value = "";
       }
       await Promise.all([loadProdutos(), loadResumoEstoque()]);
-      setFeedbackProduto("Produto cadastrado com sucesso.");
+      setFeedbackProduto(`Produto "${produtoCriado.nome}" cadastrado com sucesso (ID #${produtoCriado.id}).`);
     } catch (saveError) {
       setErrorProdutos(
         saveError instanceof Error
@@ -1034,7 +1378,22 @@ const PainelEntregas = () => {
     return estoqueEditadoPorProduto[produto.id] ?? String(produto.estoque);
   };
 
+  const getEstoquesAbacaxiGestaoEditados = (produto: ProdutoEstoqueResumo) => {
+    const fallback = {
+      grande: String(produto.estoqueAbacaxiGrande ?? 0),
+      medio: String(produto.estoqueAbacaxiMedio ?? 0),
+      pequeno: String(produto.estoqueAbacaxiPequeno ?? 0),
+    };
+
+    return estoqueAbacaxiEditadoPorProduto[produto.id] ?? fallback;
+  };
+
   const salvarEstoqueProdutoGestao = async (produto: ProdutoEstoqueResumo) => {
+    if (produtoTemTamanhos(produto)) {
+      setErrorEstoque("Para produtos com tamanhos, ajuste o estoque por tamanho.");
+      return;
+    }
+
     const valorDigitado = getEstoqueGestaoEditado(produto).replace(",", ".").trim();
     const estoque = Number(valorDigitado);
 
@@ -1073,11 +1432,69 @@ const PainelEntregas = () => {
     }
   };
 
+  const salvarEstoquesAbacaxiProdutoGestao = async (produto: ProdutoEstoqueResumo) => {
+    if (!produtoTemTamanhos(produto)) {
+      return;
+    }
+
+    const estoques = getEstoquesAbacaxiGestaoEditados(produto);
+
+    const estoqueGrande = Number(estoques.grande.replace(",", ".").trim());
+    const estoqueMedio = Number(estoques.medio.replace(",", ".").trim());
+    const estoquePequeno = Number(estoques.pequeno.replace(",", ".").trim());
+
+    if (
+      !Number.isFinite(estoqueGrande) ||
+      !Number.isFinite(estoqueMedio) ||
+      !Number.isFinite(estoquePequeno) ||
+      estoqueGrande < 0 ||
+      estoqueMedio < 0 ||
+      estoquePequeno < 0
+    ) {
+      setErrorEstoque("Informe valores válidos (0 ou maior) para os três tamanhos.");
+      return;
+    }
+
+    setUpdatingEstoqueId(produto.id);
+    setErrorEstoque("");
+
+    try {
+      await apiRequest(`/produtos/${produto.id}/estoque`, {
+        method: "POST",
+        body: {
+          tipo: "AJUSTE",
+          estoquesAbacaxi: {
+            grande: Math.trunc(estoqueGrande),
+            medio: Math.trunc(estoqueMedio),
+            pequeno: Math.trunc(estoquePequeno),
+          },
+          motivo: "Ajuste manual na aba de gestão de estoque",
+        },
+      });
+
+      await Promise.all([loadResumoEstoque(), loadProdutos(), loadMovimentacoesEstoque(produto.id)]);
+      setEstoqueAbacaxiEditadoPorProduto((current) => {
+        const next = { ...current };
+        delete next[produto.id];
+        return next;
+      });
+    } catch (updateError) {
+      setErrorEstoque(
+        updateError instanceof Error
+          ? updateError.message
+          : "Não foi possível atualizar os estoques por tamanho.",
+      );
+    } finally {
+      setUpdatingEstoqueId(null);
+    }
+  };
+
   const getPrecosAbacaxiEditados = (produto: ProdutoAdmin) => {
+    const precoBase = parsePrecoParaExibicao(produto.preco, 0);
     const fallback = {
-      grande: String(parsePrecoParaExibicao(produto.precoAbacaxiGrande, 7).toFixed(2)),
-      medio: String(parsePrecoParaExibicao(produto.precoAbacaxiMedio, 5).toFixed(2)),
-      pequeno: String(parsePrecoParaExibicao(produto.precoAbacaxiPequeno, 3).toFixed(2)),
+      grande: formatarPrecoParaCampo(parsePrecoParaExibicao(produto.precoAbacaxiGrande, precoBase)),
+      medio: formatarPrecoParaCampo(parsePrecoParaExibicao(produto.precoAbacaxiMedio, precoBase)),
+      pequeno: formatarPrecoParaCampo(parsePrecoParaExibicao(produto.precoAbacaxiPequeno, precoBase)),
     };
 
     return precoAbacaxiEditadoPorProduto[produto.id] ?? fallback;
@@ -1098,7 +1515,7 @@ const PainelEntregas = () => {
       medio < 0 ||
       pequeno < 0
     ) {
-      setErrorProdutos("Valores de abacaxi inválidos. Informe números maiores ou iguais a zero.");
+      setErrorProdutos("Valores por tamanho inválidos. Informe números maiores ou iguais a zero.");
       return;
     }
 
@@ -1122,12 +1539,12 @@ const PainelEntregas = () => {
         delete next[produto.id];
         return next;
       });
-      setFeedbackProduto("Preços do abacaxi atualizados com sucesso.");
+      setFeedbackProduto("Preços por tamanho atualizados com sucesso.");
     } catch (updateError) {
       setErrorProdutos(
         updateError instanceof Error
           ? updateError.message
-          : "Não foi possível atualizar os preços do abacaxi.",
+          : "Não foi possível atualizar os preços por tamanho.",
       );
     } finally {
       setUpdatingProdutoId(null);
@@ -1456,6 +1873,17 @@ const PainelEntregas = () => {
             </form>
 
             <div className="mb-4">
+              <input
+                type="text"
+                value={buscaClientePedidos}
+                onChange={(event) => setBuscaClientePedidos(event.target.value)}
+                placeholder="Buscar por nome do cliente ou ID do pedido"
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-foreground placeholder:text-muted-foreground"
+                aria-label="Buscar por nome do cliente ou ID do pedido"
+              />
+            </div>
+
+            <div className="mb-4">
               <select
                 value={filtroTipoEntrega}
                 onChange={(event) =>
@@ -1485,11 +1913,13 @@ const PainelEntregas = () => {
             ) : (
               <>
                 {errorPedidos && <p className="text-sm text-destructive mb-4">{errorPedidos}</p>}
-                {pedidosFiltradosPorTipo.length === 0 ? (
+                {pedidosFiltrados.length === 0 ? (
                   <p className="text-muted-foreground">Nenhum pedido encontrado.</p>
                 ) : (
                   <div className="flex flex-col gap-4">
-                    {(filtroTipoEntrega === "todos" || filtroTipoEntrega === "entrega") && (
+                    {(filtroTipoEntrega === "todos" ||
+                      filtroTipoEntrega === "entrega" ||
+                      filtroTipoEntrega === "cancelados") && (
                     <div
                       className={`rounded-xl border border-border bg-background p-3 sm:p-4 ${
                         filtroTipoEntrega === "todos"
@@ -1522,7 +1952,9 @@ const PainelEntregas = () => {
                             >
                               <div className="flex flex-wrap items-center justify-between gap-2">
                                 <p className="font-semibold text-foreground">Pedido #{pedido.id}</p>
-                                <span className="text-xs rounded-full bg-muted px-2 py-1 text-foreground">
+                                <span
+                                  className={`text-xs rounded-full border px-2.5 py-1 font-extrabold tracking-wide uppercase ${classStatusPedido(pedido.status)}`}
+                                >
                                   {formatarStatusPedido(pedido.status)}
                                 </span>
                               </div>
@@ -1575,9 +2007,9 @@ const PainelEntregas = () => {
                                   <button
                                     type="button"
                                     disabled={
-                                      pedido.status === "SAIU_PARA_ENTREGA" ||
-                                      pedido.status === "COMPLETADO" ||
-                                      pedido.status === "CANCELADO" ||
+                                      ["SAIU_PARA_ENTREGA", "COMPLETADO", "CANCELADO"].includes(
+                                        pedido.status,
+                                      ) ||
                                       updatingSaidaEntregaId === pedido.id
                                     }
                                     onClick={() => marcarPedidoSaiuParaEntrega(pedido.id)}
@@ -1591,8 +2023,6 @@ const PainelEntregas = () => {
                                     type="button"
                                     disabled={
                                       pedido.status !== "SAIU_PARA_ENTREGA" ||
-                                      pedido.status === "COMPLETADO" ||
-                                      pedido.status === "CANCELADO" ||
                                       updatingId === pedido.id
                                     }
                                     onClick={() => finalizarPedido(pedido.id)}
@@ -1609,7 +2039,9 @@ const PainelEntregas = () => {
                     </div>
                     )}
 
-                    {(filtroTipoEntrega === "todos" || filtroTipoEntrega === "retirada") && (
+                    {(filtroTipoEntrega === "todos" ||
+                      filtroTipoEntrega === "retirada" ||
+                      filtroTipoEntrega === "cancelados") && (
                     <div
                       className={`rounded-xl border border-border bg-background p-3 sm:p-4 ${
                         filtroTipoEntrega === "todos"
@@ -1642,7 +2074,9 @@ const PainelEntregas = () => {
                             >
                               <div className="flex flex-wrap items-center justify-between gap-2">
                                 <p className="font-semibold text-foreground">Pedido #{pedido.id}</p>
-                                <span className="text-xs rounded-full bg-muted px-2 py-1 text-foreground">
+                                <span
+                                  className={`text-xs rounded-full border px-2.5 py-1 font-extrabold tracking-wide uppercase ${classStatusPedido(pedido.status)}`}
+                                >
                                   {formatarStatusPedido(pedido.status)}
                                 </span>
                               </div>
@@ -1695,9 +2129,9 @@ const PainelEntregas = () => {
                                   <button
                                     type="button"
                                     disabled={
-                                      pedido.status === "PRONTO_PARA_RETIRADA" ||
-                                      pedido.status === "COMPLETADO" ||
-                                      pedido.status === "CANCELADO" ||
+                                      ["PRONTO_PARA_RETIRADA", "COMPLETADO", "CANCELADO"].includes(
+                                        pedido.status,
+                                      ) ||
                                       updatingRetiradaId === pedido.id
                                     }
                                     onClick={() => marcarPedidoProntoParaRetirada(pedido.id)}
@@ -1711,8 +2145,6 @@ const PainelEntregas = () => {
                                     type="button"
                                     disabled={
                                       pedido.status !== "PRONTO_PARA_RETIRADA" ||
-                                      pedido.status === "COMPLETADO" ||
-                                      pedido.status === "CANCELADO" ||
                                       updatingId === pedido.id
                                     }
                                     onClick={() => finalizarPedido(pedido.id)}
@@ -2087,22 +2519,203 @@ const PainelEntregas = () => {
                   />
                 </div>
 
-                <div>
-                  <label htmlFor="novo-produto-preco" className="block text-sm font-medium text-foreground mb-1">
-                    Preço (R$)
-                  </label>
+                <label className="inline-flex items-center gap-2 text-sm text-foreground">
                   <input
-                    id="novo-produto-preco"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={novoProdutoPreco}
-                    onChange={(event) => setNovoProdutoPreco(Number(event.target.value))}
-                    className="w-full rounded-lg border border-border bg-background px-4 py-3 text-foreground"
-                    placeholder="Ex.: 12.50"
-                    required
+                    type="checkbox"
+                    checked={novoProdutoControlaTamanhos}
+                    onChange={(event) => setNovoProdutoControlaTamanhos(event.target.checked)}
                   />
-                </div>
+                  Cadastrar com tamanhos (Grande, Médio e Pequeno)
+                </label>
+
+                {novoProdutoControlaTamanhos ? (
+                  <div className="rounded-lg border border-border bg-muted/25 p-4 space-y-4">
+                    <p className="text-sm text-foreground font-medium">Preços por tamanho (R$)</p>
+                    <div className="grid sm:grid-cols-3 gap-3">
+                      <div>
+                        <label htmlFor="novo-preco-grande" className="block text-xs text-muted-foreground mb-1">
+                          Grande
+                        </label>
+                        <input
+                          id="novo-preco-grande"
+                          type="text"
+                          inputMode="decimal"
+                          value={novoProdutoPrecosTamanho.grande}
+                          onChange={(event) =>
+                            setNovoProdutoPrecosTamanho((current) => ({
+                              ...current,
+                              grande: sanitizarTextoPreco(event.target.value),
+                            }))
+                          }
+                          onBlur={(event) =>
+                            setNovoProdutoPrecosTamanho((current) => ({
+                              ...current,
+                              grande: formatarPrecoDigitado(event.target.value),
+                            }))
+                          }
+                          className="w-full rounded-lg border border-border bg-background px-3 py-2 text-foreground"
+                          placeholder="Ex.: 7,00"
+                          required={novoProdutoControlaTamanhos}
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="novo-preco-medio" className="block text-xs text-muted-foreground mb-1">
+                          Médio
+                        </label>
+                        <input
+                          id="novo-preco-medio"
+                          type="text"
+                          inputMode="decimal"
+                          value={novoProdutoPrecosTamanho.medio}
+                          onChange={(event) =>
+                            setNovoProdutoPrecosTamanho((current) => ({
+                              ...current,
+                              medio: sanitizarTextoPreco(event.target.value),
+                            }))
+                          }
+                          onBlur={(event) =>
+                            setNovoProdutoPrecosTamanho((current) => ({
+                              ...current,
+                              medio: formatarPrecoDigitado(event.target.value),
+                            }))
+                          }
+                          className="w-full rounded-lg border border-border bg-background px-3 py-2 text-foreground"
+                          placeholder="Ex.: 5,00"
+                          required={novoProdutoControlaTamanhos}
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="novo-preco-pequeno" className="block text-xs text-muted-foreground mb-1">
+                          Pequeno
+                        </label>
+                        <input
+                          id="novo-preco-pequeno"
+                          type="text"
+                          inputMode="decimal"
+                          value={novoProdutoPrecosTamanho.pequeno}
+                          onChange={(event) =>
+                            setNovoProdutoPrecosTamanho((current) => ({
+                              ...current,
+                              pequeno: sanitizarTextoPreco(event.target.value),
+                            }))
+                          }
+                          onBlur={(event) =>
+                            setNovoProdutoPrecosTamanho((current) => ({
+                              ...current,
+                              pequeno: formatarPrecoDigitado(event.target.value),
+                            }))
+                          }
+                          className="w-full rounded-lg border border-border bg-background px-3 py-2 text-foreground"
+                          placeholder="Ex.: 3,00"
+                          required={novoProdutoControlaTamanhos}
+                        />
+                      </div>
+                    </div>
+
+                    <p className="text-sm text-foreground font-medium">Estoque inicial por tamanho</p>
+                    <div className="grid sm:grid-cols-3 gap-3">
+                      <div>
+                        <label htmlFor="novo-estoque-grande" className="block text-xs text-muted-foreground mb-1">
+                          Grande
+                        </label>
+                        <input
+                          id="novo-estoque-grande"
+                          type="number"
+                          min="0"
+                          step="1"
+                          value={novoProdutoEstoquesTamanho.grande}
+                          onChange={(event) =>
+                            setNovoProdutoEstoquesTamanho((current) => ({
+                              ...current,
+                              grande: event.target.value,
+                            }))
+                          }
+                          className="w-full rounded-lg border border-border bg-background px-3 py-2 text-foreground"
+                          placeholder="Ex.: 20"
+                          required={novoProdutoControlaTamanhos}
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="novo-estoque-medio" className="block text-xs text-muted-foreground mb-1">
+                          Médio
+                        </label>
+                        <input
+                          id="novo-estoque-medio"
+                          type="number"
+                          min="0"
+                          step="1"
+                          value={novoProdutoEstoquesTamanho.medio}
+                          onChange={(event) =>
+                            setNovoProdutoEstoquesTamanho((current) => ({
+                              ...current,
+                              medio: event.target.value,
+                            }))
+                          }
+                          className="w-full rounded-lg border border-border bg-background px-3 py-2 text-foreground"
+                          placeholder="Ex.: 30"
+                          required={novoProdutoControlaTamanhos}
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="novo-estoque-pequeno" className="block text-xs text-muted-foreground mb-1">
+                          Pequeno
+                        </label>
+                        <input
+                          id="novo-estoque-pequeno"
+                          type="number"
+                          min="0"
+                          step="1"
+                          value={novoProdutoEstoquesTamanho.pequeno}
+                          onChange={(event) =>
+                            setNovoProdutoEstoquesTamanho((current) => ({
+                              ...current,
+                              pequeno: event.target.value,
+                            }))
+                          }
+                          className="w-full rounded-lg border border-border bg-background px-3 py-2 text-foreground"
+                          placeholder="Ex.: 15"
+                          required={novoProdutoControlaTamanhos}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div>
+                      <label htmlFor="novo-produto-preco" className="block text-sm font-medium text-foreground mb-1">
+                        Preço (R$)
+                      </label>
+                      <input
+                        id="novo-produto-preco"
+                        type="text"
+                        inputMode="decimal"
+                        value={novoProdutoPreco}
+                        onChange={(event) => setNovoProdutoPreco(sanitizarTextoPreco(event.target.value))}
+                        onBlur={(event) => setNovoProdutoPreco(formatarPrecoDigitado(event.target.value))}
+                        className="w-full rounded-lg border border-border bg-background px-4 py-3 text-foreground"
+                        placeholder="Ex.: 12,50"
+                        required={!novoProdutoControlaTamanhos}
+                      />
+                    </div>
+
+                    <div>
+                      <label htmlFor="novo-produto-estoque" className="block text-sm font-medium text-foreground mb-1">
+                        Estoque inicial
+                      </label>
+                      <input
+                        id="novo-produto-estoque"
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={novoProdutoEstoqueInicial}
+                        onChange={(event) => setNovoProdutoEstoqueInicial(event.target.value)}
+                        className="w-full rounded-lg border border-border bg-background px-4 py-3 text-foreground"
+                        placeholder="Ex.: 100"
+                        required={!novoProdutoControlaTamanhos}
+                      />
+                    </div>
+                  </>
+                )}
 
                 <label className="inline-flex items-center gap-2 text-sm text-foreground">
                   <input
@@ -2112,23 +2725,6 @@ const PainelEntregas = () => {
                   />
                   Disponível para encomenda
                 </label>
-
-                <div>
-                  <label htmlFor="novo-produto-estoque" className="block text-sm font-medium text-foreground mb-1">
-                    Estoque inicial
-                  </label>
-                  <input
-                    id="novo-produto-estoque"
-                    type="number"
-                    min="0"
-                    step="1"
-                    value={novoProdutoEstoqueInicial}
-                    onChange={(event) => setNovoProdutoEstoqueInicial(event.target.value)}
-                    className="w-full rounded-lg border border-border bg-background px-4 py-3 text-foreground"
-                    placeholder="Ex.: 100"
-                    required
-                  />
-                </div>
 
                 <div>
                   <label htmlFor="novo-produto-imagem" className="block text-sm font-medium text-foreground mb-1">
@@ -2152,6 +2748,13 @@ const PainelEntregas = () => {
                 >
                   {savingProduto ? "Cadastrando..." : "Cadastrar produto"}
                 </button>
+
+                {errorProdutos && (
+                  <p className="text-sm text-destructive" role="alert">
+                    {errorProdutos}
+                  </p>
+                )}
+                {feedbackProduto && <p className="text-sm text-primary">{feedbackProduto}</p>}
               </form>
             </section>
 
@@ -2194,74 +2797,218 @@ const PainelEntregas = () => {
                       <p className="text-muted-foreground">Nenhum produto com controle de estoque configurado.</p>
                     ) : (
                       <div className="space-y-3 max-h-[680px] overflow-y-auto pr-1">
-                        {resumoEstoque.data.map((produto) => (
-                          <article key={produto.id} className="rounded-lg border border-border p-4">
-                            <div className="flex flex-wrap items-center justify-between gap-2">
-                              <div>
-                                <p className="font-semibold text-foreground">{produto.nome}</p>
-                                <p className="text-xs text-muted-foreground">ID: {produto.id}</p>
-                              </div>
-                              <span
-                                className={`text-xs font-semibold px-2 py-0.5 rounded-full ${classStatusEstoque(produto.estoque)}`}
-                              >
-                                {labelStatusEstoque(produto.estoque)}
-                              </span>
-                            </div>
+                        {resumoEstoque.data.map((produto) => {
+                          const produtoComTamanhos = produtoTemTamanhos(produto);
+                          const estoquesAbacaxi = getEstoquesAbacaxiGestaoEditados(produto);
 
-                            <div className="mt-3 grid sm:grid-cols-2 gap-3 text-sm">
-                              <div className="rounded-md border border-border p-3">
-                                <p className="text-xs text-muted-foreground">Estoque atual</p>
-                                <p className="font-semibold text-foreground">{produto.estoque}</p>
+                          return (
+                            <article key={produto.id} className="rounded-lg border border-border p-4">
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <div>
+                                  <p className="font-semibold text-foreground">{produto.nome}</p>
+                                  <p className="text-xs text-muted-foreground">ID: {produto.id}</p>
+                                </div>
+                                <span
+                                  className={`text-xs font-semibold px-2 py-0.5 rounded-full ${classStatusEstoque(produto.estoque)}`}
+                                >
+                                  {labelStatusEstoque(produto.estoque)}
+                                </span>
                               </div>
-                              <div className="rounded-md border border-border p-3">
-                                <p className="text-xs text-muted-foreground">Disponibilidade</p>
-                                <p className="font-semibold text-foreground">
-                                  {produto.disponivel ? "Disponível" : "Indisponível"}
-                                </p>
+
+                              <div className="mt-3 grid sm:grid-cols-2 gap-3 text-sm">
+                                <div className="rounded-md border border-border p-3">
+                                  <p className="text-xs text-muted-foreground">
+                                    {produtoComTamanhos ? "Estoque total (soma dos tamanhos)" : "Estoque atual"}
+                                  </p>
+                                  <p className="font-semibold text-foreground">{produto.estoque}</p>
+                                </div>
+                                <div className="rounded-md border border-border p-3">
+                                  <p className="text-xs text-muted-foreground">Disponibilidade</p>
+                                  <p className="font-semibold text-foreground">
+                                    {produto.disponivel ? "Disponível" : "Indisponível"}
+                                  </p>
+                                </div>
                               </div>
-                            </div>
 
-                            <p className="mt-3 text-xs text-muted-foreground">
-                              Digite o estoque final desejado e clique em salvar.
-                            </p>
+                              {produtoComTamanhos ? (
+                                <>
+                                  <div className="mt-3 grid sm:grid-cols-3 gap-3 text-sm">
+                                    <div className="rounded-md border border-border p-3">
+                                      <p className="text-xs text-muted-foreground">Estoque Grande</p>
+                                      <p className="font-semibold text-foreground">{produto.estoqueAbacaxiGrande ?? 0}</p>
+                                    </div>
+                                    <div className="rounded-md border border-border p-3">
+                                      <p className="text-xs text-muted-foreground">Estoque Médio</p>
+                                      <p className="font-semibold text-foreground">{produto.estoqueAbacaxiMedio ?? 0}</p>
+                                    </div>
+                                    <div className="rounded-md border border-border p-3">
+                                      <p className="text-xs text-muted-foreground">Estoque Pequeno</p>
+                                      <p className="font-semibold text-foreground">{produto.estoqueAbacaxiPequeno ?? 0}</p>
+                                    </div>
+                                  </div>
 
-                            <div className="mt-3 grid md:grid-cols-[180px_auto_auto] gap-3">
-                              <input
-                                type="number"
-                                min="0"
-                                step="1"
-                                value={getEstoqueGestaoEditado(produto)}
-                                onChange={(event) =>
-                                  setEstoqueEditadoPorProduto((current) => ({
-                                    ...current,
-                                    [produto.id]: event.target.value,
-                                  }))
-                                }
-                                className="rounded-md border border-border bg-background px-3 py-2.5 text-sm"
-                                placeholder="Estoque final"
-                              />
-                              <button
-                                type="button"
-                                disabled={updatingEstoqueId === produto.id}
-                                onClick={() => {
-                                  void salvarEstoqueProdutoGestao(produto);
-                                }}
-                                className="inline-flex items-center justify-center px-3 py-2.5 rounded-md bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-50"
-                              >
-                                {updatingEstoqueId === produto.id ? "Salvando..." : "Salvar estoque"}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  void loadMovimentacoesEstoque(produto.id);
-                                }}
-                                className="inline-flex items-center justify-center px-3 py-2.5 rounded-md border border-border text-sm font-semibold hover:bg-muted"
-                              >
-                                Histórico
-                              </button>
-                            </div>
-                          </article>
-                        ))}
+                                  <p className="mt-3 text-xs text-muted-foreground">
+                                    Digite o estoque final de cada tamanho e clique em salvar.
+                                  </p>
+
+                                  <div className="mt-3 grid lg:grid-cols-5 gap-3">
+                                    <div>
+                                      <label className="block text-xs text-muted-foreground mb-1">Grande</label>
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        step="1"
+                                        value={estoquesAbacaxi.grande}
+                                        onChange={(event) =>
+                                          setEstoqueAbacaxiEditadoPorProduto((current) => {
+                                            const atual = current[produto.id] ?? {
+                                              grande: String(produto.estoqueAbacaxiGrande ?? 0),
+                                              medio: String(produto.estoqueAbacaxiMedio ?? 0),
+                                              pequeno: String(produto.estoqueAbacaxiPequeno ?? 0),
+                                            };
+
+                                            return {
+                                              ...current,
+                                              [produto.id]: {
+                                                ...atual,
+                                                grande: event.target.value,
+                                              },
+                                            };
+                                          })
+                                        }
+                                        className="w-full rounded-md border border-border bg-background px-3 py-2.5 text-sm"
+                                        placeholder="Estoque grande"
+                                      />
+                                    </div>
+
+                                    <div>
+                                      <label className="block text-xs text-muted-foreground mb-1">Médio</label>
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        step="1"
+                                        value={estoquesAbacaxi.medio}
+                                        onChange={(event) =>
+                                          setEstoqueAbacaxiEditadoPorProduto((current) => {
+                                            const atual = current[produto.id] ?? {
+                                              grande: String(produto.estoqueAbacaxiGrande ?? 0),
+                                              medio: String(produto.estoqueAbacaxiMedio ?? 0),
+                                              pequeno: String(produto.estoqueAbacaxiPequeno ?? 0),
+                                            };
+
+                                            return {
+                                              ...current,
+                                              [produto.id]: {
+                                                ...atual,
+                                                medio: event.target.value,
+                                              },
+                                            };
+                                          })
+                                        }
+                                        className="w-full rounded-md border border-border bg-background px-3 py-2.5 text-sm"
+                                        placeholder="Estoque médio"
+                                      />
+                                    </div>
+
+                                    <div>
+                                      <label className="block text-xs text-muted-foreground mb-1">Pequeno</label>
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        step="1"
+                                        value={estoquesAbacaxi.pequeno}
+                                        onChange={(event) =>
+                                          setEstoqueAbacaxiEditadoPorProduto((current) => {
+                                            const atual = current[produto.id] ?? {
+                                              grande: String(produto.estoqueAbacaxiGrande ?? 0),
+                                              medio: String(produto.estoqueAbacaxiMedio ?? 0),
+                                              pequeno: String(produto.estoqueAbacaxiPequeno ?? 0),
+                                            };
+
+                                            return {
+                                              ...current,
+                                              [produto.id]: {
+                                                ...atual,
+                                                pequeno: event.target.value,
+                                              },
+                                            };
+                                          })
+                                        }
+                                        className="w-full rounded-md border border-border bg-background px-3 py-2.5 text-sm"
+                                        placeholder="Estoque pequeno"
+                                      />
+                                    </div>
+
+                                    <button
+                                      type="button"
+                                      disabled={updatingEstoqueId === produto.id}
+                                      onClick={() => {
+                                        void salvarEstoquesAbacaxiProdutoGestao(produto);
+                                      }}
+                                      className="inline-flex justify-self-start items-center justify-center px-3 py-2.5 rounded-md bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-50"
+                                    >
+                                      {updatingEstoqueId === produto.id
+                                        ? "Salvando..."
+                                        : "Salvar tamanhos"}
+                                    </button>
+
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        void loadMovimentacoesEstoque(produto.id);
+                                      }}
+                                      className="inline-flex items-center justify-center px-3 py-2.5 rounded-md border border-border text-sm font-semibold hover:bg-muted"
+                                    >
+                                      Histórico
+                                    </button>
+                                  </div>
+                                </>
+                              ) : (
+                                <>
+                                  <p className="mt-3 text-xs text-muted-foreground">
+                                    Digite o estoque final desejado e clique em salvar.
+                                  </p>
+
+                                  <div className="mt-3 grid md:grid-cols-[180px_auto_auto] gap-3">
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      step="1"
+                                      value={getEstoqueGestaoEditado(produto)}
+                                      onChange={(event) =>
+                                        setEstoqueEditadoPorProduto((current) => ({
+                                          ...current,
+                                          [produto.id]: event.target.value,
+                                        }))
+                                      }
+                                      className="rounded-md border border-border bg-background px-3 py-2.5 text-sm"
+                                      placeholder="Estoque final"
+                                    />
+                                    <button
+                                      type="button"
+                                      disabled={updatingEstoqueId === produto.id}
+                                      onClick={() => {
+                                        void salvarEstoqueProdutoGestao(produto);
+                                      }}
+                                      className="inline-flex items-center justify-center px-3 py-2.5 rounded-md bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-50"
+                                    >
+                                      {updatingEstoqueId === produto.id ? "Salvando..." : "Salvar estoque"}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        void loadMovimentacoesEstoque(produto.id);
+                                      }}
+                                      className="inline-flex items-center justify-center px-3 py-2.5 rounded-md border border-border text-sm font-semibold hover:bg-muted"
+                                    >
+                                      Histórico
+                                    </button>
+                                  </div>
+                                </>
+                              )}
+                            </article>
+                          );
+                        })}
                       </div>
                     )}
 
@@ -2362,7 +3109,15 @@ const PainelEntregas = () => {
               ) : (
                 <ul className="space-y-3 max-h-[680px] overflow-y-auto pr-1">
                   {produtosFiltrados.map((produto) => (
-                    <li key={produto.id} className="border border-border rounded-lg p-4">
+                    <li
+                      id={`produto-admin-${produto.id}`}
+                      key={produto.id}
+                      className={`border rounded-lg p-4 ${
+                        ultimoProdutoCadastradoId === produto.id
+                          ? "border-primary ring-2 ring-primary/25"
+                          : "border-border"
+                      }`}
+                    >
                       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                         <div>
                           <p className="font-semibold text-foreground">{produto.nome}</p>
@@ -2414,25 +3169,33 @@ const PainelEntregas = () => {
                             </button>
                           </div>
 
-                          {produto.nome.trim().toLowerCase() === "abacaxi" && (
+                          {produtoTemTamanhos(produto) && (
                             <div className="mt-3 rounded-lg border border-border p-3 bg-muted/30">
                               <p className="text-xs font-semibold text-foreground mb-2">
-                                Preços por tamanho (abacaxi)
+                                Preços por tamanho
                               </p>
                               <div className="grid sm:grid-cols-3 gap-2">
                                 <div>
                                   <label className="block text-xs text-muted-foreground mb-1">Grande</label>
                                   <input
-                                    type="number"
-                                    min="0"
-                                    step="0.01"
+                                    type="text"
+                                    inputMode="decimal"
                                     value={getPrecosAbacaxiEditados(produto).grande}
                                     onChange={(event) =>
                                       setPrecoAbacaxiEditadoPorProduto((current) => ({
                                         ...current,
                                         [produto.id]: {
                                           ...getPrecosAbacaxiEditados(produto),
-                                          grande: event.target.value,
+                                          grande: sanitizarTextoPreco(event.target.value),
+                                        },
+                                      }))
+                                    }
+                                    onBlur={(event) =>
+                                      setPrecoAbacaxiEditadoPorProduto((current) => ({
+                                        ...current,
+                                        [produto.id]: {
+                                          ...getPrecosAbacaxiEditados(produto),
+                                          grande: formatarPrecoDigitado(event.target.value),
                                         },
                                       }))
                                     }
@@ -2442,16 +3205,24 @@ const PainelEntregas = () => {
                                 <div>
                                   <label className="block text-xs text-muted-foreground mb-1">Médio</label>
                                   <input
-                                    type="number"
-                                    min="0"
-                                    step="0.01"
+                                    type="text"
+                                    inputMode="decimal"
                                     value={getPrecosAbacaxiEditados(produto).medio}
                                     onChange={(event) =>
                                       setPrecoAbacaxiEditadoPorProduto((current) => ({
                                         ...current,
                                         [produto.id]: {
                                           ...getPrecosAbacaxiEditados(produto),
-                                          medio: event.target.value,
+                                          medio: sanitizarTextoPreco(event.target.value),
+                                        },
+                                      }))
+                                    }
+                                    onBlur={(event) =>
+                                      setPrecoAbacaxiEditadoPorProduto((current) => ({
+                                        ...current,
+                                        [produto.id]: {
+                                          ...getPrecosAbacaxiEditados(produto),
+                                          medio: formatarPrecoDigitado(event.target.value),
                                         },
                                       }))
                                     }
@@ -2461,16 +3232,24 @@ const PainelEntregas = () => {
                                 <div>
                                   <label className="block text-xs text-muted-foreground mb-1">Pequeno</label>
                                   <input
-                                    type="number"
-                                    min="0"
-                                    step="0.01"
+                                    type="text"
+                                    inputMode="decimal"
                                     value={getPrecosAbacaxiEditados(produto).pequeno}
                                     onChange={(event) =>
                                       setPrecoAbacaxiEditadoPorProduto((current) => ({
                                         ...current,
                                         [produto.id]: {
                                           ...getPrecosAbacaxiEditados(produto),
-                                          pequeno: event.target.value,
+                                          pequeno: sanitizarTextoPreco(event.target.value),
+                                        },
+                                      }))
+                                    }
+                                    onBlur={(event) =>
+                                      setPrecoAbacaxiEditadoPorProduto((current) => ({
+                                        ...current,
+                                        [produto.id]: {
+                                          ...getPrecosAbacaxiEditados(produto),
+                                          pequeno: formatarPrecoDigitado(event.target.value),
                                         },
                                       }))
                                     }
@@ -2500,8 +3279,13 @@ const PainelEntregas = () => {
                             onClick={() =>
                               atualizarDisponibilidadeProduto(produto.id, !produto.disponivel)
                             }
-                            className="inline-flex items-center justify-center px-4 py-2 rounded-md border border-border text-sm font-semibold hover:bg-muted disabled:opacity-50"
+                            className={`inline-flex items-center justify-center gap-2 px-4 py-2 rounded-md border text-sm font-bold transition-colors shadow-sm disabled:opacity-50 ${
+                              produto.disponivel
+                                ? "border-amber-500 bg-amber-600 text-white hover:bg-amber-500"
+                                : "border-emerald-500 bg-emerald-600 text-white hover:bg-emerald-500"
+                            }`}
                           >
+                            <Ban className="h-4 w-4" />
                             {updatingProdutoId === produto.id
                               ? "Atualizando..."
                               : produto.disponivel
@@ -2514,8 +3298,9 @@ const PainelEntregas = () => {
                             onClick={() => {
                               setProdutoParaExcluir(produto);
                             }}
-                            className="inline-flex items-center justify-center px-4 py-2 rounded-md border border-destructive/50 text-sm font-semibold text-destructive hover:bg-destructive/10 disabled:opacity-50"
+                            className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-md border border-destructive bg-destructive text-destructive-foreground text-sm font-bold shadow-sm hover:bg-destructive/90 transition-colors disabled:opacity-50"
                           >
+                            <Trash2 className="h-4 w-4" />
                             {updatingProdutoId === produto.id ? "Processando..." : "Excluir"}
                           </button>
                         </div>
@@ -2569,9 +3354,16 @@ const PainelEntregas = () => {
                               : "border-border hover:bg-muted"
                           }`}
                         >
-                          <p className="font-semibold text-foreground truncate">
-                            {usuario.nome || "Sem nome"}
-                          </p>
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="font-semibold text-foreground truncate">
+                              {usuario.nome || "Sem nome"}
+                            </p>
+                            {isRoleAdmin(usuario.role) && (
+                              <span className="shrink-0 rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-primary">
+                                Admin
+                              </span>
+                            )}
+                          </div>
                           <p className="text-muted-foreground truncate">{usuario.email}</p>
                         </button>
                       </li>
@@ -2588,6 +3380,13 @@ const PainelEntregas = () => {
                     <p className="text-muted-foreground">Selecione um usuário para visualizar o perfil.</p>
                   ) : (
                     <div className="space-y-3">
+                      {isRoleAdmin(perfilUsuarioSelecionado.role) && (
+                        <div>
+                          <span className="inline-flex items-center rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-primary">
+                            Perfil Administrador
+                          </span>
+                        </div>
+                      )}
                       <p className="text-sm text-foreground"><strong>ID da conta:</strong> {perfilUsuarioSelecionado.id}</p>
                       <p className="text-sm text-foreground"><strong>Nome:</strong> {perfilUsuarioSelecionado.nome || "Não informado"}</p>
                       <p className="text-sm text-foreground"><strong>E-mail:</strong> {perfilUsuarioSelecionado.email}</p>

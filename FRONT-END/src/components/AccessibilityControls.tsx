@@ -1,8 +1,18 @@
 import { useEffect, useState } from "react";
-import { Contrast, RotateCcw, ZoomIn, ZoomOut } from "lucide-react";
+import { Contrast, Moon, RotateCcw, SlidersHorizontal, Sun, ZoomIn, ZoomOut } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const ZOOM_STORAGE_KEY = "accessibility:zoom";
 const CONTRAST_STORAGE_KEY = "accessibility:high-contrast";
+const DARK_MODE_STORAGE_KEY = "accessibility:dark-mode";
 const DEFAULT_ZOOM = 100;
 const MIN_ZOOM = 90;
 const MAX_ZOOM = 200;
@@ -18,9 +28,14 @@ const applyHighContrast = (enabled: boolean) => {
   document.documentElement.classList.toggle("high-contrast", enabled);
 };
 
+const applyDarkMode = (enabled: boolean) => {
+  document.documentElement.classList.toggle("dark", enabled);
+};
+
 const AccessibilityControls = ({ mobile = false }: { mobile?: boolean }) => {
   const [zoom, setZoom] = useState(DEFAULT_ZOOM);
   const [highContrast, setHighContrast] = useState(false);
+  const [darkMode, setDarkMode] = useState(false);
 
   useEffect(() => {
     const storedZoom = window.localStorage.getItem(ZOOM_STORAGE_KEY);
@@ -30,10 +45,33 @@ const AccessibilityControls = ({ mobile = false }: { mobile?: boolean }) => {
     const storedContrast = window.localStorage.getItem(CONTRAST_STORAGE_KEY);
     const initialHighContrast = storedContrast === "1";
 
+    const storedDarkMode = window.localStorage.getItem(DARK_MODE_STORAGE_KEY);
+    const hasStoredDarkMode = storedDarkMode === "1" || storedDarkMode === "0";
+    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    const initialDarkMode = hasStoredDarkMode ? storedDarkMode === "1" : prefersDark;
+
     setZoom(initialZoom);
     setHighContrast(initialHighContrast);
+    setDarkMode(initialDarkMode);
     applyZoom(initialZoom);
     applyHighContrast(initialHighContrast);
+    applyDarkMode(initialDarkMode);
+
+    const colorSchemeQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    const syncSystemTheme = (event: MediaQueryListEvent) => {
+      const hasManualPreference = window.localStorage.getItem(DARK_MODE_STORAGE_KEY);
+      if (hasManualPreference) {
+        return;
+      }
+
+      setDarkMode(event.matches);
+      applyDarkMode(event.matches);
+    };
+
+    colorSchemeQuery.addEventListener("change", syncSystemTheme);
+    return () => {
+      colorSchemeQuery.removeEventListener("change", syncSystemTheme);
+    };
   }, []);
 
   const updateZoom = (nextZoom: number) => {
@@ -43,11 +81,33 @@ const AccessibilityControls = ({ mobile = false }: { mobile?: boolean }) => {
     window.localStorage.setItem(ZOOM_STORAGE_KEY, String(normalizedZoom));
   };
 
-  const toggleHighContrast = () => {
-    const nextHighContrast = !highContrast;
-    setHighContrast(nextHighContrast);
-    applyHighContrast(nextHighContrast);
-    window.localStorage.setItem(CONTRAST_STORAGE_KEY, nextHighContrast ? "1" : "0");
+  const setHighContrastEnabled = (enabled: boolean) => {
+    setHighContrast(enabled);
+    applyHighContrast(enabled);
+    window.localStorage.setItem(CONTRAST_STORAGE_KEY, enabled ? "1" : "0");
+
+    if (enabled) {
+      setDarkMode(false);
+      applyDarkMode(false);
+      window.localStorage.setItem(DARK_MODE_STORAGE_KEY, "0");
+    }
+  };
+
+  const setDarkModeEnabled = (enabled: boolean) => {
+    setDarkMode(enabled);
+    applyDarkMode(enabled);
+    window.localStorage.setItem(DARK_MODE_STORAGE_KEY, enabled ? "1" : "0");
+
+    if (enabled) {
+      setHighContrast(false);
+      applyHighContrast(false);
+      window.localStorage.setItem(CONTRAST_STORAGE_KEY, "0");
+    }
+  };
+
+  const resetToLightDefault = () => {
+    setDarkModeEnabled(false);
+    setHighContrastEnabled(false);
   };
 
   const containerClassName = mobile
@@ -57,9 +117,26 @@ const AccessibilityControls = ({ mobile = false }: { mobile?: boolean }) => {
   const buttonBaseClassName =
     "inline-flex items-center justify-center h-8 rounded-lg border border-border bg-background text-foreground hover:bg-muted transition-colors";
 
+  const appearanceButtonClassName = highContrast || darkMode
+    ? `${buttonBaseClassName} bg-primary text-primary-foreground border-primary`
+    : buttonBaseClassName;
+
+  const darkModeButtonClassName = darkMode
+    ? `${buttonBaseClassName} bg-secondary text-secondary-foreground border-secondary`
+    : buttonBaseClassName;
+
   const contrastButtonClassName = highContrast
     ? `${buttonBaseClassName} bg-primary text-primary-foreground border-primary`
     : buttonBaseClassName;
+
+  const appearanceTitle =
+    highContrast && darkMode
+      ? "Aparência: escuro e alto contraste"
+      : highContrast
+        ? "Aparência: alto contraste"
+        : darkMode
+          ? "Aparência: modo escuro"
+          : "Aparência: padrão";
 
   return (
     <div className={containerClassName} aria-label="Controles visuais">
@@ -97,16 +174,89 @@ const AccessibilityControls = ({ mobile = false }: { mobile?: boolean }) => {
           </button>
         </div>
 
-        <button
-          type="button"
-          onClick={toggleHighContrast}
-          className={`${contrastButtonClassName} w-9`}
-          aria-label="Alternar alto contraste"
-          aria-pressed={highContrast}
-          title="Alternar alto contraste"
-        >
-          <Contrast className="h-4 w-4" />
-        </button>
+        {mobile ? (
+          <>
+            <button
+              type="button"
+              onClick={() => setDarkModeEnabled(!darkMode)}
+              className={`${darkModeButtonClassName} w-9`}
+              aria-label="Alternar modo escuro"
+              aria-pressed={darkMode}
+              title="Alternar modo escuro"
+            >
+              {darkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setHighContrastEnabled(!highContrast)}
+              className={`${contrastButtonClassName} w-9`}
+              aria-label="Alternar alto contraste"
+              aria-pressed={highContrast}
+              title="Alternar alto contraste"
+            >
+              <Contrast className="h-4 w-4" />
+            </button>
+
+            <button
+              type="button"
+              onClick={resetToLightDefault}
+              className={`${buttonBaseClassName} px-2 gap-1.5`}
+              aria-label="Voltar para padrão claro"
+              title="Voltar para padrão claro"
+            >
+              <Sun className="h-4 w-4" />
+              <span className="text-xs font-semibold">Padrão</span>
+            </button>
+          </>
+        ) : (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className={`${appearanceButtonClassName} w-9`}
+                aria-label="Abrir ajustes de aparência"
+                title={appearanceTitle}
+              >
+                <SlidersHorizontal className="h-4 w-4" />
+              </button>
+            </DropdownMenuTrigger>
+
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuLabel>Aparência</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+
+              <DropdownMenuCheckboxItem
+                checked={darkMode}
+                onCheckedChange={(checked) => setDarkModeEnabled(checked === true)}
+              >
+                <span className="inline-flex items-center gap-2">
+                  {darkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                  Modo escuro
+                </span>
+              </DropdownMenuCheckboxItem>
+
+              <DropdownMenuCheckboxItem
+                checked={highContrast}
+                onCheckedChange={(checked) => setHighContrastEnabled(checked === true)}
+              >
+                <span className="inline-flex items-center gap-2">
+                  <Contrast className="h-4 w-4" />
+                  Alto contraste
+                </span>
+              </DropdownMenuCheckboxItem>
+
+              <DropdownMenuSeparator />
+
+              <DropdownMenuItem onSelect={resetToLightDefault}>
+                <span className="inline-flex items-center gap-2">
+                  <Sun className="h-4 w-4" />
+                  Padrão claro
+                </span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </div>
     </div>
   );

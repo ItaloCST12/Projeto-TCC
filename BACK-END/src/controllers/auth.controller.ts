@@ -2,6 +2,8 @@ import { Request, Response } from "express";
 import * as AuthService from "../services/auth.service";
 import bcrypt from "bcryptjs";
 
+const PASSWORD_MAX_LENGTH = 8;
+
 export const login = async (request: Request, response: Response) => {
   const { email, password, senha } = request.body;
   try {
@@ -32,12 +34,8 @@ export const register = async (req: Request, res: Response) => {
       return res.status(400).json({ error: "Senha é obrigatória" });
     }
 
-    if (String(senhaFinal).length < 8) {
-      return res.status(400).json({ error: "Senha deve ter no mínimo 8 caracteres" });
-    }
-
-    if (String(senhaFinal).length > 128) {
-      return res.status(400).json({ error: "Senha deve ter no máximo 128 caracteres" });
+    if (String(senhaFinal).length > PASSWORD_MAX_LENGTH) {
+      return res.status(400).json({ error: "Senha deve ter no máximo 8 caracteres" });
     }
 
     if (!telefone || String(telefone).trim() === "") {
@@ -103,12 +101,8 @@ export const forgotPassword = async (req: Request, res: Response) => {
       return res.status(400).json({ error: "Nova senha é obrigatória" });
     }
 
-    if (String(senhaFinal).length < 8) {
-      return res.status(400).json({ error: "A nova senha deve ter no mínimo 8 caracteres" });
-    }
-
-    if (String(senhaFinal).length > 128) {
-      return res.status(400).json({ error: "A nova senha deve ter no máximo 128 caracteres" });
+    if (String(senhaFinal).length > PASSWORD_MAX_LENGTH) {
+      return res.status(400).json({ error: "A nova senha deve ter no máximo 8 caracteres" });
     }
 
     const senhaHash = await bcrypt.hash(senhaFinal, 10);

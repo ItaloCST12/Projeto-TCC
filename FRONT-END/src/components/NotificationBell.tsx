@@ -60,6 +60,15 @@ type EventoSocketAtendimento =
   | {
       type: "conversa_limpada";
       payload: { usuarioId: number };
+    }
+  | {
+      type: "notificacao_nova";
+      payload: {
+        destinoRole: "ADMIN" | "USUARIO";
+        usuarioId?: number;
+        tipo?: string;
+        pedidoId?: number;
+      };
     };
 
 const WS_BASE_URL = (import.meta.env.VITE_API_URL as string | undefined)?.trim() || "";
@@ -165,7 +174,7 @@ const NotificationBell = ({ mobile = false }: Props) => {
     }
   }, []);
 
-  const obterChavePublicaPush = async () => {
+  const obterChavePublicaPush = useCallback(async () => {
     const envKey = String(import.meta.env.VITE_VAPID_PUBLIC_KEY ?? "").trim();
     if (envKey) {
       return envKey;
@@ -173,9 +182,9 @@ const NotificationBell = ({ mobile = false }: Props) => {
 
     const resposta = await apiRequest<PushPublicKeyResponse>("/notificacoes/push/public-key");
     return String(resposta.publicKey ?? "").trim();
-  };
+  }, []);
 
-  const inscreverPushNoDispositivo = async () => {
+  const inscreverPushNoDispositivo = useCallback(async () => {
     if (
       !("serviceWorker" in navigator) ||
       !("PushManager" in window) ||
@@ -228,7 +237,7 @@ const NotificationBell = ({ mobile = false }: Props) => {
         },
       },
     });
-  };
+  }, [obterChavePublicaPush, suportaNotificationApi]);
 
   useEffect(() => {
     let ativo = true;
@@ -279,7 +288,10 @@ const NotificationBell = ({ mobile = false }: Props) => {
         try {
           const parsed = JSON.parse(event.data as string) as EventoSocketAtendimento;
 
-          if (parsed.type === "mensagem_nova" && "id" in parsed.payload) {
+          if (
+            (parsed.type === "mensagem_nova" && "id" in parsed.payload) ||
+            parsed.type === "notificacao_nova"
+          ) {
             void carregar();
 
             // Segundo refresh curto para evitar corrida entre evento WS e persistência da notificação.
@@ -320,7 +332,7 @@ const NotificationBell = ({ mobile = false }: Props) => {
 
   useEffect(() => {
     void inscreverPushNoDispositivo();
-  }, []);
+  }, [inscreverPushNoDispositivo]);
 
   const tituloBotao = useMemo(() => {
     if (naoLidas > 0) {

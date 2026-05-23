@@ -29,6 +29,19 @@ const buildUrl = (path: string) => {
   return `${API_BASE_URL}${path}`;
 };
 
+const extractMessageFromText = (rawText: string) => {
+  const cleaned = rawText
+    .replace(/<[^>]*>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!cleaned) {
+    return null;
+  }
+
+  return cleaned.slice(0, 220);
+};
+
 export const apiRequest = async <T>(
   path: string,
   { method = "GET", body, token }: RequestOptions = {},
@@ -61,10 +74,14 @@ export const apiRequest = async <T>(
   const contentType = response.headers.get("content-type") || "";
   const isJson = contentType.includes("application/json");
   const payload = isJson ? await response.json() : null;
+  const textPayload = isJson ? null : await response.text();
 
   if (!response.ok) {
     const message =
-      payload?.error || payload?.message || `Erro HTTP ${response.status}`;
+      payload?.error ||
+      payload?.message ||
+      (textPayload ? extractMessageFromText(textPayload) : null) ||
+      `Erro HTTP ${response.status}`;
     throw new ApiError(message, response.status);
   }
 

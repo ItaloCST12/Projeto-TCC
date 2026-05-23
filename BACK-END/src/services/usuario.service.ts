@@ -160,7 +160,18 @@ export class UsuarioService {
 }
 
 export const getByEmail = async (email: string) => {
-  return prisma.usuario.findUnique({
-    where: { email },
+  const normalizedEmail = email.trim();
+
+  if (!normalizedEmail) {
+    return null;
+  }
+
+  return prisma.usuario.findFirst({
+    where: {
+      email: {
+        equals: normalizedEmail,
+        mode: "insensitive",
+      },
+    },
   });
 };

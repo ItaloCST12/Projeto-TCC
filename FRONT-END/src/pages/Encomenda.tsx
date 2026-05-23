@@ -20,6 +20,10 @@ type Produto = {
   precoAbacaxiGrande?: number | null;
   precoAbacaxiMedio?: number | null;
   precoAbacaxiPequeno?: number | null;
+  estoque: number;
+  estoqueAbacaxiGrande?: number;
+  estoqueAbacaxiMedio?: number;
+  estoqueAbacaxiPequeno?: number;
   disponivel: boolean;
   imagemUrl?: string | null;
 };
@@ -34,6 +38,12 @@ type ProdutoVisual = {
     unit: string;
   }[];
 };
+
+const OPCOES_VENDA_TAMANHOS: ProdutoVisual["opcoesVenda"] = [
+  { value: "unidade (grande)", label: "Grande", price: "", unit: "unidade" },
+  { value: "unidade (médio)", label: "Médio", price: "", unit: "unidade" },
+  { value: "unidade (pequeno)", label: "Pequeno", price: "", unit: "unidade" },
+];
 
 const MAX_QUANTIDADE_POR_ITEM = 1000;
 
@@ -145,6 +155,21 @@ const parsePrecoPositivo = (
   return preco > 0 ? preco : fallback;
 };
 
+const produtoTemTamanhos = (produto: Produto) => {
+  const possuiPrecoTamanhoConfigurado = [
+    produto.precoAbacaxiGrande,
+    produto.precoAbacaxiMedio,
+    produto.precoAbacaxiPequeno,
+  ].some((value) => value !== null && value !== undefined && String(value).trim() !== "");
+
+  return (
+    possuiPrecoTamanhoConfigurado ||
+    Number(produto.estoqueAbacaxiGrande ?? 0) > 0 ||
+    Number(produto.estoqueAbacaxiMedio ?? 0) > 0 ||
+    Number(produto.estoqueAbacaxiPequeno ?? 0) > 0
+  );
+};
+
 const resolverChaveVisualProduto = (nomeProduto: string) => {
   const nome = normalizarTexto(nomeProduto);
 
@@ -220,7 +245,7 @@ const Encomenda = () => {
   }, []);
 
   if (!authenticated) {
-    return <Navigate to="/login?redirect=/encomenda" replace />;
+    return <Navigate to="/#produtos" replace />;
   }
 
   const hasProdutos = produtos.length > 0;
@@ -234,6 +259,14 @@ const Encomenda = () => {
         opcoesVenda: [{ value: "unidade", label: "Unidade", price: "Consulte", unit: "unidade" }],
       }
     );
+  };
+
+  const getOpcoesVendaProduto = (produto: Produto, visual: ProdutoVisual) => {
+    if (produtoTemTamanhos(produto)) {
+      return OPCOES_VENDA_TAMANHOS;
+    }
+
+    return visual.opcoesVenda;
   };
 
   const getQuantidadeSelecionada = (produtoId: number) => {
@@ -253,34 +286,66 @@ const Encomenda = () => {
     return unidadePorProduto[produtoId] ?? defaultUnit;
   };
 
-  const getOpcaoSelecionada = (produtoId: number, visual: ProdutoVisual) => {
-    const opcaoPadrao = visual.opcoesVenda[0];
+  const getEstoquePorOpcao = (produto: Produto, opcaoValue: string) => {
+    const opcaoNormalizada = normalizarTexto(opcaoValue);
+
+    if (produtoTemTamanhos(produto)) {
+      if (opcaoNormalizada.includes("grande")) {
+        return produto.estoqueAbacaxiGrande ?? 0;
+      }
+      if (opcaoNormalizada.includes("medio") || opcaoNormalizada.includes("médio")) {
+        return produto.estoqueAbacaxiMedio ?? 0;
+      }
+      if (opcaoNormalizada.includes("pequeno")) {
+        return produto.estoqueAbacaxiPequeno ?? 0;
+      }
+
+      return produto.estoqueAbacaxiMedio ?? 0;
+    }
+
+    return produto.estoque ?? 0;
+  };
+
+  const isOpcaoDisponivel = (produto: Produto, opcaoValue: string) =>
+    produto.disponivel && getEstoquePorOpcao(produto, opcaoValue) > 0;
+
+  const getOpcaoSelecionada = (produto: Produto, produtoId: number, visual: ProdutoVisual) => {
+    const opcoesVenda = getOpcoesVendaProduto(produto, visual);
+    const opcaoPadrao = opcoesVenda[0];
     if (!opcaoPadrao) {
       return { value: "unidade", label: "Unidade", price: "Consulte", unit: "unidade" };
     }
 
     const unidadeSelecionada = getUnidadeSelecionada(produtoId, opcaoPadrao.value);
-    return (
-      visual.opcoesVenda.find((opcao) => opcao.value === unidadeSelecionada) ?? opcaoPadrao
+    const opcaoSelecionada =
+      opcoesVenda.find((opcao) => opcao.value === unidadeSelecionada) ?? opcaoPadrao;
+
+    if (isOpcaoDisponivel(produto, opcaoSelecionada.value)) {
+      return opcaoSelecionada;
+    }
+
+    const primeiraOpcaoDisponivel = opcoesVenda.find((opcao) =>
+      isOpcaoDisponivel(produto, opcao.value),
     );
+
+    return primeiraOpcaoDisponivel ?? opcaoSelecionada;
   };
 
   const getPrecoPorOpcao = (produto: Produto, opcaoValue: string) => {
-    const nomeNormalizado = normalizarTexto(produto.nome);
     const opcaoNormalizada = normalizarTexto(opcaoValue);
 
-    if (nomeNormalizado.includes("abacaxi")) {
+    if (produtoTemTamanhos(produto)) {
       if (opcaoNormalizada.includes("grande")) {
-        return parsePrecoPositivo(produto.precoAbacaxiGrande, 7);
+        return parsePrecoPositivo(produto.precoAbacaxiGrande, parsePrecoPositivo(produto.preco, 0));
       }
       if (opcaoNormalizada.includes("medio") || opcaoNormalizada.includes("médio")) {
-        return parsePrecoPositivo(produto.precoAbacaxiMedio, 5);
+        return parsePrecoPositivo(produto.precoAbacaxiMedio, parsePrecoPositivo(produto.preco, 0));
       }
       if (opcaoNormalizada.includes("pequeno")) {
-        return parsePrecoPositivo(produto.precoAbacaxiPequeno, 3);
+        return parsePrecoPositivo(produto.precoAbacaxiPequeno, parsePrecoPositivo(produto.preco, 0));
       }
 
-      return parsePrecoPositivo(produto.preco, 5);
+      return parsePrecoPositivo(produto.preco, 0);
     }
 
     const precoBanco = parsePreco(produto.preco, 0);
@@ -312,7 +377,21 @@ const Encomenda = () => {
 
     const quantidadeSelecionada = getQuantidadeSelecionada(produto.id);
     const visual = getProdutoVisual(produto.nome);
-    const opcaoSelecionada = getOpcaoSelecionada(produto.id, visual);
+    const opcaoSelecionada = getOpcaoSelecionada(produto, produto.id, visual);
+    const estoqueOpcaoSelecionada = getEstoquePorOpcao(produto, opcaoSelecionada.value);
+
+    if (estoqueOpcaoSelecionada <= 0) {
+      setError(`Sem estoque disponível para ${produto.nome} (${opcaoSelecionada.label}).`);
+      return;
+    }
+
+    if (quantidadeSelecionada > estoqueOpcaoSelecionada) {
+      setError(
+        `Quantidade maior que o estoque disponível para ${produto.nome} (${opcaoSelecionada.label}). Disponível: ${estoqueOpcaoSelecionada}.`,
+      );
+      return;
+    }
+
     addToCart(produto.id, produto.nome, quantidadeSelecionada, opcaoSelecionada.value);
 
     setAnimandoAdicaoPorProduto((current) => ({
@@ -382,19 +461,23 @@ const Encomenda = () => {
                 <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
                   {produtos.map((produto) => {
                     const visual = getProdutoVisual(produto.nome);
+                    const opcoesVenda = getOpcoesVendaProduto(produto, visual);
                     const imagemCard = resolverImagemProduto(produto.imagemUrl, visual.image);
-                    const isAbacaxi = normalizarTexto(produto.nome).includes("abacaxi");
+                    const produtoComTamanhos = produtoTemTamanhos(produto);
                     const quantidadeSelecionada = getQuantidadeSelecionada(produto.id);
-                    const opcaoPadrao = visual.opcoesVenda[0];
-                    const unidadeSelecionada = getUnidadeSelecionada(
-                      produto.id,
-                      opcaoPadrao?.value ?? "unidade",
-                    );
-                    const opcaoSelecionada = getOpcaoSelecionada(produto.id, visual);
+                    const opcaoPadrao = opcoesVenda[0];
+                    const opcaoSelecionada = getOpcaoSelecionada(produto, produto.id, visual);
+                    const unidadeSelecionada = opcaoSelecionada.value ?? opcaoPadrao?.value ?? "unidade";
                     const precoOpcaoSelecionada = getPrecoPorOpcao(
                       produto,
                       opcaoSelecionada.value,
                     );
+                    const estoqueOpcaoSelecionada = getEstoquePorOpcao(
+                      produto,
+                      opcaoSelecionada.value,
+                    );
+                    const opcaoSelecionadaDisponivel =
+                      produto.disponivel && estoqueOpcaoSelecionada > 0;
 
                     return (
                       <div
@@ -428,6 +511,11 @@ const Encomenda = () => {
                             {!produto.disponivel && (
                               <p className="text-sm font-semibold text-destructive mt-1">Indisponível</p>
                             )}
+                            {produto.disponivel && !opcaoSelecionadaDisponivel && (
+                              <p className="text-sm font-semibold text-destructive mt-1">
+                                Sem estoque para {opcaoSelecionada.label.toLowerCase()}
+                              </p>
+                            )}
                             <p className="text-primary font-bold mt-1">
                               {formatarMoeda(precoOpcaoSelecionada)}
                               <span className="text-sm text-muted-foreground font-medium"> / {opcaoSelecionada.unit}</span>
@@ -436,17 +524,19 @@ const Encomenda = () => {
 
                           <div>
                             <label className="block text-sm font-medium text-foreground mb-1">
-                              {isAbacaxi ? "Tamanho do abacaxi" : visual.opcoesVenda.length > 1 ? "Categoria" : "Forma de venda"}
+                              {produtoComTamanhos ? "Tamanho" : opcoesVenda.length > 1 ? "Categoria" : "Forma de venda"}
                             </label>
-                            {isAbacaxi ? (
+                            {produtoComTamanhos ? (
                               <div className="grid grid-cols-3 gap-2">
-                                {visual.opcoesVenda.map((opcao) => {
+                                {opcoesVenda.map((opcao) => {
                                   const ativa = unidadeSelecionada === opcao.value;
+                                  const estoqueOpcao = getEstoquePorOpcao(produto, opcao.value);
+                                  const opcaoDisponivel = produto.disponivel && estoqueOpcao > 0;
                                   return (
                                     <button
                                       key={`${produto.id}-${opcao.value}`}
                                       type="button"
-                                      disabled={!produto.disponivel || isAdmin}
+                                      disabled={!opcaoDisponivel || isAdmin}
                                       onClick={() =>
                                         setUnidadePorProduto((current) => ({
                                           ...current,
@@ -456,15 +546,20 @@ const Encomenda = () => {
                                       className={`rounded-lg border px-2 py-2 text-sm transition-colors ${
                                         ativa
                                           ? "border-primary bg-primary/10 text-primary font-semibold"
-                                          : "border-border text-foreground hover:bg-muted"
+                                          : opcaoDisponivel
+                                            ? "border-border text-foreground hover:bg-muted"
+                                            : "border-border text-muted-foreground"
                                       } disabled:opacity-50`}
                                     >
-                                      {opcao.label}
+                                      <span className="block">{opcao.label}</span>
+                                      <span className="block text-[11px] leading-tight opacity-80">
+                                        {opcaoDisponivel ? `${estoqueOpcao} disponível` : "Sem estoque"}
+                                      </span>
                                     </button>
                                   );
                                 })}
                               </div>
-                            ) : visual.opcoesVenda.length > 1 ? (
+                            ) : opcoesVenda.length > 1 ? (
                               <select
                                 value={unidadeSelecionada}
                                 disabled={!produto.disponivel || isAdmin}
@@ -476,7 +571,7 @@ const Encomenda = () => {
                                 }
                                 className="w-full rounded-lg border border-border bg-background px-3 py-2 text-foreground disabled:opacity-50"
                               >
-                                {visual.opcoesVenda.map((opcao) => (
+                                {opcoesVenda.map((opcao) => (
                                   <option key={`${produto.id}-${opcao.value}`} value={opcao.value}>
                                     {opcao.label} — {formatarMoeda(getPrecoPorOpcao(produto, opcao.value))} / {opcao.unit}
                                   </option>
@@ -490,21 +585,24 @@ const Encomenda = () => {
                             <p className="text-xs text-muted-foreground mt-1">
                               Selecionado: {opcaoSelecionada.label} ({formatarMoeda(precoOpcaoSelecionada)} por {opcaoSelecionada.unit})
                             </p>
+                            <p className={`text-xs mt-1 ${opcaoSelecionadaDisponivel ? "text-muted-foreground" : "text-destructive"}`}>
+                              Estoque do tamanho selecionado: {opcaoSelecionadaDisponivel ? `${estoqueOpcaoSelecionada} disponível` : "Indisponível"}
+                            </p>
                           </div>
 
                           <div>
                             <label className="block text-sm font-medium text-foreground mb-1">
-                              {isAbacaxi ? "Quantidade de abacaxis" : "Quantidade"}
+                              Quantidade
                             </label>
                             <p className="text-xs text-muted-foreground mb-1">
-                              {isAbacaxi
-                                ? "Depois de escolher o tamanho, ajuste quantos abacaxis você quer."
+                              {produtoComTamanhos
+                                ? "Depois de escolher o tamanho, ajuste a quantidade desejada."
                                 : `Informe em ${opcaoSelecionada.unit}.`}
                             </p>
                             <div className="flex items-center rounded-lg border border-border overflow-hidden">
                               <button
                                 type="button"
-                                disabled={!produto.disponivel || isAdmin}
+                                disabled={!opcaoSelecionadaDisponivel || isAdmin}
                                 onClick={() => {
                                   limparEdicaoQuantidade(produto.id);
                                   setQuantidadePorProduto((current) => ({
@@ -520,7 +618,7 @@ const Encomenda = () => {
                                 type="text"
                                 inputMode="numeric"
                                 pattern="[0-9]*"
-                                disabled={!produto.disponivel || isAdmin}
+                                disabled={!opcaoSelecionadaDisponivel || isAdmin}
                                 value={getQuantidadeExibidaNoInput(produto.id)}
                                 onChange={(event) => {
                                   const valorSomenteNumeros = event.target.value.replace(/\D/g, "");
@@ -567,7 +665,7 @@ const Encomenda = () => {
                               />
                               <button
                                 type="button"
-                                disabled={!produto.disponivel || isAdmin}
+                                disabled={!opcaoSelecionadaDisponivel || isAdmin}
                                 onClick={() => {
                                   limparEdicaoQuantidade(produto.id);
                                   setQuantidadePorProduto((current) => ({
@@ -584,18 +682,18 @@ const Encomenda = () => {
 
                           <button
                             type="button"
-                            disabled={!produto.disponivel || isAdmin}
+                            disabled={!opcaoSelecionadaDisponivel || isAdmin}
                             onClick={() => adicionarProdutoViaCard(produto)}
                             className={`mt-auto w-full inline-flex items-center justify-center px-4 py-2 rounded-lg text-base font-semibold transition-all ${
-                              !produto.disponivel
+                              !opcaoSelecionadaDisponivel
                                 ? "bg-muted text-muted-foreground cursor-not-allowed"
                                 : isAdmin
                                   ? "bg-muted text-muted-foreground cursor-not-allowed"
                                   : `bg-primary text-primary-foreground hover:bg-primary/90 ${animandoAdicaoPorProduto[produto.id] ? "animate-pulse scale-[0.98]" : ""}`
                             }`}
                           >
-                            {!produto.disponivel
-                              ? "Indisponível"
+                            {!opcaoSelecionadaDisponivel
+                              ? "Sem estoque"
                               : isAdmin
                                 ? "Visualização apenas"
                                 : animandoAdicaoPorProduto[produto.id]

@@ -267,10 +267,10 @@ npm --prefix BACK-END run dev
 npm --prefix FRONT-END run dev
 ```
 
-| Serviço  | URL                           |
-| -------- | ----------------------------- |
-| Frontend | http://localhost:8080         |
-| Backend  | http://localhost:3333         |
+| Serviço  | URL                               |
+| -------- | --------------------------------- |
+| Frontend | http://localhost:8080             |
+| Backend  | http://localhost:3333             |
 | pgAdmin  | http://localhost:`<PGADMIN_PORT>` |
 
 > O frontend possui proxy configurado no Vite: todas as chamadas para `/auth`, `/produtos`, `/pedidos`, `/atendimentos`, etc., são redirecionadas automaticamente para `http://localhost:3333`.

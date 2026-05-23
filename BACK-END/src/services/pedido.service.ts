@@ -2,6 +2,7 @@ import prisma from "../models/client";
 import { Prisma } from "@prisma/client";
 import { NotificacaoService } from "./notificacao.service";
 import { EstoqueService } from "./estoque.service";
+import { emitPedidoAtualizado } from "../socket/atendimento.socket";
 
 const MAX_QUANTIDADE_POR_ITEM = 1000;
 const FORMAS_PAGAMENTO_DISPONIVEIS = ["PIX", "DINHEIRO"];
@@ -66,6 +67,125 @@ const resolverPrecoComFallback = (precoBanco: number, nomeProduto?: string, unid
   }
 
   return resolverPrecoFallbackPorNomeUnidade(nomeProduto, unidade);
+};
+
+type TamanhoProduto = "grande" | "medio" | "pequeno";
+
+type ProdutoComConfiguracaoTamanho = {
+  precoAbacaxiGrande?: unknown;
+  precoAbacaxiMedio?: unknown;
+  precoAbacaxiPequeno?: unknown;
+  estoqueAbacaxiGrande?: number;
+  estoqueAbacaxiMedio?: number;
+  estoqueAbacaxiPequeno?: number;
+};
+
+type ProdutoComEstoque = {
+  id: number;
+  nome: string;
+  disponivel: boolean;
+  estoque: number;
+  precoAbacaxiGrande?: unknown;
+  precoAbacaxiMedio?: unknown;
+  precoAbacaxiPequeno?: unknown;
+  estoqueAbacaxiGrande: number;
+  estoqueAbacaxiMedio: number;
+  estoqueAbacaxiPequeno: number;
+};
+
+const normalizarTexto = (value: string) =>
+  value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+
+const isProdutoComTamanhos = (produto?: ProdutoComConfiguracaoTamanho | null) => {
+  if (!produto) {
+    return false;
+  }
+
+  return Boolean(
+    produto.precoAbacaxiGrande !== null && produto.precoAbacaxiGrande !== undefined ||
+      produto.precoAbacaxiMedio !== null && produto.precoAbacaxiMedio !== undefined ||
+      produto.precoAbacaxiPequeno !== null && produto.precoAbacaxiPequeno !== undefined ||
+      Number(produto.estoqueAbacaxiGrande ?? 0) > 0 ||
+      Number(produto.estoqueAbacaxiMedio ?? 0) > 0 ||
+      Number(produto.estoqueAbacaxiPequeno ?? 0) > 0,
+  );
+};
+
+const resolverTamanhoPorUnidade = (unidade?: string): TamanhoProduto => {
+  const unidadeNormalizada = normalizarTexto(unidade ?? "");
+  if (unidadeNormalizada.includes("grande")) {
+    return "grande";
+  }
+  if (unidadeNormalizada.includes("pequeno")) {
+    return "pequeno";
+  }
+
+  return "medio";
+};
+
+const getLabelTamanho = (tamanho: TamanhoProduto) => {
+  if (tamanho === "grande") {
+    return "Grande";
+  }
+  if (tamanho === "pequeno") {
+    return "Pequeno";
+  }
+
+  return "Médio";
+};
+
+const getEstoqueDisponivel = (produto: ProdutoComEstoque, unidade?: string) => {
+  if (!isProdutoComTamanhos(produto)) {
+    return {
+      quantidadeDisponivel: produto.estoque,
+      tamanho: null,
+    };
+  }
+
+  const tamanho = resolverTamanhoPorUnidade(unidade);
+  if (tamanho === "grande") {
+    return {
+      quantidadeDisponivel: produto.estoqueAbacaxiGrande,
+      tamanho,
+    };
+  }
+  if (tamanho === "pequeno") {
+    return {
+      quantidadeDisponivel: produto.estoqueAbacaxiPequeno,
+      tamanho,
+    };
+  }
+
+  return {
+    quantidadeDisponivel: produto.estoqueAbacaxiMedio,
+    tamanho,
+  };
+};
+
+const validarEstoqueDisponivel = (
+  produto: ProdutoComEstoque,
+  quantidadeSolicitada: number,
+  unidade?: string,
+) => {
+  const { quantidadeDisponivel, tamanho } = getEstoqueDisponivel(produto, unidade);
+
+  if (quantidadeDisponivel >= quantidadeSolicitada) {
+    return;
+  }
+
+  if (tamanho) {
+    throw new Error(
+      `Estoque insuficiente para ${produto.nome} (${getLabelTamanho(tamanho)}). Disponível: ${quantidadeDisponivel}`,
+    );
+  }
+
+  throw new Error(
+    `Estoque insuficiente para o produto ${produto.nome}. Disponível: ${quantidadeDisponivel}`,
+  );
 };
 
 export class PedidoService {
@@ -135,11 +255,7 @@ export class PedidoService {
     if (!produtoPrincipal.disponivel) {
       throw new Error("Produto principal indisponível");
     }
-    if (produtoPrincipal.estoque < quantidadePrincipal) {
-      throw new Error(
-        `Estoque insuficiente para o produto ${produtoPrincipal.nome}. Disponível: ${produtoPrincipal.estoque}`,
-      );
-    }
+    validarEstoqueDisponivel(produtoPrincipal, quantidadePrincipal, unidadePedido);
 
     if (enderecoId) {
       if (!Number.isInteger(enderecoId) || enderecoId <= 0) {
@@ -189,10 +305,7 @@ export class PedidoService {
       const produtos = await prisma.produto.findMany({
         where: { id: { in: produtoIds } },
       });
-      const produtosMap = new Map<
-        number,
-        { id: number; nome: string; disponivel: boolean; estoque: number }
-      >(
+      const produtosMap = new Map<number, ProdutoComEstoque>(
         produtos.map((produto) => [
           produto.id,
           produto,
@@ -207,11 +320,7 @@ export class PedidoService {
         if (!produto.disponivel) {
           throw new Error(`Produto do item ${item.produtoId} indisponível`);
         }
-        if (produto.estoque < item.quantidade) {
-          throw new Error(
-            `Estoque insuficiente para o produto ${produto.nome}. Disponível: ${produto.estoque}`,
-          );
-        }
+        validarEstoqueDisponivel(produto, item.quantidade, item.unidade);
       }
     }
 
@@ -239,6 +348,7 @@ export class PedidoService {
       {
         nome: string;
         preco: number;
+        produtoComTamanhos: boolean;
         precoAbacaxiGrande: number | null;
         precoAbacaxiMedio: number | null;
         precoAbacaxiPequeno: number | null;
@@ -249,6 +359,7 @@ export class PedidoService {
         {
           nome: produto.nome,
           preco: Number(produto.preco),
+          produtoComTamanhos: isProdutoComTamanhos(produto),
           precoAbacaxiGrande:
             produto.precoAbacaxiGrande !== null
               ? Number(produto.precoAbacaxiGrande)
@@ -265,20 +376,20 @@ export class PedidoService {
       ]),
     );
 
-    const resolverPrecoComRegraAbacaxi = (
+    const resolverPrecoComRegraTamanho = (
       dadosProduto: {
         nome: string;
         preco: number;
+        produtoComTamanhos: boolean;
         precoAbacaxiGrande: number | null;
         precoAbacaxiMedio: number | null;
         precoAbacaxiPequeno: number | null;
       } | undefined,
       unidadeItem: string,
     ) => {
-      const nomeNormalizado = (dadosProduto?.nome || "").trim().toLowerCase();
-      const unidadeNormalizada = (unidadeItem || "").trim().toLowerCase();
+      const unidadeNormalizada = normalizarTexto(unidadeItem);
 
-      if (nomeNormalizado === "abacaxi") {
+      if (dadosProduto?.produtoComTamanhos) {
         if (
           unidadeNormalizada.includes("grande") &&
           dadosProduto?.precoAbacaxiGrande !== null &&
@@ -316,7 +427,7 @@ export class PedidoService {
       itemsNormalizados && itemsNormalizados.length > 0
         ? itemsNormalizados.map((item) => {
             const dadosProduto = dadosProdutoPorId.get(item.produtoId);
-            const valorUnitario = resolverPrecoComRegraAbacaxi(
+            const valorUnitario = resolverPrecoComRegraTamanho(
               dadosProduto,
               item.unidade,
             );
@@ -335,7 +446,7 @@ export class PedidoService {
         ? itensComValor.reduce((total, item) => total + item.valorTotalItem, 0)
         : (() => {
             const dadosProduto = dadosProdutoPorId.get(produtoIdPrincipal);
-            const valorUnitarioPrincipal = resolverPrecoComRegraAbacaxi(
+            const valorUnitarioPrincipal = resolverPrecoComRegraTamanho(
               dadosProduto,
               unidadePedido,
             );
@@ -383,6 +494,13 @@ export class PedidoService {
         pedidoId: pedidoCriado.id,
       }),
     );
+
+    emitPedidoAtualizado({
+      pedidoId: pedidoCriado.id,
+      usuarioId: pedidoCriado.usuarioId,
+      status: pedidoCriado.status,
+      origem: "NOVO_PEDIDO",
+    });
 
     return pedidoCriado;
   }
@@ -683,6 +801,13 @@ export class PedidoService {
       }),
     );
 
+    emitPedidoAtualizado({
+      pedidoId: pedidoAtualizado.id,
+      usuarioId: pedidoAtualizado.usuarioId,
+      status: pedidoAtualizado.status,
+      origem: "STATUS_ATUALIZADO",
+    });
+
     return pedidoAtualizado;
   }
 
@@ -729,6 +854,13 @@ export class PedidoService {
         pedidoId: pedidoAtualizado.id,
       }),
     );
+
+    emitPedidoAtualizado({
+      pedidoId: pedidoAtualizado.id,
+      usuarioId: pedidoAtualizado.usuarioId,
+      status: pedidoAtualizado.status,
+      origem: "STATUS_ATUALIZADO",
+    });
 
     return pedidoAtualizado;
   }
@@ -777,6 +909,13 @@ export class PedidoService {
         pedidoId: pedidoCancelado.id,
       }),
     );
+
+    emitPedidoAtualizado({
+      pedidoId: pedidoCancelado.id,
+      usuarioId: pedidoCancelado.usuarioId,
+      status: pedidoCancelado.status,
+      origem: "STATUS_ATUALIZADO",
+    });
 
     return pedidoCancelado;
   }

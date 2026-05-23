@@ -1,6 +1,18 @@
+import { useEffect, useState } from "react";
 import heroFarm from "@/assets/img2.jpeg";
+import { isAuthenticated, subscribeAuthSessionChange } from "@/lib/auth";
 
 const HeroSection = () => {
+  const [loggedIn, setLoggedIn] = useState(() => isAuthenticated());
+
+  useEffect(() => {
+    const syncAuth = () => {
+      setLoggedIn(isAuthenticated());
+    };
+
+    return subscribeAuthSessionChange(syncAuth);
+  }, []);
+
   return (
     <section
       id="inicio"
@@ -28,7 +40,7 @@ const HeroSection = () => {
           <span className="!text-white">fresquinho e natural</span>
         </h1>
         <p
-          className="max-w-3xl mx-auto text-base sm:text-lg md:text-xl text-primary-foreground/95 mb-6 sm:mb-8 animate-fade-in-up drop-shadow-[0_3px_12px_rgba(0,0,0,0.4)]"
+          className="max-w-3xl mx-auto text-base sm:text-lg md:text-xl !text-white mb-6 sm:mb-8 animate-fade-in-up drop-shadow-[0_4px_14px_rgba(0,0,0,0.48)]"
           style={{ animationDelay: "0.2s" }}
         >
          Há mais de 20 anos, a Fazenda Bispo leva frutas frescas e selecionadas direto do campo para sua família. Encomende laranjas, tangerinas, limões e abacaxis com qualidade e confiança desde 2002.
@@ -39,16 +51,18 @@ const HeroSection = () => {
         >
           <a
             href="#produtos"
-            className="inline-flex w-full max-w-[17rem] sm:w-auto sm:min-w-52 items-center justify-center px-6 sm:px-8 py-2.5 sm:py-3 rounded-xl bg-secondary text-secondary-foreground font-bold text-base sm:text-lg shadow-lg shadow-secondary/35 hover:-translate-y-[1px] hover:bg-secondary/95 transition-all"
+            className="inline-flex w-full max-w-[17rem] sm:w-auto sm:min-w-52 items-center justify-center px-6 sm:px-8 py-2.5 sm:py-3 rounded-xl bg-secondary dark:bg-amber-700 !text-white font-bold text-base sm:text-lg shadow-lg shadow-secondary/35 dark:shadow-amber-950/50 hover:-translate-y-[1px] hover:bg-secondary/95 dark:hover:bg-amber-600 transition-all"
           >
             Ver Produtos
           </a>
-          <a
-            href="/login"
-            className="inline-flex w-full max-w-[17rem] sm:w-auto sm:min-w-52 items-center justify-center px-6 sm:px-8 py-2.5 sm:py-3 rounded-xl border-2 border-primary bg-primary text-primary-foreground font-extrabold text-base sm:text-lg shadow-lg shadow-primary/35 hover:bg-primary/90 hover:border-primary/90 hover:-translate-y-[1px] transition-all"
-          >
-            Entrar
-          </a>
+          {!loggedIn ? (
+            <a
+              href="/login"
+              className="inline-flex w-full max-w-[17rem] sm:w-auto sm:min-w-52 items-center justify-center px-6 sm:px-8 py-2.5 sm:py-3 rounded-xl border-2 border-primary dark:border-emerald-600 bg-primary dark:bg-emerald-700 !text-white font-extrabold text-base sm:text-lg shadow-lg shadow-primary/35 dark:shadow-emerald-950/50 hover:bg-primary/90 hover:border-primary/90 dark:hover:bg-emerald-600 dark:hover:border-emerald-500 hover:-translate-y-[1px] transition-all"
+            >
+              Entrar
+            </a>
+          ) : null}
         </div>
       </div>
     </section>

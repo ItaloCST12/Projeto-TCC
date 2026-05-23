@@ -19,7 +19,7 @@ const productCards: ProductCard[] = [
   {
     name: "Abacaxi",
     price: "R$ 3,00 a R$ 7,00",
-    unit: "kg (pequeno, médio e grande)",
+    unit: "unidade (pequeno, médio e grande)",
     image: abacaxiImg,
     description: "Doce e suculento, perfeito para sucos e sobremesas.",
   },

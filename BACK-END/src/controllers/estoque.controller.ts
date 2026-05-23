@@ -46,7 +46,37 @@ export const ajustarEstoqueProduto = async (req: Request, res: Response) => {
       throw new Error("ID do produto inválido");
     }
 
-    const { tipo, quantidade, motivo, pedidoId } = req.body;
+    const { tipo, quantidade, motivo, pedidoId, tamanho, estoquesAbacaxi } = req.body;
+
+    if (estoquesAbacaxi && typeof estoquesAbacaxi === "object") {
+      const estoqueGrande = Number((estoquesAbacaxi as { grande?: unknown }).grande);
+      const estoqueMedio = Number((estoquesAbacaxi as { medio?: unknown }).medio);
+      const estoquePequeno = Number((estoquesAbacaxi as { pequeno?: unknown }).pequeno);
+
+      if (
+        !Number.isFinite(estoqueGrande) ||
+        !Number.isFinite(estoqueMedio) ||
+        !Number.isFinite(estoquePequeno) ||
+        estoqueGrande < 0 ||
+        estoqueMedio < 0 ||
+        estoquePequeno < 0
+      ) {
+        throw new Error("Estoques por tamanho inválidos");
+      }
+
+      const produto = await estoqueService.ajustarEstoquesAbacaxi(
+        produtoId,
+        {
+          grande: Math.trunc(estoqueGrande),
+          medio: Math.trunc(estoqueMedio),
+          pequeno: Math.trunc(estoquePequeno),
+        },
+        typeof motivo === "string" ? motivo : undefined,
+      );
+
+      return res.json(produto);
+    }
+
     if (typeof tipo !== "string" || !tipo.trim()) {
       throw new Error("Tipo de movimentação é obrigatório");
     }
@@ -84,6 +114,7 @@ export const ajustarEstoqueProduto = async (req: Request, res: Response) => {
       Math.trunc(quantidadeNumber),
       typeof motivo === "string" ? motivo : undefined,
       pedidoIdNumber,
+      typeof tamanho === "string" ? tamanho : undefined,
     );
 
     return res.json(produto);

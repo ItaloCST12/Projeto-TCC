@@ -22,8 +22,14 @@ const getForgotPasswordRequestKey = (req: Request) => {
   return `${ipKeyGenerator(req.ip || req.socket.remoteAddress || "")}::${email}`;
 };
 
+type RateLimitedRequest = Request & {
+  rateLimit?: {
+    resetTime?: Date;
+  };
+};
+
 const buildForgotPasswordRateLimitMessage = (req: Request) => {
-  const resetTimeMs = req.rateLimit?.resetTime?.getTime();
+  const resetTimeMs = (req as RateLimitedRequest).rateLimit?.resetTime?.getTime();
   const remainingMs =
     typeof resetTimeMs === "number" ? Math.max(0, resetTimeMs - Date.now()) : 0;
   const waitMinutes =

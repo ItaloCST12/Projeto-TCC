@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, Navigate, useSearchParams } from "react-router-dom";
 import { CalendarDays, CheckCircle2, Clock3, PackageCheck, Truck } from "lucide-react";
 import { apiRequest } from "@/lib/api";
-import { getAuthUser, isAuthenticated } from "@/lib/auth";
+import { getAuthToken, getAuthUser, isAuthenticated } from "@/lib/auth";
 import Navbar from "@/components/Navbar";
 import PageShell from "@/components/PageShell";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -47,6 +47,41 @@ type RespostaPaginada<T> = {
     total: number;
     totalPages: number;
   };
+};
+
+type EventoSocketTempoReal =
+  | {
+      type: "pedido_atualizado";
+      payload: {
+        pedidoId: number;
+        usuarioId: number;
+        status: string;
+        origem: "NOVO_PEDIDO" | "STATUS_ATUALIZADO";
+      };
+    }
+  | {
+      type: "notificacao_nova";
+      payload: {
+        destinoRole: "ADMIN" | "USUARIO";
+        usuarioId?: number;
+        tipo?: string;
+        pedidoId?: number;
+      };
+    };
+
+const WS_BASE_URL = (import.meta.env.VITE_API_URL as string | undefined)?.trim() || "";
+
+const buildWsUrl = (token: string) => {
+  if (WS_BASE_URL) {
+    const normalizedBase = WS_BASE_URL.endsWith("/")
+      ? WS_BASE_URL.slice(0, -1)
+      : WS_BASE_URL;
+    const wsBase = normalizedBase.replace(/^http/i, "ws");
+    return `${wsBase}/atendimentos/ws?token=${encodeURIComponent(token)}`;
+  }
+
+  const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+  return `${wsProtocol}//${window.location.host}/atendimentos/ws?token=${encodeURIComponent(token)}`;
 };
 
 const ENDERECO_LOJA_RETIRADA = "R. Pastor Sozinho, 3071 - Provedor, Santana - AP, 68927-078";
@@ -122,6 +157,32 @@ const formatarStatusPedido = (status?: string) => {
   return status || "-";
 };
 
+const classStatusPedido = (status?: string) => {
+  const statusNormalizado = (status ?? "").trim().toUpperCase();
+
+  if (statusNormalizado === "PENDENTE") {
+    return "border-yellow-300 bg-yellow-500/15 text-yellow-800";
+  }
+
+  if (statusNormalizado === "PRONTO_PARA_RETIRADA") {
+    return "border-sky-300 bg-sky-500/15 text-sky-800";
+  }
+
+  if (statusNormalizado === "SAIU_PARA_ENTREGA") {
+    return "border-indigo-300 bg-indigo-500/15 text-indigo-800";
+  }
+
+  if (statusNormalizado === "COMPLETADO") {
+    return "border-emerald-300 bg-emerald-500/15 text-emerald-800";
+  }
+
+  if (statusNormalizado === "CANCELADO") {
+    return "border-destructive/40 bg-destructive/15 text-destructive";
+  }
+
+  return "border-border bg-muted text-foreground";
+};
+
 const ETAPAS_STATUS_ENTREGA = [
   { label: "Pendente", icon: Clock3 },
   { label: "Pronto", icon: CheckCircle2 },
@@ -160,6 +221,7 @@ const ordenarPedidosMaisRecentes = (lista: Pedido[]) =>
 const MinhasEncomendas = () => {
   const authenticated = isAuthenticated();
   const user = getAuthUser();
+  const authToken = getAuthToken();
   const isAdmin = user?.role === "ADMIN";
   const [searchParams] = useSearchParams();
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
@@ -171,6 +233,11 @@ const MinhasEncomendas = () => {
   const [totalPaginas, setTotalPaginas] = useState(1);
   const [totalPedidos, setTotalPedidos] = useState(0);
   const [dataFiltro, setDataFiltro] = useState("");
+  const socketPedidosRef = useRef<WebSocket | null>(null);
+  const reconnectSocketPedidosTimeoutRef = useRef<number | null>(null);
+  const refreshPedidosTimeoutRef = useRef<number | null>(null);
+  const paginaAtualRef = useRef(1);
+  const carregarPedidosRef = useRef<(page?: number) => Promise<void>>(async () => {});
 
   const pedidoIdAlvo = useMemo(() => {
     const valor = searchParams.get("pedidoId");
@@ -186,7 +253,7 @@ const MinhasEncomendas = () => {
     return parsed;
   }, [searchParams]);
 
-  const carregarPedidos = async (page = paginaAtual) => {
+  const carregarPedidos = useCallback(async (page = paginaAtual) => {
     setLoading(true);
     setError("");
 
@@ -215,7 +282,15 @@ const MinhasEncomendas = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [dataFiltro, paginaAtual]);
+
+  useEffect(() => {
+    paginaAtualRef.current = paginaAtual;
+  }, [paginaAtual]);
+
+  useEffect(() => {
+    carregarPedidosRef.current = carregarPedidos;
+  }, [carregarPedidos]);
 
   useEffect(() => {
     void carregarPedidos(1);
@@ -234,6 +309,84 @@ const MinhasEncomendas = () => {
 
     elemento.scrollIntoView({ behavior: "smooth", block: "center" });
   }, [loading, pedidoIdAlvo, pedidos]);
+
+  useEffect(() => {
+    if (!authenticated || isAdmin || !user?.id || !authToken) {
+      if (refreshPedidosTimeoutRef.current) {
+        window.clearTimeout(refreshPedidosTimeoutRef.current);
+      }
+      if (reconnectSocketPedidosTimeoutRef.current) {
+        window.clearTimeout(reconnectSocketPedidosTimeoutRef.current);
+      }
+      socketPedidosRef.current?.close();
+      return;
+    }
+
+    let shouldReconnect = true;
+
+    const agendarAtualizacaoPedidos = () => {
+      if (refreshPedidosTimeoutRef.current) {
+        window.clearTimeout(refreshPedidosTimeoutRef.current);
+      }
+
+      refreshPedidosTimeoutRef.current = window.setTimeout(() => {
+        void carregarPedidosRef.current(paginaAtualRef.current || 1);
+        refreshPedidosTimeoutRef.current = null;
+      }, 200);
+    };
+
+    const conectar = () => {
+      const socket = new WebSocket(buildWsUrl(authToken));
+      socketPedidosRef.current = socket;
+
+      socket.onmessage = (event) => {
+        try {
+          const parsed = JSON.parse(event.data as string) as EventoSocketTempoReal;
+
+          if (
+            parsed.type === "pedido_atualizado" &&
+            parsed.payload.usuarioId === user.id
+          ) {
+            agendarAtualizacaoPedidos();
+            return;
+          }
+
+          if (parsed.type === "notificacao_nova") {
+            const tipo = String(parsed.payload.tipo ?? "").trim().toUpperCase();
+            const pertenceAoUsuario = parsed.payload.usuarioId === user.id;
+            const ehNotificacaoDePedido = tipo.includes("PEDIDO") || Boolean(parsed.payload.pedidoId);
+
+            if (parsed.payload.destinoRole === "USUARIO" && pertenceAoUsuario && ehNotificacaoDePedido) {
+              agendarAtualizacaoPedidos();
+            }
+          }
+        } catch {
+          return;
+        }
+      };
+
+      socket.onclose = () => {
+        if (!shouldReconnect) {
+          return;
+        }
+
+        reconnectSocketPedidosTimeoutRef.current = window.setTimeout(conectar, 1500);
+      };
+    };
+
+    conectar();
+
+    return () => {
+      shouldReconnect = false;
+      if (refreshPedidosTimeoutRef.current) {
+        window.clearTimeout(refreshPedidosTimeoutRef.current);
+      }
+      if (reconnectSocketPedidosTimeoutRef.current) {
+        window.clearTimeout(reconnectSocketPedidosTimeoutRef.current);
+      }
+      socketPedidosRef.current?.close();
+    };
+  }, [authToken, authenticated, isAdmin, user?.id]);
 
   const aplicarFiltroData = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -414,15 +567,11 @@ const MinhasEncomendas = () => {
                       <p className="text-sm font-semibold text-foreground">
                         Pedido #{pedido.id}
                       </p>
-                      {pedido.status === "CANCELADO" ? (
-                        <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-destructive/10 text-destructive text-xs font-semibold">
-                          Cancelado
-                        </span>
-                      ) : (
-                        <span className="text-xs font-medium text-muted-foreground">
-                          {formatarStatusPedido(pedido.status)}
-                        </span>
-                      )}
+                      <span
+                        className={`inline-flex items-center px-2.5 py-1 rounded-full border text-xs font-extrabold tracking-wide uppercase ${classStatusPedido(pedido.status)}`}
+                      >
+                        {formatarStatusPedido(pedido.status)}
+                      </span>
                     </div>
 
                     <div className="grid sm:grid-cols-2 gap-2 text-sm mb-3">

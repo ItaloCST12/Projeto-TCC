@@ -1,5 +1,18 @@
 import prisma from "../models/client";
 
+type ConfiguracaoTamanhosCadastro = {
+  precoTamanhos: {
+    grande: number;
+    medio: number;
+    pequeno: number;
+  };
+  estoqueTamanhos: {
+    grande: number;
+    medio: number;
+    pequeno: number;
+  };
+};
+
 const normalizarNomeProduto = (nome: string) => {
   const nomeSemEspacosExtras = nome.trim().replace(/\s+/g, " ");
   if (!nomeSemEspacosExtras) {
@@ -40,6 +53,7 @@ export class ProdutoService {
     disponivel: boolean = true,
     estoque: number,
     imagemUrl?: string,
+    configuracaoTamanhos?: ConfiguracaoTamanhosCadastro,
   ) {
     const estoqueNormalizado = Math.max(0, Math.trunc(estoque));
     const nomeNormalizado = normalizarNomeProduto(nome);
@@ -48,12 +62,50 @@ export class ProdutoService {
       throw new Error("Nome do produto é obrigatório");
     }
 
+    const precoNormalizado = Number(preco);
+    if (!Number.isFinite(precoNormalizado) || precoNormalizado < 0) {
+      throw new Error("Preço do produto inválido");
+    }
+
+    const estoquePorTamanho =
+      configuracaoTamanhos !== undefined
+        ? {
+            grande: Math.max(0, Math.trunc(configuracaoTamanhos.estoqueTamanhos.grande)),
+            medio: Math.max(0, Math.trunc(configuracaoTamanhos.estoqueTamanhos.medio)),
+            pequeno: Math.max(0, Math.trunc(configuracaoTamanhos.estoqueTamanhos.pequeno)),
+          }
+        : null;
+
+    const precoPorTamanho =
+      configuracaoTamanhos !== undefined
+        ? {
+            grande: Number(configuracaoTamanhos.precoTamanhos.grande),
+            medio: Number(configuracaoTamanhos.precoTamanhos.medio),
+            pequeno: Number(configuracaoTamanhos.precoTamanhos.pequeno),
+          }
+        : null;
+
+    const estoqueFinal =
+      estoquePorTamanho !== null
+        ? estoquePorTamanho.grande + estoquePorTamanho.medio + estoquePorTamanho.pequeno
+        : estoqueNormalizado;
+
     return await prisma.produto.create({
       data: {
         nome: nomeNormalizado,
-        preco,
+        preco: precoNormalizado,
         disponivel,
-        estoque: estoqueNormalizado,
+        estoque: estoqueFinal,
+        ...(estoquePorTamanho
+          ? {
+              estoqueAbacaxiGrande: estoquePorTamanho.grande,
+              estoqueAbacaxiMedio: estoquePorTamanho.medio,
+              estoqueAbacaxiPequeno: estoquePorTamanho.pequeno,
+              precoAbacaxiGrande: precoPorTamanho!.grande,
+              precoAbacaxiMedio: precoPorTamanho!.medio,
+              precoAbacaxiPequeno: precoPorTamanho!.pequeno,
+            }
+          : {}),
         imagemUrl: imagemUrl ?? null,
       },
     });

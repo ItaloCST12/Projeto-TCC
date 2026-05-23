@@ -26,8 +26,15 @@ type AtendimentoMensagemEvento = {
 };
 
 type EventoSocket = {
-  type: "mensagem_nova" | "conversa_limpada";
+  type: "mensagem_nova" | "conversa_limpada" | "notificacao_nova" | "pedido_atualizado";
   payload: unknown;
+};
+
+type PedidoAtualizadoPayload = {
+  pedidoId: number;
+  usuarioId: number;
+  status: string;
+  origem: "NOVO_PEDIDO" | "STATUS_ATUALIZADO";
 };
 
 let wss: WebSocketServer | null = null;
@@ -54,6 +61,22 @@ const broadcastParaAtendimento = (
 ) => {
   for (const [socket, meta] of clients.entries()) {
     if (meta.role === "ADMIN" || meta.usuarioId === usuarioId) {
+      enviar(socket, evento);
+    }
+  }
+};
+
+const broadcastParaAdmins = (evento: EventoSocket) => {
+  for (const [socket, meta] of clients.entries()) {
+    if (meta.role === "ADMIN") {
+      enviar(socket, evento);
+    }
+  }
+};
+
+const broadcastParaUsuario = (usuarioId: number, evento: EventoSocket) => {
+  for (const [socket, meta] of clients.entries()) {
+    if (meta.usuarioId === usuarioId) {
       enviar(socket, evento);
     }
   }
@@ -127,4 +150,57 @@ export const emitConversaLimpada = (usuarioId: number) => {
     type: "conversa_limpada",
     payload: { usuarioId },
   });
+};
+
+export const emitNotificacaoNovaParaAdmins = (payload: {
+  tipo?: string;
+  pedidoId?: number;
+}) => {
+  if (!wss) {
+    return;
+  }
+
+  broadcastParaAdmins({
+    type: "notificacao_nova",
+    payload: {
+      destinoRole: "ADMIN",
+      ...payload,
+    },
+  });
+};
+
+export const emitNotificacaoNovaParaUsuario = (
+  usuarioId: number,
+  payload: {
+    tipo?: string;
+    pedidoId?: number;
+  },
+) => {
+  if (!wss) {
+    return;
+  }
+
+  broadcastParaUsuario(usuarioId, {
+    type: "notificacao_nova",
+    payload: {
+      destinoRole: "USUARIO",
+      usuarioId,
+      ...payload,
+    },
+  });
+};
+
+export const emitPedidoAtualizado = (payload: PedidoAtualizadoPayload) => {
+  if (!wss) {
+    return;
+  }
+
+  for (const [socket, meta] of clients.entries()) {
+    if (meta.role === "ADMIN" || meta.usuarioId === payload.usuarioId) {
+      enviar(socket, {
+        type: "pedido_atualizado",
+        payload,
+      });
+    }
+  }
 };

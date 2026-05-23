@@ -15,7 +15,12 @@ import {
   UserCircle2,
   X,
 } from "lucide-react";
-import { clearAuthSession, getAuthUser, isAuthenticated } from "@/lib/auth";
+import {
+  clearAuthSession,
+  getAuthUser,
+  isAuthenticated,
+  subscribeAuthSessionChange,
+} from "@/lib/auth";
 import { getCartTotalItems, subscribeToCartUpdates } from "@/lib/cart";
 import logoAbacaxi from "@/assets/abacaxi-logo.svg";
 import AccessibilityControls from "@/components/AccessibilityControls";
@@ -29,11 +34,20 @@ const Navbar = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [cartTotalItems, setCartTotalItems] = useState(0);
+  const [loggedIn, setLoggedIn] = useState(() => isAuthenticated());
+  const [user, setUser] = useState(() => getAuthUser());
   const location = useLocation();
-  const loggedIn = isAuthenticated();
-  const user = getAuthUser();
   const userId = user?.id ?? null;
   const isAdmin = user?.role === "ADMIN";
+
+  useEffect(() => {
+    const syncAuth = () => {
+      setLoggedIn(isAuthenticated());
+      setUser(getAuthUser());
+    };
+
+    return subscribeAuthSessionChange(syncAuth);
+  }, []);
 
   useEffect(() => {
     if (!loggedIn || isAdmin) {
@@ -106,7 +120,8 @@ const Navbar = () => {
       ]
     : [{ label: "Entrar", to: "/login", icon: LogIn }];
 
-  const ctaTo = loggedIn ? "/encomenda" : "/login?redirect=/encomenda";
+  const ctaTo = loggedIn ? "/encomenda" : "/#produtos";
+  const mobileCtaTo = loggedIn ? "/encomenda" : "/#produtos";
   const profileLink = isAdmin ? "/painel-entregas" : "/perfil";
   const mobileCartTo = "/carrinho";
   const cartBadgeCount = cartTotalItems > 99 ? "99+" : String(cartTotalItems);
@@ -131,14 +146,14 @@ const Navbar = () => {
       />
 
       <aside
-        className="absolute left-0 top-0 h-full w-[88vw] max-w-sm bg-background border-r border-border/80 shadow-2xl transition-transform duration-300 ease-out will-change-transform"
+        className="absolute left-0 top-0 h-full w-[88vw] max-w-sm bg-background border-r border-border/60 shadow-2xl transition-transform duration-300 ease-out will-change-transform"
         style={{ transform: mobileOpen ? "translateX(0)" : "translateX(-100%)" }}
         role="dialog"
         aria-modal="true"
         aria-label="Menu lateral"
       >
         <div className="flex h-full flex-col">
-          <div className="flex items-center justify-between border-b border-border/70 px-4 py-4">
+          <div className="flex items-center justify-between border-b border-border/60 px-4 py-4">
             <a
               href="/#inicio"
               className="inline-flex items-center gap-2"
@@ -151,7 +166,7 @@ const Navbar = () => {
             </a>
             <button
               type="button"
-              className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-border/70 bg-card/80 text-foreground"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-border/60 bg-card/75 text-foreground hover:border-border/80 hover:bg-muted/70 transition-colors"
               aria-label="Fechar menu"
               onClick={() => setMobileOpen(false)}
             >
@@ -170,7 +185,7 @@ const Navbar = () => {
                   <a
                     href={link.href}
                     onClick={() => setMobileOpen(false)}
-                    className="inline-flex w-full items-center gap-2 py-2.5 px-3 rounded-lg border border-transparent text-muted-foreground font-semibold hover:text-primary hover:border-primary/20 hover:bg-muted transition-colors"
+                    className="inline-flex w-full items-center gap-2 py-2.5 px-3 rounded-lg border border-transparent text-muted-foreground font-semibold hover:text-primary hover:border-border/70 hover:bg-muted transition-colors"
                   >
                     <link.icon className="h-4 w-4" />
                     {link.label}
@@ -182,7 +197,7 @@ const Navbar = () => {
                 <li key={link.to}>
                   <Link
                     to={link.to}
-                    className="inline-flex w-full items-center gap-2 py-2.5 px-3 rounded-lg border border-transparent text-muted-foreground font-semibold hover:text-primary hover:border-primary/20 hover:bg-muted transition-colors"
+                    className="inline-flex w-full items-center gap-2 py-2.5 px-3 rounded-lg border border-transparent text-muted-foreground font-semibold hover:text-primary hover:border-border/70 hover:bg-muted transition-colors"
                     onClick={() => setMobileOpen(false)}
                   >
                     <link.icon className="h-4 w-4" />
@@ -192,7 +207,7 @@ const Navbar = () => {
               ))}
             </ul>
 
-            <div className="mt-4 border-t border-border/70 pt-4">
+            <div className="mt-4 border-t border-border/60 pt-4">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground px-1 pb-2">
                 Acessibilidade
               </p>
@@ -200,7 +215,7 @@ const Navbar = () => {
             </div>
 
             {loggedIn ? (
-              <div className="mt-4 border-t border-border/70 pt-4">
+              <div className="mt-4 border-t border-border/60 pt-4">
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground px-1 pb-2">
                   Conta
                 </p>
@@ -208,10 +223,10 @@ const Navbar = () => {
                   {!isAdmin && (
                     <Link
                       to="/carrinho"
-                      className="inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border border-primary/25 bg-primary/5 text-foreground text-sm font-semibold"
+                      className="inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border border-primary/30 bg-primary/5 text-foreground text-sm font-semibold"
                       onClick={() => setMobileOpen(false)}
                     >
-                      <ShoppingCart className="h-4 w-4" />
+                      <ShoppingCart className="h-5 w-5" />
                       {cartTotalItems}
                     </Link>
                   )}
@@ -219,7 +234,7 @@ const Navbar = () => {
                     to={profileLink}
                     aria-label="Abrir perfil"
                     title="Perfil"
-                    className="inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border border-border/80 bg-card text-foreground text-sm font-semibold hover:bg-muted transition-colors"
+                    className="inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border border-border/60 bg-card text-foreground text-sm font-semibold hover:border-border/80 hover:bg-muted transition-colors"
                     onClick={() => setMobileOpen(false)}
                   >
                     <UserCircle2 className="h-4 w-4" />
@@ -242,15 +257,26 @@ const Navbar = () => {
                 </div>
               </div>
             ) : (
-              <div className="mt-4 border-t border-border/70 pt-4">
-                <Link
-                  to={ctaTo}
-                  className="inline-flex w-full items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm shadow-md shadow-primary/30"
-                  onClick={() => setMobileOpen(false)}
-                >
-                  <Package className="h-4 w-4" />
-                  Ver Produtos
-                </Link>
+              <div className="mt-4 border-t border-border/60 pt-4">
+                {loggedIn ? (
+                  <Link
+                    to={mobileCtaTo}
+                    className="inline-flex w-full items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm shadow-md shadow-primary/30"
+                    onClick={() => setMobileOpen(false)}
+                  >
+                    <Package className="h-4 w-4" />
+                    Ver Produtos
+                  </Link>
+                ) : (
+                  <a
+                    href="/#produtos"
+                    className="inline-flex w-full items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm shadow-md shadow-primary/30"
+                    onClick={() => setMobileOpen(false)}
+                  >
+                    <Package className="h-4 w-4" />
+                    Ver Produtos
+                  </a>
+                )}
               </div>
             )}
           </div>
@@ -261,11 +287,11 @@ const Navbar = () => {
 
   return (
     <>
-    <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border/80 bg-background/90 backdrop-blur-xl shadow-sm">
-      <div className="w-full h-20 px-4 lg:px-8">
+    <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border/60 bg-background/90 backdrop-blur-xl shadow-sm">
+      <div className="mx-auto h-20 w-full max-w-[1680px] px-4 lg:px-6 2xl:px-10">
         <div className="lg:hidden h-full flex items-center justify-between relative">
           <button
-            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-border/70 bg-card/80 text-foreground"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-border/60 bg-card/75 text-foreground hover:border-border/80 hover:bg-muted/70 transition-colors"
             onClick={() => setMobileOpen(!mobileOpen)}
             aria-label="Menu"
           >
@@ -289,12 +315,12 @@ const Navbar = () => {
             {!isAdmin && (
               <Link
                 to={mobileCartTo}
-                className="relative inline-flex items-center justify-center h-10 w-10 rounded-xl border border-border/80 bg-card text-foreground hover:bg-muted/70 transition-colors"
+                className="relative inline-flex items-center justify-center h-11 w-11 rounded-xl border border-border/60 bg-card text-foreground hover:border-border/80 hover:bg-muted/70 transition-colors"
                 aria-label="Carrinho"
                 title="Carrinho"
                 onClick={() => setMobileOpen(false)}
               >
-                <ShoppingCart className="h-5 w-5" />
+                <ShoppingCart className="h-6 w-6" />
                 {loggedIn && cartTotalItems > 0 && (
                   <span className="absolute -top-1.5 -right-1.5 inline-flex items-center justify-center min-w-5 h-5 px-1 rounded-full bg-secondary text-secondary-foreground text-[10px] font-bold leading-none shadow-sm">
                     {cartBadgeCount}
@@ -305,8 +331,8 @@ const Navbar = () => {
           </div>
         </div>
 
-        <div className="hidden lg:grid h-full grid-cols-[auto_1fr_auto] items-center gap-6">
-          <a href="/#inicio" className="flex items-center gap-3 group">
+        <div className="hidden lg:grid h-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-4 xl:gap-6">
+          <a href="/#inicio" className="flex shrink-0 items-center gap-3 group">
             <img
               src={logoAbacaxi}
               alt="Logo Fazenda Bispo"
@@ -317,26 +343,26 @@ const Navbar = () => {
             </span>
           </a>
 
-          <div className="flex items-center justify-center">
-            <div className="inline-flex items-center gap-2 rounded-2xl border border-border/80 bg-card/95 px-2 py-1.5 shadow-sm">
+          <div className="min-w-0 flex items-center justify-center">
+            <div className="inline-flex max-w-full items-center gap-1.5 rounded-2xl border border-border/65 bg-card/95 px-2 py-1.5 shadow-sm overflow-x-auto whitespace-nowrap [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
               {storeLinks.map((link) => (
                 <a
                   key={link.href}
                   href={link.href}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-transparent text-muted-foreground font-semibold hover:text-primary hover:border-primary/20 hover:bg-muted transition-colors"
+                  className="inline-flex shrink-0 items-center gap-1.5 px-3 py-1.5 rounded-lg border border-transparent text-muted-foreground font-semibold hover:text-primary hover:border-border/70 hover:bg-muted transition-colors"
                 >
                   <link.icon className="h-4 w-4" />
                   {link.label}
                 </a>
               ))}
 
-              <span className="h-5 w-px bg-border mx-1" />
+              <span className="mx-1 h-5 w-px shrink-0 bg-border" />
 
               {appLinks.map((link) => (
                 <Link
                   key={link.to}
                   to={link.to}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-transparent text-muted-foreground font-semibold hover:text-primary hover:border-primary/20 hover:bg-muted transition-colors"
+                  className="inline-flex shrink-0 items-center gap-1.5 px-3 py-1.5 rounded-lg border border-transparent text-muted-foreground font-semibold hover:text-primary hover:border-border/70 hover:bg-muted transition-colors"
                 >
                   <link.icon className="h-4 w-4" />
                   {link.label}
@@ -346,23 +372,22 @@ const Navbar = () => {
               {loggedIn && !isAdmin && (
                 <Link
                   to="/carrinho"
-                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border border-primary/25 bg-primary/5 text-foreground text-sm font-semibold hover:bg-primary/10 transition-colors"
+                  aria-label="Carrinho"
+                  title="Carrinho"
+                  className="relative inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/5 text-foreground hover:border-primary/35 hover:bg-primary/10 transition-colors"
                 >
-                  <span className="relative inline-flex">
-                    <ShoppingCart className="h-4 w-4" />
-                    {cartTotalItems > 0 && (
-                      <span className="absolute -top-2 -right-2 inline-flex items-center justify-center min-w-4 h-4 px-1 rounded-full bg-secondary text-secondary-foreground text-[10px] font-bold leading-none">
-                        {cartBadgeCount}
-                      </span>
-                    )}
-                  </span>
-                  Carrinho
+                  <ShoppingCart className="h-5 w-5" />
+                  {cartTotalItems > 0 && (
+                    <span className="absolute -top-1 -right-1 inline-flex items-center justify-center min-w-[1rem] h-[1rem] px-0.5 rounded-full bg-secondary text-secondary-foreground text-[9px] font-bold leading-none">
+                      {cartBadgeCount}
+                    </span>
+                  )}
                 </Link>
               )}
             </div>
           </div>
 
-          <div className="hidden lg:flex items-center gap-2 justify-end">
+          <div className="hidden lg:flex shrink-0 items-center gap-2 justify-end">
             <AccessibilityControls />
 
             {loggedIn ? (
@@ -372,7 +397,7 @@ const Navbar = () => {
                   to={profileLink}
                   aria-label="Abrir perfil"
                   title="Perfil"
-                  className="inline-flex items-center justify-center h-10 w-10 rounded-xl border border-border/80 bg-card text-foreground hover:bg-muted transition-colors"
+                  className="inline-flex items-center justify-center h-10 w-10 rounded-xl border border-border/60 bg-card text-foreground hover:border-border/80 hover:bg-muted transition-colors"
                 >
                   <UserCircle2 className="h-5 w-5" />
                 </Link>

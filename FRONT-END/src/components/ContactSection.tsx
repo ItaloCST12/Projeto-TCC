@@ -43,7 +43,7 @@ const ContactSection = () => {
               <MapPin className="h-7 w-7 text-primary" />
             </div>
             <h3 className="font-display text-lg font-semibold text-foreground mb-1">Localização</h3>
-            <p className="text-muted-foreground text-sm text-center">Zona Rural, Cidade - Estado</p>
+            <p className="text-muted-foreground text-sm text-center">R. Pastor Sozinho, 3071 - Provedor, Santana - AP, 68927-078</p>
           </div>
         </div>
       </div>

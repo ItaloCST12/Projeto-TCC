@@ -5,6 +5,7 @@ vi.mock("../models/client", () => ({
   default: {
     usuario: {
       findUnique: vi.fn(),
+      findFirst: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
     },
@@ -53,7 +54,7 @@ describe("AuthService", () => {
     });
 
     it("deve lançar erro se usuário não existir", async () => {
-      vi.mocked(prisma.usuario.findUnique).mockResolvedValue(null);
+      vi.mocked(prisma.usuario.findFirst).mockResolvedValue(null);
 
       await expect(
         AuthService.login({ email: "naoexiste@email.com", password: "12345678" }),
@@ -62,7 +63,7 @@ describe("AuthService", () => {
 
     it("deve lançar erro se senha estiver incorreta", async () => {
       const hashedPassword = await bcrypt.hash("senhaCorreta", 10);
-      vi.mocked(prisma.usuario.findUnique).mockResolvedValue({
+      vi.mocked(prisma.usuario.findFirst).mockResolvedValue({
         id: 1,
         nome: "Test",
         email: "test@email.com",
@@ -78,7 +79,7 @@ describe("AuthService", () => {
 
     it("deve retornar token e dados do usuário com credenciais válidas", async () => {
       const hashedPassword = await bcrypt.hash("senhaCorreta", 10);
-      vi.mocked(prisma.usuario.findUnique).mockResolvedValue({
+      vi.mocked(prisma.usuario.findFirst).mockResolvedValue({
         id: 1,
         nome: "Test User",
         email: "test@email.com",
@@ -101,6 +102,33 @@ describe("AuthService", () => {
         telefone: "11999999999",
         role: "USER",
       });
+    });
+
+    it("deve permitir login com senha legada sem hash e migrar senha para bcrypt", async () => {
+      vi.mocked(prisma.usuario.findFirst).mockResolvedValue({
+        id: 7,
+        nome: "Usuario Legado",
+        email: "legado@email.com",
+        telefone: "11911112222",
+        password: "12345678",
+        role: "USER",
+      } as any);
+      vi.mocked(prisma.usuario.update).mockResolvedValue({ id: 7 } as any);
+
+      const result = await AuthService.login({
+        email: "  LEGADO@EMAIL.COM  ",
+        password: "12345678",
+      });
+
+      expect(result.token).toBeDefined();
+      expect(prisma.usuario.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 7 },
+          data: {
+            password: expect.stringMatching(/^\$2[aby]\$/),
+          },
+        }),
+      );
     });
   });
 
@@ -150,7 +178,7 @@ describe("AuthService", () => {
     });
 
     it("deve lançar erro se email já estiver cadastrado", async () => {
-      vi.mocked(prisma.usuario.findUnique).mockResolvedValue({
+      vi.mocked(prisma.usuario.findFirst).mockResolvedValue({
         id: 1,
         email: "t@t.com",
       } as any);
@@ -166,7 +194,7 @@ describe("AuthService", () => {
     });
 
     it("deve criar usuário com role USER por padrão", async () => {
-      vi.mocked(prisma.usuario.findUnique).mockResolvedValue(null);
+      vi.mocked(prisma.usuario.findFirst).mockResolvedValue(null);
       vi.mocked(prisma.usuario.create).mockResolvedValue({
         id: 1,
         nome: "Test",
@@ -210,7 +238,7 @@ describe("AuthService", () => {
     });
 
     it("deve retornar mensagem genérica se usuário não existir (sem vazar info)", async () => {
-      vi.mocked(prisma.usuario.findUnique).mockResolvedValue(null);
+      vi.mocked(prisma.usuario.findFirst).mockResolvedValue(null);
 
       const result = await AuthService.solicitarRedefinicaoSenha({
         email: "naoexiste@email.com",
@@ -220,7 +248,7 @@ describe("AuthService", () => {
     });
 
     it("deve gerar código numérico de 8 dígitos para redefinição", async () => {
-      vi.mocked(prisma.usuario.findUnique).mockResolvedValue({
+      vi.mocked(prisma.usuario.findFirst).mockResolvedValue({
         id: 1,
         email: "cliente@email.com",
       } as any);
@@ -245,7 +273,7 @@ describe("AuthService", () => {
     });
 
     it("deve gerar novo código quando o sorteado inicialmente coincide com o último emitido", async () => {
-      vi.mocked(prisma.usuario.findUnique).mockResolvedValue({
+      vi.mocked(prisma.usuario.findFirst).mockResolvedValue({
         id: 1,
         email: "cliente@email.com",
       } as any);
@@ -262,7 +290,7 @@ describe("AuthService", () => {
       vi.mocked(sendResetPasswordEmail).mockResolvedValue({ delivered: false, skipped: true });
 
       const randomSpy = vi
-        .spyOn(crypto, "randomInt")
+        .spyOn(crypto as any, "randomInt")
         .mockReturnValueOnce(12345678)
         .mockReturnValueOnce(87654321);
 
@@ -301,7 +329,7 @@ describe("AuthService", () => {
     });
 
     it("deve lançar erro se usuário não existir", async () => {
-      vi.mocked(prisma.usuario.findUnique).mockResolvedValue(null);
+      vi.mocked(prisma.usuario.findFirst).mockResolvedValue(null);
 
       await expect(
         AuthService.redefinirSenha({

@@ -22,6 +22,8 @@ type ForgotPasswordRequestResponse = {
   resetToken?: string;
 };
 
+const PASSWORD_LENGTH = 8;
+
 const Login = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -53,11 +55,18 @@ const Login = () => {
 
     const submit = async () => {
       try {
+        const normalizedEmail = email.trim().toLowerCase();
+
+        if (!normalizedEmail) {
+          setError("Informe um e-mail válido.");
+          return;
+        }
+
         if (mode === "forgot") {
           if (forgotStep === "request") {
             const response = await apiRequest<ForgotPasswordRequestResponse>("/auth/forgot-password/request", {
               method: "POST",
-              body: { email },
+              body: { email: normalizedEmail },
             });
 
             setForgotStep("reset");
@@ -86,6 +95,11 @@ const Login = () => {
             return;
           }
 
+          if (novaSenha.length > PASSWORD_LENGTH) {
+            setError("A nova senha deve ter no máximo 8 caracteres.");
+            return;
+          }
+
           if (novaSenha !== confirmarNovaSenha) {
             setError("A confirmação de senha não confere.");
             return;
@@ -94,7 +108,7 @@ const Login = () => {
           await apiRequest("/auth/forgot-password", {
             method: "POST",
             body: {
-              email,
+              email: normalizedEmail,
               codigo: codigoRedefinicao,
               novaSenha,
             },
@@ -110,12 +124,17 @@ const Login = () => {
         }
 
         if (mode === "register") {
+          if (senha.length > PASSWORD_LENGTH) {
+            setError("A senha deve ter no máximo 8 caracteres.");
+            return;
+          }
+
           await apiRequest("/auth/register", {
             method: "POST",
             body: {
               nome,
               telefone,
-              email,
+              email: normalizedEmail,
               senha,
             },
           });
@@ -124,7 +143,7 @@ const Login = () => {
         const loginResponse = await apiRequest<LoginResponse>("/auth/login", {
           method: "POST",
           body: {
-            email,
+            email: normalizedEmail,
             senha,
           },
         });
@@ -151,20 +170,15 @@ const Login = () => {
   };
 
   const handleSenhaChange = (valor: string) => {
-    if (mode === "login") {
-      setSenha(valor);
-      return;
-    }
-
-    setSenha(valor.slice(0, 128));
+    setSenha(valor.slice(0, PASSWORD_LENGTH));
   };
 
   const handleNovaSenhaChange = (valor: string) => {
-    setNovaSenha(valor.slice(0, 128));
+    setNovaSenha(valor.slice(0, PASSWORD_LENGTH));
   };
 
   const handleConfirmarNovaSenhaChange = (valor: string) => {
-    setConfirmarNovaSenha(valor.slice(0, 128));
+    setConfirmarNovaSenha(valor.slice(0, PASSWORD_LENGTH));
   };
 
   const handleCodigoRedefinicaoChange = (valor: string) => {
@@ -318,10 +332,9 @@ const Login = () => {
                     value={senha}
                     onChange={(event) => handleSenhaChange(event.target.value)}
                     className="w-full rounded-xl border border-border/80 bg-background px-3 py-2.5 pr-10 text-foreground outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/30"
-                    placeholder={mode === "register" ? "Mínimo 8 caracteres" : "Digite sua senha"}
+                    placeholder={mode === "register" ? "Até 8 caracteres" : "Digite sua senha"}
                     inputMode="text"
-                    maxLength={128}
-                    minLength={mode === "register" ? 8 : undefined}
+                    maxLength={PASSWORD_LENGTH}
                     required
                   />
                   <button
@@ -335,7 +348,7 @@ const Login = () => {
                   </button>
                 </div>
                 {mode === "register" && (
-                  <p className="text-xs text-muted-foreground mt-1">A senha deve ter no mínimo 8 caracteres.</p>
+                  <p className="text-xs text-muted-foreground mt-1">A senha deve ter no máximo 8 caracteres.</p>
                 )}
                 {mode === "login" && (
                   <div className="mt-2 text-right">
@@ -395,10 +408,9 @@ const Login = () => {
                             value={novaSenha}
                             onChange={(event) => handleNovaSenhaChange(event.target.value)}
                             className="w-full rounded-xl border border-border/80 bg-background px-3 py-2.5 pr-10 text-foreground outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/30"
-                            placeholder="Mínimo 8 caracteres"
+                            placeholder="Até 8 caracteres"
                             inputMode="text"
-                            maxLength={128}
-                            minLength={8}
+                            maxLength={PASSWORD_LENGTH}
                             required
                           />
                           <button
@@ -425,11 +437,10 @@ const Login = () => {
                           className="w-full rounded-xl border border-border/80 bg-background px-3 py-2.5 text-foreground outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/30"
                           placeholder="Repita a nova senha"
                           inputMode="text"
-                          maxLength={128}
-                          minLength={8}
+                          maxLength={PASSWORD_LENGTH}
                           required
                         />
-                        <p className="text-xs text-muted-foreground mt-1">A senha deve ter no mínimo 8 caracteres.</p>
+                        <p className="text-xs text-muted-foreground mt-1">A senha deve ter no máximo 8 caracteres.</p>
                       </div>
                     </>
                   )}

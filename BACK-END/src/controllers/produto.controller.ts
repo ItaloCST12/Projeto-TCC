@@ -52,6 +52,24 @@ const parsePrecoOpcional = (value: unknown) => {
   return parsed;
 };
 
+const parsePrecoObrigatorio = (value: unknown, campo: string) => {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    throw new Error(`Campo ${campo} inválido`);
+  }
+
+  return parsed;
+};
+
+const parseEstoqueObrigatorio = (value: unknown, campo: string) => {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    throw new Error(`Campo ${campo} inválido`);
+  }
+
+  return Math.trunc(parsed);
+};
+
 export const getProdutos = async (_req: Request, res: Response) => {
   try {
     const produtos = await produtoService.getProdutos();
@@ -94,23 +112,75 @@ export const cadastrarProduto = async (req: Request, res: Response) => {
       throw new Error("Nome do produto é obrigatório");
     }
 
-    const precoNumber = Number(preco);
-    if (!Number.isFinite(precoNumber) || precoNumber < 0) {
-      throw new Error("Preço do produto inválido");
-    }
+    const possuiCamposTamanho = [
+      req.body.precoAbacaxiGrande,
+      req.body.precoAbacaxiMedio,
+      req.body.precoAbacaxiPequeno,
+      req.body.estoqueAbacaxiGrande,
+      req.body.estoqueAbacaxiMedio,
+      req.body.estoqueAbacaxiPequeno,
+    ].some((value) => value !== undefined && value !== null && String(value).trim() !== "");
 
-    const estoqueNumber = Number(estoque);
-    if (!Number.isFinite(estoqueNumber) || estoqueNumber < 0) {
-      throw new Error("Estoque é obrigatório e deve ser maior ou igual a zero");
-    }
+    const controlaTamanhos = parseBoolean(req.body.controlaTamanhos, possuiCamposTamanho);
 
     const imagemUrl = getImagemUrlFromFile(req);
+
+    if (controlaTamanhos) {
+      const precoGrande = parsePrecoObrigatorio(req.body.precoAbacaxiGrande, "precoAbacaxiGrande");
+      const precoMedio = parsePrecoObrigatorio(req.body.precoAbacaxiMedio, "precoAbacaxiMedio");
+      const precoPequeno = parsePrecoObrigatorio(req.body.precoAbacaxiPequeno, "precoAbacaxiPequeno");
+
+      const estoqueGrande = parseEstoqueObrigatorio(
+        req.body.estoqueAbacaxiGrande,
+        "estoqueAbacaxiGrande",
+      );
+      const estoqueMedio = parseEstoqueObrigatorio(
+        req.body.estoqueAbacaxiMedio,
+        "estoqueAbacaxiMedio",
+      );
+      const estoquePequeno = parseEstoqueObrigatorio(
+        req.body.estoqueAbacaxiPequeno,
+        "estoqueAbacaxiPequeno",
+      );
+
+      const precoBase =
+        req.body.preco !== undefined
+          ? parsePrecoObrigatorio(req.body.preco, "preco")
+          : precoMedio;
+
+      const estoqueTotal = estoqueGrande + estoqueMedio + estoquePequeno;
+
+      const produtoComTamanhos = await produtoService.cadastrarProduto(
+        nome.trim(),
+        precoBase,
+        parseBoolean(disponivel, true),
+        estoqueTotal,
+        imagemUrl,
+        {
+          precoTamanhos: {
+            grande: precoGrande,
+            medio: precoMedio,
+            pequeno: precoPequeno,
+          },
+          estoqueTamanhos: {
+            grande: estoqueGrande,
+            medio: estoqueMedio,
+            pequeno: estoquePequeno,
+          },
+        },
+      );
+
+      return res.status(201).json(produtoComTamanhos);
+    }
+
+    const precoNumber = parsePrecoObrigatorio(preco, "preco");
+    const estoqueNumber = parseEstoqueObrigatorio(estoque, "estoque");
 
     const produto = await produtoService.cadastrarProduto(
       nome.trim(),
       precoNumber,
       parseBoolean(disponivel, true),
-      Math.trunc(estoqueNumber),
+      estoqueNumber,
       imagemUrl,
     );
     res.status(201).json(produto);

@@ -1,5 +1,9 @@
 import prisma from "../models/client";
 import webpush from "web-push";
+import {
+  emitNotificacaoNovaParaAdmins,
+  emitNotificacaoNovaParaUsuario,
+} from "../socket/atendimento.socket";
 
 type DestinoRole = "ADMIN" | "CLIENTE";
 
@@ -203,6 +207,11 @@ export class NotificacaoService {
       },
     });
 
+    emitNotificacaoNovaParaAdmins({
+      tipo: tipoPersistido,
+      ...(input.pedidoId !== undefined ? { pedidoId: input.pedidoId } : {}),
+    });
+
     await this.enviarPush("ADMIN", {
       title: input.titulo,
       body: input.mensagem,
@@ -228,6 +237,11 @@ export class NotificacaoService {
         mensagem: input.mensagem,
         ...(input.pedidoId !== undefined ? { pedidoId: input.pedidoId } : {}),
       },
+    });
+
+    emitNotificacaoNovaParaUsuario(usuarioId, {
+      tipo: tipoPersistido,
+      ...(input.pedidoId !== undefined ? { pedidoId: input.pedidoId } : {}),
     });
 
     await this.enviarPush(

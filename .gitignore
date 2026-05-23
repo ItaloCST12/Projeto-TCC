@@ -51,3 +51,6 @@ coverage/
 # ===== Docker volumes locais =====
 data_pgdir/
 data_pgadmin/
+
+# ===== Backups de banco de dados (dados sensíveis) =====
+BACK-END/backups/

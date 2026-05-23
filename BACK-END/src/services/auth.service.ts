@@ -11,6 +11,9 @@ const RESET_CODE_LENGTH = 8;
 const RESET_CODE_MAX_VALUE = 10 ** RESET_CODE_LENGTH;
 const MAX_RESET_CODE_GENERATION_ATTEMPTS = 10;
 
+const normalizeEmail = (email: string) => email.trim().toLowerCase();
+const BCRYPT_HASH_REGEX = /^\$2[aby]\$\d{2}\$[./A-Za-z0-9]{53}$/;
+
 const generateResetCode = () =>
   crypto.randomInt(0, RESET_CODE_MAX_VALUE).toString().padStart(RESET_CODE_LENGTH, "0");
 
@@ -43,13 +46,30 @@ export const login = async (data: { email: string; password?: string }) => {
     throw new Error("Email e senha são obrigatórios");
   }
 
-  const user = await UserService.getByEmail(data.email);
+  const normalizedEmail = normalizeEmail(data.email);
+  const user = await UserService.getByEmail(normalizedEmail);
 
   if (!user) {
     throw new Error("Usuário não encontrado");
   }
 
-  const isPasswordValid = await bcrypt.compare(data.password, user.password);
+  let isPasswordValid = false;
+
+  if (BCRYPT_HASH_REGEX.test(user.password)) {
+    isPasswordValid = await bcrypt.compare(data.password, user.password);
+  } else {
+    // Compatibilidade para contas antigas salvas sem hash; migra em login bem-sucedido.
+    isPasswordValid = data.password === user.password;
+
+    if (isPasswordValid) {
+      const newHashedPassword = await bcrypt.hash(data.password, 10);
+      await prisma.usuario.update({
+        where: { id: user.id },
+        data: { password: newHashedPassword },
+      });
+    }
+  }
+
   if (!isPasswordValid) {
     throw new Error("Credenciais inválidas");
   }
@@ -79,11 +99,13 @@ export const register = async (data: {
   password: string;
   role?: string;
 }) => {
+  const normalizedEmail = normalizeEmail(data.email ?? "");
+
   if (!data.nome?.trim()) {
     throw new Error("Nome é obrigatório");
   }
 
-  if (!data.email?.trim()) {
+  if (!normalizedEmail) {
     throw new Error("E-mail é obrigatório");
   }
 
@@ -95,16 +117,14 @@ export const register = async (data: {
     throw new Error("Telefone é obrigatório");
   }
 
-  const usuarioExistente = await prisma.usuario.findUnique({
-    where: { email: data.email },
-  });
+  const usuarioExistente = await UserService.getByEmail(normalizedEmail);
   if (usuarioExistente) {
     throw new Error("E-mail já cadastrado");
   }
   return prisma.usuario.create({
     data: {
       nome: data.nome.trim(),
-      email: data.email.trim(),
+      email: normalizedEmail,
       telefone: data.telefone.trim(),
       password: data.password,
       role: data.role ?? "USER",
@@ -123,7 +143,9 @@ export const redefinirSenha = async (data: {
   email: string;
   novaSenhaHash: string;
 }) => {
-  if (!data.email?.trim()) {
+  const normalizedEmail = normalizeEmail(data.email ?? "");
+
+  if (!normalizedEmail) {
     throw new Error("E-mail é obrigatório");
   }
 
@@ -131,9 +153,7 @@ export const redefinirSenha = async (data: {
     throw new Error("Nova senha é obrigatória");
   }
 
-  const usuario = await prisma.usuario.findUnique({
-    where: { email: data.email.trim() },
-  });
+  const usuario = await UserService.getByEmail(normalizedEmail);
 
   if (!usuario) {
     throw new Error("Usuário não encontrado");
@@ -148,13 +168,13 @@ export const redefinirSenha = async (data: {
 };
 
 export const solicitarRedefinicaoSenha = async (data: { email: string }) => {
-  if (!data.email?.trim()) {
+  const normalizedEmail = normalizeEmail(data.email ?? "");
+
+  if (!normalizedEmail) {
     throw new Error("E-mail é obrigatório");
   }
 
-  const usuario = await prisma.usuario.findUnique({
-    where: { email: data.email.trim() },
-  });
+  const usuario = await UserService.getByEmail(normalizedEmail);
 
   if (!usuario) {
     return {
@@ -219,7 +239,9 @@ export const redefinirSenhaComCodigo = async (data: {
   codigo: string;
   novaSenhaHash: string;
 }) => {
-  if (!data.email?.trim()) {
+  const normalizedEmail = normalizeEmail(data.email ?? "");
+
+  if (!normalizedEmail) {
     throw new Error("E-mail é obrigatório");
   }
 
@@ -236,9 +258,7 @@ export const redefinirSenhaComCodigo = async (data: {
     throw new Error("Código de redefinição deve conter 8 dígitos numéricos");
   }
 
-  const usuario = await prisma.usuario.findUnique({
-    where: { email: data.email.trim() },
-  });
+  const usuario = await UserService.getByEmail(normalizedEmail);
 
   if (!usuario) {
     throw new Error("Código de redefinição inválido ou expirado");

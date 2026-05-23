@@ -97,8 +97,27 @@ const normalizarTexto = (valor: string) =>
     .toLowerCase()
     .trim();
 
-const isNomeAbacaxi = (nomeProduto?: string) =>
-  normalizarTexto(nomeProduto || "").includes("abacaxi");
+const isUnidadeComTamanho = (unidade?: string) => {
+  const unidadeNormalizada = normalizarTexto(unidade || "");
+  return (
+    unidadeNormalizada.includes("grande") ||
+    unidadeNormalizada.includes("medio") ||
+    unidadeNormalizada.includes("médio") ||
+    unidadeNormalizada.includes("pequeno")
+  );
+};
+
+const produtoTemTamanhos = (produto?: Produto | null) => {
+  if (!produto) {
+    return false;
+  }
+
+  return [
+    produto.precoAbacaxiGrande,
+    produto.precoAbacaxiMedio,
+    produto.precoAbacaxiPequeno,
+  ].some((value) => value !== null && value !== undefined && String(value).trim() !== "");
+};
 
 const formatarNomeProduto = (nome: string) =>
   nome
@@ -107,20 +126,17 @@ const formatarNomeProduto = (nome: string) =>
     .map((parte) => parte.charAt(0).toUpperCase() + parte.slice(1).toLowerCase())
     .join(" ");
 
-const formatarUnidadeItem = (unidade: string, nomeProduto: string) => {
+const formatarUnidadeItem = (unidade: string) => {
   const unidadeNormalizada = normalizarTexto(unidade);
 
-  if (isNomeAbacaxi(nomeProduto)) {
-    if (unidadeNormalizada.includes("grande")) {
-      return "Grande";
-    }
-    if (unidadeNormalizada.includes("medio")) {
-      return "Medio";
-    }
-    if (unidadeNormalizada.includes("pequeno")) {
-      return "Pequeno";
-    }
-    return "Unidade";
+  if (unidadeNormalizada.includes("grande")) {
+    return "Grande";
+  }
+  if (unidadeNormalizada.includes("medio") || unidadeNormalizada.includes("médio")) {
+    return "Médio";
+  }
+  if (unidadeNormalizada.includes("pequeno")) {
+    return "Pequeno";
   }
 
   return unidade
@@ -234,10 +250,9 @@ const Carrinho = () => {
   const resolverPrecoUnitarioItem = useCallback((item: CartItem) => {
     const produto = produtosPorId.get(item.produtoId);
 
-    const nomeNormalizado = normalizarTexto(produto?.nome || item.nome || "");
     const unidadeNormalizada = normalizarTexto(item.unidade || "");
 
-    if (nomeNormalizado.includes("abacaxi")) {
+    if (produtoTemTamanhos(produto) || isUnidadeComTamanho(item.unidade)) {
       if (unidadeNormalizada.includes("grande")) {
         const precoGrande = parsePreco(produto?.precoAbacaxiGrande, -1);
         if (precoGrande > 0) {
@@ -259,9 +274,9 @@ const Carrinho = () => {
         }
       }
 
-      const precoAbacaxiPadrao = parsePreco(produto?.preco, -1);
-      if (precoAbacaxiPadrao > 0) {
-        return precoAbacaxiPadrao;
+      const precoBaseProduto = parsePreco(produto?.preco, -1);
+      if (precoBaseProduto > 0) {
+        return precoBaseProduto;
       }
 
       return resolverPrecoFallbackPorNomeUnidade(produto?.nome || item.nome, item.unidade);
@@ -748,7 +763,7 @@ const Carrinho = () => {
                                   {formatarNomeProduto(item.nome)}
                                 </span>
                                 <p className="text-xs text-muted-foreground mt-0.5">
-                                  Unidade: {formatarUnidadeItem(item.unidade, item.nome)}
+                                  Unidade: {formatarUnidadeItem(item.unidade)}
                                 </p>
                                 <div className="mt-2 grid grid-cols-1 min-[420px]:grid-cols-2 gap-2">
                                   <div className="rounded-lg border border-border/80 bg-muted/20 px-3 py-2.5">
