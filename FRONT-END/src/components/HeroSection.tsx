@@ -55,6 +55,12 @@ const HeroSection = () => {
           >
             Ver Produtos
           </a>
+          <a
+            href="/politicas"
+            className="inline-flex w-full max-w-[17rem] sm:w-auto sm:min-w-52 items-center justify-center px-6 sm:px-8 py-2.5 sm:py-3 rounded-xl border-2 border-red-700 bg-red-600 !text-white font-extrabold text-base sm:text-lg shadow-lg shadow-red-950/35 hover:bg-red-500 hover:-translate-y-[1px] transition-all"
+          >
+            Politicas
+          </a>
           {!loggedIn ? (
             <a
               href="/login"

@@ -1,6 +1,6 @@
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
-import { ShoppingCart } from "lucide-react";
+import { Info, ShoppingCart } from "lucide-react";
 import { apiRequest } from "@/lib/api";
 import { getAuthUser, isAuthenticated } from "@/lib/auth";
 import {
@@ -202,6 +202,33 @@ type ViaCepResponse = {
   cidade: string;
 };
 
+type DadosEnderecoComparacao = {
+  rua?: string | null;
+  numero?: string | null;
+  cidade?: string | null;
+  cep?: string | null;
+};
+
+const normalizarCampoEndereco = (valor?: string | null) =>
+  (valor ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+
+const normalizarNumeroEndereco = (valor?: string | null) =>
+  normalizarCampoEndereco(valor).replace(/\s+/g, "");
+
+const normalizarCepEndereco = (valor?: string | null) => (valor ?? "").replace(/\D/g, "");
+
+const montarChaveEndereco = (endereco: DadosEnderecoComparacao) => [
+  normalizarCampoEndereco(endereco.rua),
+  normalizarNumeroEndereco(endereco.numero),
+  normalizarCampoEndereco(endereco.cidade),
+  normalizarCepEndereco(endereco.cep),
+].join("|");
+
 const Carrinho = () => {
   const authenticated = isAuthenticated();
   const user = getAuthUser();
@@ -325,10 +352,7 @@ const Carrinho = () => {
       setError("");
 
       try {
-        const [produtosResponse, enderecosResponse] = await Promise.all([
-          apiRequest<Produto[]>("/produtos"),
-          apiRequest<Endereco[]>("/enderecos/me"),
-        ]);
+        const produtosResponse = await apiRequest<Produto[]>("/produtos");
 
         setProdutosCatalogo(produtosResponse);
 
@@ -365,9 +389,12 @@ const Carrinho = () => {
           });
         }
 
-        setEnderecos(enderecosResponse);
-        if (enderecosResponse.length > 0) {
-          setEnderecoId(enderecosResponse[0].id);
+        if (authenticated) {
+          const enderecosResponse = await apiRequest<Endereco[]>("/enderecos/me");
+          setEnderecos(enderecosResponse);
+          if (enderecosResponse.length > 0) {
+            setEnderecoId(enderecosResponse[0].id);
+          }
         }
       } catch (loadError) {
         setError(
@@ -598,8 +625,29 @@ const Carrinho = () => {
     setEnderecoFormError("");
     setEnderecoFormSuccess("");
 
-    if (!rua.trim() || !cidade.trim()) {
+    const dadosFormulario = {
+      rua: rua.trim(),
+      numero: numero.trim(),
+      cidade: cidade.trim(),
+      cep: cep.trim(),
+    };
+
+    if (!dadosFormulario.rua || !dadosFormulario.cidade) {
       setEnderecoFormError("Preencha rua e cidade para salvar o endereço.");
+      return;
+    }
+
+    const chaveNovoEndereco = montarChaveEndereco(dadosFormulario);
+    const enderecoDuplicado = enderecos.some((enderecoExistente) => {
+      if (editingEnderecoId && enderecoExistente.id === editingEnderecoId) {
+        return false;
+      }
+
+      return montarChaveEndereco(enderecoExistente) === chaveNovoEndereco;
+    });
+
+    if (enderecoDuplicado) {
+      setEnderecoFormError("Endereço já cadastrado.");
       return;
     }
 
@@ -610,10 +658,10 @@ const Carrinho = () => {
         const atualizado = await apiRequest<Endereco>(`/enderecos/${editingEnderecoId}`, {
           method: "PATCH",
           body: {
-            rua: rua.trim(),
-            numero: numero.trim(),
-            cidade: cidade.trim(),
-            cep: cep.trim(),
+            rua: dadosFormulario.rua,
+            numero: dadosFormulario.numero,
+            cidade: dadosFormulario.cidade,
+            cep: dadosFormulario.cep,
           },
         });
 
@@ -625,10 +673,10 @@ const Carrinho = () => {
         const criado = await apiRequest<Endereco>("/enderecos", {
           method: "POST",
           body: {
-            rua: rua.trim(),
-            numero: numero.trim(),
-            cidade: cidade.trim(),
-            cep: cep.trim(),
+            rua: dadosFormulario.rua,
+            numero: dadosFormulario.numero,
+            cidade: dadosFormulario.cidade,
+            cep: dadosFormulario.cep,
           },
         });
 
@@ -688,10 +736,6 @@ const Carrinho = () => {
       setEnderecoParaExcluir(null);
     }
   };
-
-  if (!authenticated) {
-    return <Navigate to="/login?redirect=/carrinho" replace />;
-  }
 
   if (isAdmin) {
     return <Navigate to="/encomenda" replace />;
@@ -847,6 +891,7 @@ const Carrinho = () => {
                 </div>
               </div>
 
+              {authenticated && (
               <div className="grid sm:grid-cols-2 gap-3">
                 <div>
                   <label htmlFor="tipoEntrega" className="block text-sm font-medium text-foreground mb-1">
@@ -921,175 +966,209 @@ const Carrinho = () => {
                   </div>
                 )}
               </div>
+              )}
+
+              <div className="relative overflow-hidden flex items-center gap-3.5 rounded-xl border border-emerald-300/70 bg-gradient-to-r from-emerald-50 to-teal-100/40 p-3.5 shadow-sm dark:border-emerald-700/50 dark:from-emerald-950/30 dark:to-teal-900/10">
+                <span className="pointer-events-none absolute inset-y-0 left-0 w-1.5 bg-emerald-500 dark:bg-emerald-500" aria-hidden="true" />
+                <span className="ml-1 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-100 ring-1 ring-emerald-300/70 dark:bg-emerald-900/40 dark:ring-emerald-700/50">
+                  <Info className="h-5 w-5 text-emerald-700 dark:text-emerald-400" />
+                </span>
+                <div>
+                  <p className="text-sm font-semibold text-emerald-900 dark:text-emerald-200">
+                    Pagamento fora da plataforma
+                  </p>
+                  <p className="text-sm leading-relaxed text-emerald-800/90 dark:text-emerald-200/80">
+                    Nenhum pagamento é processado aqui. O valor (PIX ou dinheiro) é combinado e pago
+                    diretamente na entrega ou na retirada do pedido.
+                  </p>
+                </div>
+              </div>
 
               {error && <p className="text-sm text-destructive">{error}</p>}
               {success && <p className="text-sm text-primary">{success}</p>}
 
-              <button
-                type="submit"
-                disabled={submitting}
-                className="w-full inline-flex items-center justify-center px-5 py-2 rounded-lg bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 transition-opacity disabled:opacity-60"
-              >
-                {submitting ? "Finalizando encomenda..." : "Finalizar Encomenda"}
-              </button>
+              {authenticated ? (
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="w-full inline-flex items-center justify-center px-5 py-2 rounded-lg bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 transition-opacity disabled:opacity-60"
+                >
+                  {submitting ? "Finalizando encomenda..." : "Finalizar Encomenda"}
+                </button>
+              ) : (
+                <div className="rounded-lg border border-border bg-muted/40 p-4 text-center">
+                  <p className="text-sm text-muted-foreground">
+                    Entre na sua conta para escolher entrega, pagamento e finalizar a encomenda. Seus
+                    itens serão mantidos.
+                  </p>
+                  <Link
+                    to="/login?redirect=/carrinho"
+                    className="mt-3 inline-flex items-center justify-center px-5 py-2 rounded-lg bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 transition-opacity"
+                  >
+                    Entrar para finalizar
+                  </Link>
+                </div>
+              )}
             </form>
           )}
         </div>
 
-        <div className="bg-card border border-border rounded-xl p-6 mt-6">
-          <h2 className="font-display text-xl font-semibold text-foreground mb-3">
-            Meus endereços
-          </h2>
-          <p className="text-sm text-muted-foreground mb-4">
-            Cadastre e atualize seus endereços. Você pode usar um deles para entrega no checkout.
-          </p>
+        {authenticated && tipoEntrega === "entrega" && (
+          <div className="bg-card border border-border rounded-xl p-6 mt-6">
+            <h2 className="font-display text-xl font-semibold text-foreground mb-3">
+              Meus endereços
+            </h2>
+            <p className="text-sm text-muted-foreground mb-4">
+              Cadastre e atualize seus endereços. Você pode usar um deles para entrega no checkout.
+            </p>
 
-          {enderecos.length === 0 ? (
-            <p className="text-sm text-muted-foreground mb-4">Nenhum endereço cadastrado.</p>
-          ) : (
-            <ul className="space-y-2 mb-4">
-              {enderecos.map((endereco) => (
-                <li
-                  key={endereco.id}
-                  className="border border-border rounded-lg p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
+            {enderecos.length === 0 ? (
+              <p className="text-sm text-muted-foreground mb-4">Nenhum endereço cadastrado.</p>
+            ) : (
+              <ul className="space-y-2 mb-4">
+                {enderecos.map((endereco) => (
+                  <li
+                    key={endereco.id}
+                    className="border border-border rounded-lg p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
+                  >
+                    <div className="text-sm text-foreground">
+                      <p>
+                        {endereco.rua}
+                        {endereco.numero ? `, ${endereco.numero}` : ""}
+                      </p>
+                      <p className="text-muted-foreground">
+                        {endereco.cidade}
+                        {endereco.cep?.trim() ? ` - ${endereco.cep}` : ""}
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => iniciarEdicaoEndereco(endereco)}
+                        className="inline-flex items-center px-3 py-1 rounded-md bg-primary text-primary-foreground text-sm font-semibold"
+                      >
+                        Editar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEnderecoParaExcluir(endereco)}
+                        disabled={deletingEnderecoId === endereco.id}
+                        className="inline-flex items-center px-3 py-1 rounded-md border border-border text-foreground text-sm font-semibold hover:bg-muted disabled:opacity-60"
+                      >
+                        {deletingEnderecoId === endereco.id ? "Excluindo..." : "Excluir"}
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            <div className="grid sm:grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <input
+                  type="text"
+                  value={cep}
+                  onChange={(event) => atualizarCepEConsultar(event.target.value)}
+                  onBlur={(event) => {
+                    const cepDigitado = event.currentTarget.value;
+                    if (cepDigitado.replace(/\D/g, "").length === 8) {
+                      void buscarEnderecoPorCep(cepDigitado);
+                    }
+                  }}
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-foreground"
+                  placeholder="CEP"
+                  inputMode="numeric"
+                  maxLength={9}
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    cancelarBuscaCepPendente();
+                    setAjudaCepAtiva(true);
+                    setCep("");
+                    setCepError("");
+                    setLoadingCep(false);
+                    window.open(
+                      "https://buscacepinter.correios.com.br/app/endereco/index.php",
+                      "_blank",
+                      "noopener,noreferrer",
+                    );
+                  }}
+                  className="inline-flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground"
                 >
-                  <div className="text-sm text-foreground">
-                    <p>
-                      {endereco.rua}
-                      {endereco.numero ? `, ${endereco.numero}` : ""}
-                    </p>
-                    <p className="text-muted-foreground">
-                      {endereco.cidade}
-                      {endereco.cep?.trim() ? ` - ${endereco.cep}` : ""}
-                    </p>
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => iniciarEdicaoEndereco(endereco)}
-                      className="inline-flex items-center px-3 py-1 rounded-md bg-primary text-primary-foreground text-sm font-semibold"
-                    >
-                      Editar
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setEnderecoParaExcluir(endereco)}
-                      disabled={deletingEnderecoId === endereco.id}
-                      className="inline-flex items-center px-3 py-1 rounded-md border border-border text-foreground text-sm font-semibold hover:bg-muted disabled:opacity-60"
-                    >
-                      {deletingEnderecoId === endereco.id ? "Excluindo..." : "Excluir"}
-                    </button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-
-          <div className="grid sm:grid-cols-2 gap-3">
-            <div className="space-y-2">
+                  <span className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-border text-[10px] font-semibold leading-none">
+                    ?
+                  </span>
+                  Não sei meu CEP
+                </button>
+              </div>
               <input
                 type="text"
-                value={cep}
-                onChange={(event) => atualizarCepEConsultar(event.target.value)}
-                onBlur={(event) => {
-                  const cepDigitado = event.currentTarget.value;
-                  if (cepDigitado.replace(/\D/g, "").length === 8) {
-                    void buscarEnderecoPorCep(cepDigitado);
-                  }
-                }}
+                value={numero}
+                onChange={(event) => setNumero(event.target.value)}
                 className="w-full rounded-lg border border-border bg-background px-3 py-2 text-foreground"
-                placeholder="CEP"
-                inputMode="numeric"
-                maxLength={9}
+                placeholder="Número"
               />
+              <input
+                type="text"
+                value={rua}
+                onChange={(event) => setRua(event.target.value)}
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-foreground"
+                placeholder="Rua"
+              />
+              <input
+                type="text"
+                value={cidade}
+                onChange={(event) => setCidade(event.target.value)}
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-foreground"
+                placeholder="Cidade"
+              />
+            </div>
+
+            <div className="mt-2">
               <button
                 type="button"
-                onClick={() => {
-                  cancelarBuscaCepPendente();
-                  setAjudaCepAtiva(true);
-                  setCep("");
-                  setCepError("");
-                  setLoadingCep(false);
-                  window.open(
-                    "https://buscacepinter.correios.com.br/app/endereco/index.php",
-                    "_blank",
-                    "noopener,noreferrer",
-                  );
-                }}
-                className="inline-flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground"
+                onClick={() => void buscarEnderecoPorCep(cep)}
+                disabled={loadingCep || cep.replace(/\D/g, "").length !== 8}
+                className="inline-flex items-center justify-center px-4 py-2 rounded-lg border border-border text-foreground text-sm font-semibold hover:bg-muted disabled:opacity-50"
               >
-                <span className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-border text-[10px] font-semibold leading-none">
-                  ?
-                </span>
-                Não sei meu CEP
+                {loadingCep ? "Buscando CEP..." : "Buscar CEP"}
               </button>
             </div>
-            <input
-              type="text"
-              value={numero}
-              onChange={(event) => setNumero(event.target.value)}
-              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-foreground"
-              placeholder="Número"
-            />
-            <input
-              type="text"
-              value={rua}
-              onChange={(event) => setRua(event.target.value)}
-              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-foreground"
-              placeholder="Rua"
-            />
-            <input
-              type="text"
-              value={cidade}
-              onChange={(event) => setCidade(event.target.value)}
-              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-foreground"
-              placeholder="Cidade"
-            />
-          </div>
 
-          <div className="mt-2">
-            <button
-              type="button"
-              onClick={() => void buscarEnderecoPorCep(cep)}
-              disabled={loadingCep || cep.replace(/\D/g, "").length !== 8}
-              className="inline-flex items-center justify-center px-4 py-2 rounded-lg border border-border text-foreground text-sm font-semibold hover:bg-muted disabled:opacity-50"
-            >
-              {loadingCep ? "Buscando CEP..." : "Buscar CEP"}
-            </button>
-          </div>
+            <div className="flex flex-wrap gap-2 mt-3">
+              <button
+                type="button"
+                onClick={() => void salvarEndereco()}
+                disabled={savingEndereco}
+                className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-50"
+              >
+                {savingEndereco
+                  ? "Salvando..."
+                  : editingEnderecoId
+                    ? "Atualizar endereço"
+                    : "Cadastrar endereço"}
+              </button>
+              <button
+                type="button"
+                onClick={limparFormularioEndereco}
+                className="inline-flex items-center justify-center px-4 py-2 rounded-lg border border-border text-foreground text-sm font-semibold hover:bg-muted"
+              >
+                Limpar
+              </button>
+            </div>
 
-          <div className="flex flex-wrap gap-2 mt-3">
-            <button
-              type="button"
-              onClick={() => void salvarEndereco()}
-              disabled={savingEndereco}
-              className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-50"
-            >
-              {savingEndereco
-                ? "Salvando..."
-                : editingEnderecoId
-                  ? "Atualizar endereço"
-                  : "Cadastrar endereço"}
-            </button>
-            <button
-              type="button"
-              onClick={limparFormularioEndereco}
-              className="inline-flex items-center justify-center px-4 py-2 rounded-lg border border-border text-foreground text-sm font-semibold hover:bg-muted"
-            >
-              Limpar
-            </button>
+            {loadingCep && <p className="text-sm text-muted-foreground mt-3">Buscando CEP...</p>}
+            {ajudaCepAtiva && (
+              <p className="text-sm text-muted-foreground mt-3">
+                Sem problemas. Você pode preencher rua e cidade manualmente para cadastrar o endereço.
+              </p>
+            )}
+            {cepError && <p className="text-sm text-destructive mt-3">{cepError}</p>}
+            {enderecoFormError && <p className="text-sm text-destructive mt-2">{enderecoFormError}</p>}
+            {enderecoFormSuccess && <p className="text-sm text-primary mt-2">{enderecoFormSuccess}</p>}
           </div>
-
-          {loadingCep && <p className="text-sm text-muted-foreground mt-3">Buscando CEP...</p>}
-          {ajudaCepAtiva && (
-            <p className="text-sm text-muted-foreground mt-3">
-              Sem problemas. Você pode preencher rua e cidade manualmente para cadastrar o endereço.
-            </p>
-          )}
-          {cepError && <p className="text-sm text-destructive mt-3">{cepError}</p>}
-          {enderecoFormError && <p className="text-sm text-destructive mt-2">{enderecoFormError}</p>}
-          {enderecoFormSuccess && <p className="text-sm text-primary mt-2">{enderecoFormSuccess}</p>}
-        </div>
+        )}
 
         <AlertDialog
           open={enderecoParaExcluir !== null}

@@ -108,6 +108,7 @@ const getEstoqueTotalPorTamanhos = (produto: {
 
 type FiltroMovimentacoes = {
   produtoId?: number;
+  tipo?: string;
   page: number;
   pageSize: number;
   dataInicio?: Date;
@@ -370,7 +371,7 @@ export class EstoqueService {
   }
 
   async getMovimentacoes(filtros: FiltroMovimentacoes) {
-    const { produtoId, page, pageSize, dataInicio, dataFim } = filtros;
+    const { produtoId, tipo, page, pageSize, dataInicio, dataFim } = filtros;
     const skip = (page - 1) * pageSize;
 
     const createdAt: Prisma.DateTimeFilter = {};
@@ -383,6 +384,7 @@ export class EstoqueService {
 
     const where: Prisma.MovimentacaoEstoqueWhereInput = {
       ...(produtoId ? { produtoId } : {}),
+      ...(tipo ? { tipo: normalizarTipoMovimentacao(tipo) } : {}),
       ...(Object.keys(createdAt).length > 0 ? { createdAt } : {}),
     };
 

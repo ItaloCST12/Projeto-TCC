@@ -50,10 +50,16 @@ type ApiProduto = {
   id: number;
   nome: string;
   disponivel: boolean;
+  preco?: number | string | null;
+  tipoVenda?: "KILO" | "SACA" | "UNIDADE" | string | null;
+  precoAbacaxiGrande?: number | string | null;
+  precoAbacaxiMedio?: number | string | null;
+  precoAbacaxiPequeno?: number | string | null;
   imagemUrl?: string | null;
 };
 
 type ProductCardView = {
+  id: number | string;
   name: string;
   price: string;
   unit: string;
@@ -105,6 +111,90 @@ const resolverImagemProduto = (imagemUrl: string | null | undefined, fallback: s
   return `${normalizedBase}${normalizedPath}`;
 };
 
+const formatarPrecoBRL = (valor: number) =>
+  new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  }).format(valor);
+
+const parsePrecoNumero = (valor: number | string | null | undefined) => {
+  if (typeof valor === "number") {
+    return Number.isFinite(valor) ? valor : null;
+  }
+
+  if (typeof valor !== "string") {
+    return null;
+  }
+
+  const texto = valor.trim();
+  if (!texto) {
+    return null;
+  }
+
+  let normalizado = texto;
+  if (normalizado.includes(",") && normalizado.includes(".")) {
+    normalizado = normalizado.replace(/\./g, "").replace(",", ".");
+  } else if (normalizado.includes(",")) {
+    normalizado = normalizado.replace(",", ".");
+  }
+
+  const numero = Number(normalizado);
+  return Number.isFinite(numero) ? numero : null;
+};
+
+const resolverPrecoProduto = (
+  produto: ApiProduto,
+  fallback?: string,
+) => {
+  const precosPorTamanho = [
+    parsePrecoNumero(produto.precoAbacaxiPequeno),
+    parsePrecoNumero(produto.precoAbacaxiMedio),
+    parsePrecoNumero(produto.precoAbacaxiGrande),
+  ].filter((valor): valor is number => valor !== null);
+
+  if (precosPorTamanho.length > 0) {
+    const menorPreco = Math.min(...precosPorTamanho);
+    const maiorPreco = Math.max(...precosPorTamanho);
+
+    if (menorPreco === maiorPreco) {
+      return formatarPrecoBRL(menorPreco);
+    }
+
+    return `${formatarPrecoBRL(menorPreco)} a ${formatarPrecoBRL(maiorPreco)}`;
+  }
+
+  const precoBase = parsePrecoNumero(produto.preco);
+  if (precoBase !== null) {
+    return formatarPrecoBRL(precoBase);
+  }
+
+  return fallback ?? "Consulte";
+};
+
+const resolverUnidadeProduto = (
+  produto: ApiProduto,
+  fallback?: string,
+) => {
+  const tipoVenda = String(produto.tipoVenda ?? "").trim().toUpperCase();
+  if (tipoVenda === "SACA") {
+    return "saca";
+  }
+  if (tipoVenda === "KILO") {
+    return "kilo";
+  }
+
+  const temPrecoPorTamanho =
+    parsePrecoNumero(produto.precoAbacaxiPequeno) !== null ||
+    parsePrecoNumero(produto.precoAbacaxiMedio) !== null ||
+    parsePrecoNumero(produto.precoAbacaxiGrande) !== null;
+
+  if (temPrecoPorTamanho) {
+    return fallback ?? "unidade (pequeno, médio e grande)";
+  }
+
+  return fallback ?? "unidade";
+};
+
 const ProductsSection = () => {
   const [apiProducts, setApiProducts] = useState<ApiProduto[]>([]);
   const [loading, setLoading] = useState(true);
@@ -131,7 +221,8 @@ const ProductsSection = () => {
 
   const productsToShow = useMemo<ProductCardView[]>(() => {
     if (apiProducts.length === 0) {
-      return productCards.map((item) => ({
+      return productCards.map((item, index) => ({
+        id: `fallback-${resolverChaveVisualProduto(item.name)}-${index}`,
         ...item,
         fallbackImage: item.image,
       }));
@@ -142,10 +233,11 @@ const ProductsSection = () => {
       const fallbackImage = mapped?.image ?? abacaxiImg;
 
       return {
+        id: apiProduct.id,
         name: apiProduct.nome,
         disponivel: apiProduct.disponivel,
-        price: mapped?.price ?? "Consulte",
-        unit: mapped?.unit ?? "unidade",
+        price: resolverPrecoProduto(apiProduct, mapped?.price),
+        unit: resolverUnidadeProduto(apiProduct, mapped?.unit),
         image: resolverImagemProduto(apiProduct.imagemUrl, fallbackImage),
         fallbackImage,
         description:
@@ -185,7 +277,7 @@ const ProductsSection = () => {
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {productsToShow.map((product) => (
             <div
-              key={product.name}
+              key={product.id}
               className="glass-card overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-card-hover group"
             >
               <div className="aspect-square overflow-hidden bg-background">

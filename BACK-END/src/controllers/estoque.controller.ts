@@ -34,6 +34,19 @@ const parseData = (value: unknown, tipo: "inicio" | "fim") => {
   return parsed;
 };
 
+const parseTipoMovimentacao = (value: unknown) => {
+  if (!value) {
+    return undefined;
+  }
+
+  const tipo = String(value).trim();
+  if (!tipo) {
+    return undefined;
+  }
+
+  return tipo.toUpperCase();
+};
+
 export const ajustarEstoqueProduto = async (req: Request, res: Response) => {
   try {
     const idParam = req.params.id;
@@ -135,6 +148,7 @@ export const getMovimentacoesEstoque = async (req: Request, res: Response) => {
     const page = parsePagina(req.query.page);
     const dataInicio = parseData(req.query.dataInicio, "inicio");
     const dataFim = parseData(req.query.dataFim, "fim");
+    const tipo = parseTipoMovimentacao(req.query.tipo);
 
     if (dataInicio && dataFim && dataInicio > dataFim) {
       throw new Error("Data inicial não pode ser maior que a data final");
@@ -144,6 +158,7 @@ export const getMovimentacoesEstoque = async (req: Request, res: Response) => {
       ...(produtoId ? { produtoId } : {}),
       page,
       pageSize: 15,
+      ...(tipo ? { tipo } : {}),
       ...(dataInicio ? { dataInicio } : {}),
       ...(dataFim ? { dataFim } : {}),
     });

@@ -418,7 +418,14 @@ const NotificationBell = ({ mobile = false }: Props) => {
         </button>
       </DropdownMenuTrigger>
 
-      <DropdownMenuContent align="end" className="w-[340px] p-0">
+      <DropdownMenuContent
+        align="end"
+        className={
+          mobile
+            ? "z-[130] w-[min(20rem,calc(100vw-1.5rem))] p-0"
+            : "w-[340px] p-0"
+        }
+      >
         <div className="px-3 py-2 border-b border-border flex items-center justify-between gap-2">
           <DropdownMenuLabel className="p-0 text-sm inline-flex items-center gap-1.5">
             <Bell className="h-4 w-4 text-primary" />

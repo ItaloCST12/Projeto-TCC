@@ -16,11 +16,13 @@ import {
   X,
 } from "lucide-react";
 import {
+  AuthUser,
   clearAuthSession,
   getAuthUser,
   isAuthenticated,
   subscribeAuthSessionChange,
 } from "@/lib/auth";
+import { apiRequest } from "@/lib/api";
 import { getCartTotalItems, subscribeToCartUpdates } from "@/lib/cart";
 import logoAbacaxi from "@/assets/abacaxi-logo.svg";
 import AccessibilityControls from "@/components/AccessibilityControls";
@@ -38,7 +40,7 @@ const Navbar = () => {
   const [user, setUser] = useState(() => getAuthUser());
   const location = useLocation();
   const userId = user?.id ?? null;
-  const isAdmin = user?.role === "ADMIN";
+  const isAdmin = (user?.role ?? "").trim().toUpperCase() === "ADMIN";
 
   useEffect(() => {
     const syncAuth = () => {
@@ -50,7 +52,37 @@ const Navbar = () => {
   }, []);
 
   useEffect(() => {
-    if (!loggedIn || isAdmin) {
+    if (!loggedIn) {
+      return;
+    }
+
+    const roleAtual = (user?.role ?? "").trim();
+    if (roleAtual) {
+      return;
+    }
+
+    let ativo = true;
+
+    const carregarPerfil = async () => {
+      try {
+        const perfil = await apiRequest<AuthUser>("/usuarios/perfil");
+        if (ativo) {
+          setUser(perfil);
+        }
+      } catch {
+        // Mantem comportamento atual quando nao for possivel carregar perfil.
+      }
+    };
+
+    void carregarPerfil();
+
+    return () => {
+      ativo = false;
+    };
+  }, [loggedIn, user?.role]);
+
+  useEffect(() => {
+    if (isAdmin) {
       setCartTotalItems(0);
       return;
     }
@@ -118,11 +150,14 @@ const Navbar = () => {
         { label: "Atendimento", to: "/chat", icon: MessageCircle },
         ...(isAdmin ? [{ label: "Painel", to: "/painel-entregas", icon: BarChart3 }] : []),
       ]
-    : [{ label: "Entrar", to: "/login", icon: LogIn }];
+    : [
+        { label: "Produtos", to: "/encomenda", icon: Package },
+        { label: "Entrar", to: "/login", icon: LogIn },
+      ];
 
-  const ctaTo = loggedIn ? "/encomenda" : "/#produtos";
-  const mobileCtaTo = loggedIn ? "/encomenda" : "/#produtos";
   const profileLink = isAdmin ? "/painel-entregas" : "/perfil";
+  const profileLabel = isAdmin ? "Painel" : "Perfil";
+  const ProfileIcon = isAdmin ? BarChart3 : UserCircle2;
   const mobileCartTo = "/carrinho";
   const cartBadgeCount = cartTotalItems > 99 ? "99+" : String(cartTotalItems);
 
@@ -232,13 +267,13 @@ const Navbar = () => {
                   )}
                   <Link
                     to={profileLink}
-                    aria-label="Abrir perfil"
-                    title="Perfil"
+                    aria-label={isAdmin ? "Abrir painel" : "Abrir perfil"}
+                    title={profileLabel}
                     className="inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border border-border/60 bg-card text-foreground text-sm font-semibold hover:border-border/80 hover:bg-muted transition-colors"
                     onClick={() => setMobileOpen(false)}
                   >
-                    <UserCircle2 className="h-4 w-4" />
-                    Perfil
+                    <ProfileIcon className="h-4 w-4" />
+                    {profileLabel}
                   </Link>
                 </div>
                 <div className="mt-2 grid grid-cols-2 gap-2">
@@ -256,29 +291,7 @@ const Navbar = () => {
                   </button>
                 </div>
               </div>
-            ) : (
-              <div className="mt-4 border-t border-border/60 pt-4">
-                {loggedIn ? (
-                  <Link
-                    to={mobileCtaTo}
-                    className="inline-flex w-full items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm shadow-md shadow-primary/30"
-                    onClick={() => setMobileOpen(false)}
-                  >
-                    <Package className="h-4 w-4" />
-                    Ver Produtos
-                  </Link>
-                ) : (
-                  <a
-                    href="/#produtos"
-                    className="inline-flex w-full items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm shadow-md shadow-primary/30"
-                    onClick={() => setMobileOpen(false)}
-                  >
-                    <Package className="h-4 w-4" />
-                    Ver Produtos
-                  </a>
-                )}
-              </div>
-            )}
+            ) : null}
           </div>
         </div>
       </aside>
@@ -321,7 +334,7 @@ const Navbar = () => {
                 onClick={() => setMobileOpen(false)}
               >
                 <ShoppingCart className="h-6 w-6" />
-                {loggedIn && cartTotalItems > 0 && (
+                {cartTotalItems > 0 && (
                   <span className="absolute -top-1.5 -right-1.5 inline-flex items-center justify-center min-w-5 h-5 px-1 rounded-full bg-secondary text-secondary-foreground text-[10px] font-bold leading-none shadow-sm">
                     {cartBadgeCount}
                   </span>
@@ -344,7 +357,11 @@ const Navbar = () => {
           </a>
 
           <div className="min-w-0 flex items-center justify-center">
-            <div className="inline-flex max-w-full items-center gap-1.5 rounded-2xl border border-border/65 bg-card/95 px-2 py-1.5 shadow-sm overflow-x-auto whitespace-nowrap [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+            <div
+              className={`inline-flex max-w-full items-center gap-1.5 rounded-2xl border bg-card/95 px-2 py-1.5 shadow-sm overflow-x-auto whitespace-nowrap [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden ${
+                loggedIn ? "border-border/65" : "border-green-700"
+              }`}
+            >
               {storeLinks.map((link) => (
                 <a
                   key={link.href}
@@ -369,7 +386,7 @@ const Navbar = () => {
                 </Link>
               ))}
 
-              {loggedIn && !isAdmin && (
+              {!isAdmin && (
                 <Link
                   to="/carrinho"
                   aria-label="Carrinho"
@@ -410,15 +427,7 @@ const Navbar = () => {
                   Sair
                 </button>
               </>
-            ) : (
-              <Link
-                to={ctaTo}
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm shadow-md shadow-primary/30 hover:bg-primary/95 hover:shadow-lg hover:shadow-primary/35 transition-all"
-              >
-                <Package className="h-4 w-4" />
-                Ver Produtos
-              </Link>
-            )}
+            ) : null}
           </div>
         </div>
       </div>

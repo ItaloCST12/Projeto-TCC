@@ -1,8 +1,9 @@
 import { FormEvent, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Eye, EyeOff, UserCircle2 } from "lucide-react";
+import { Check, Eye, EyeOff, UserCircle2, X } from "lucide-react";
 import { apiRequest } from "@/lib/api";
 import { setAuthSession } from "@/lib/auth";
+import { mergeGuestCartIntoCurrentUser } from "@/lib/cart";
 import Navbar from "@/components/Navbar";
 import PageShell from "@/components/PageShell";
 
@@ -23,6 +24,40 @@ type ForgotPasswordRequestResponse = {
 };
 
 const PASSWORD_LENGTH = 8;
+
+const PASSWORD_POLICY_MESSAGE =
+  "A senha deve ter exatamente 8 caracteres e incluir letra maiúscula, minúscula, número e caractere especial.";
+
+const requisitosSenha = (valor: string) => [
+  { label: `Exatamente ${PASSWORD_LENGTH} caracteres`, ok: valor.length === PASSWORD_LENGTH },
+  { label: "Uma letra maiúscula", ok: /[A-Z]/.test(valor) },
+  { label: "Uma letra minúscula", ok: /[a-z]/.test(valor) },
+  { label: "Um número", ok: /[0-9]/.test(valor) },
+  { label: "Um caractere especial", ok: /[^A-Za-z0-9]/.test(valor) },
+];
+
+const senhaAtendePolitica = (valor: string) =>
+  requisitosSenha(valor).every((item) => item.ok);
+
+const ChecklistSenha = ({ valor }: { valor: string }) => (
+  <ul className="mt-2 space-y-1">
+    {requisitosSenha(valor).map((requisito) => (
+      <li
+        key={requisito.label}
+        className={`flex items-center gap-1.5 text-xs ${
+          requisito.ok ? "text-emerald-600" : "text-muted-foreground"
+        }`}
+      >
+        {requisito.ok ? (
+          <Check className="h-3.5 w-3.5 shrink-0" />
+        ) : (
+          <X className="h-3.5 w-3.5 shrink-0" />
+        )}
+        {requisito.label}
+      </li>
+    ))}
+  </ul>
+);
 
 const Login = () => {
   const navigate = useNavigate();
@@ -95,8 +130,8 @@ const Login = () => {
             return;
           }
 
-          if (novaSenha.length > PASSWORD_LENGTH) {
-            setError("A nova senha deve ter no máximo 8 caracteres.");
+          if (!senhaAtendePolitica(novaSenha)) {
+            setError(PASSWORD_POLICY_MESSAGE);
             return;
           }
 
@@ -124,8 +159,8 @@ const Login = () => {
         }
 
         if (mode === "register") {
-          if (senha.length > PASSWORD_LENGTH) {
-            setError("A senha deve ter no máximo 8 caracteres.");
+          if (!senhaAtendePolitica(senha)) {
+            setError(PASSWORD_POLICY_MESSAGE);
             return;
           }
 
@@ -154,6 +189,8 @@ const Login = () => {
           return;
         }
 
+        // Cliente: traz para a conta os itens adicionados como visitante.
+        mergeGuestCartIntoCurrentUser();
         navigate(redirectTo, { replace: true });
       } catch (submitError) {
         setError(
@@ -242,10 +279,10 @@ const Login = () => {
                   setError("");
                   setSuccess("");
                 }}
-                className={`rounded-lg py-2.5 text-sm font-semibold transition-all ${
+                className={`rounded-lg border py-2.5 text-sm font-semibold transition-all ${
                   mode === "login" || mode === "forgot"
-                    ? "bg-background text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
+                    ? "border-border bg-background text-foreground shadow-sm"
+                    : "border-border/60 text-muted-foreground hover:border-border hover:text-foreground"
                 }`}
               >
                 Entrar
@@ -257,10 +294,10 @@ const Login = () => {
                   setError("");
                   setSuccess("");
                 }}
-                className={`rounded-lg py-2.5 text-sm font-semibold transition-all ${
+                className={`rounded-lg border py-2.5 text-sm font-semibold transition-all ${
                   mode === "register"
-                    ? "bg-background text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
+                    ? "border-border bg-background text-foreground shadow-sm"
+                    : "border-border/60 text-muted-foreground hover:border-border hover:text-foreground"
                 }`}
               >
                 Cadastro
@@ -332,7 +369,7 @@ const Login = () => {
                     value={senha}
                     onChange={(event) => handleSenhaChange(event.target.value)}
                     className="w-full rounded-xl border border-border/80 bg-background px-3 py-2.5 pr-10 text-foreground outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/30"
-                    placeholder={mode === "register" ? "Até 8 caracteres" : "Digite sua senha"}
+                    placeholder={mode === "register" ? "Crie uma senha forte" : "Digite sua senha"}
                     inputMode="text"
                     maxLength={PASSWORD_LENGTH}
                     required
@@ -347,9 +384,7 @@ const Login = () => {
                     {mostrarSenha ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
-                {mode === "register" && (
-                  <p className="text-xs text-muted-foreground mt-1">A senha deve ter no máximo 8 caracteres.</p>
-                )}
+                {mode === "register" && <ChecklistSenha valor={senha} />}
                 {mode === "login" && (
                   <div className="mt-2 text-right">
                     <button
@@ -408,7 +443,7 @@ const Login = () => {
                             value={novaSenha}
                             onChange={(event) => handleNovaSenhaChange(event.target.value)}
                             className="w-full rounded-xl border border-border/80 bg-background px-3 py-2.5 pr-10 text-foreground outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/30"
-                            placeholder="Até 8 caracteres"
+                            placeholder="Crie uma senha forte"
                             inputMode="text"
                             maxLength={PASSWORD_LENGTH}
                             required
@@ -423,6 +458,7 @@ const Login = () => {
                             {mostrarNovaSenha ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                           </button>
                         </div>
+                        <ChecklistSenha valor={novaSenha} />
                       </div>
 
                       <div>
@@ -440,7 +476,9 @@ const Login = () => {
                           maxLength={PASSWORD_LENGTH}
                           required
                         />
-                        <p className="text-xs text-muted-foreground mt-1">A senha deve ter no máximo 8 caracteres.</p>
+                        {confirmarNovaSenha.length > 0 && confirmarNovaSenha !== novaSenha && (
+                          <p className="text-xs text-destructive mt-1">As senhas não conferem.</p>
+                        )}
                       </div>
                     </>
                   )}

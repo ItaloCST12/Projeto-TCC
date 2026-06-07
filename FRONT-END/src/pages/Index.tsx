@@ -1,11 +1,35 @@
+import { useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import Navbar from "@/components/Navbar";
 import HeroSection from "@/components/HeroSection";
 import AboutSection from "@/components/AboutSection";
 import ProductsSection from "@/components/ProductsSection";
 import ContactSection from "@/components/ContactSection";
-import Footer from "@/components/Footer";
 
 const Index = () => {
+  const location = useLocation();
+
+  useEffect(() => {
+    if (!location.hash) {
+      return;
+    }
+
+    const id = location.hash.replace("#", "");
+    if (!id) {
+      return;
+    }
+
+    // Aguarda a renderização das seções antes de rolar até a âncora.
+    const timeout = window.setTimeout(() => {
+      const targetElement = document.getElementById(id);
+      if (targetElement) {
+        targetElement.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    }, 120);
+
+    return () => window.clearTimeout(timeout);
+  }, [location]);
+
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
@@ -15,7 +39,6 @@ const Index = () => {
         <ProductsSection />
         <ContactSection />
       </main>
-      <Footer />
     </div>
   );
 };

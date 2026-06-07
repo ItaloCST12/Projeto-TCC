@@ -1,8 +1,7 @@
 import { Request, Response } from "express";
 import * as AuthService from "../services/auth.service";
 import bcrypt from "bcryptjs";
-
-const PASSWORD_MAX_LENGTH = 8;
+import { PASSWORD_POLICY_MESSAGE, validarForcaSenha } from "../utils/password-policy";
 
 export const login = async (request: Request, response: Response) => {
   const { email, password, senha } = request.body;
@@ -34,8 +33,8 @@ export const register = async (req: Request, res: Response) => {
       return res.status(400).json({ error: "Senha é obrigatória" });
     }
 
-    if (String(senhaFinal).length > PASSWORD_MAX_LENGTH) {
-      return res.status(400).json({ error: "Senha deve ter no máximo 8 caracteres" });
+    if (validarForcaSenha(String(senhaFinal)).length > 0) {
+      return res.status(400).json({ error: PASSWORD_POLICY_MESSAGE });
     }
 
     if (!telefone || String(telefone).trim() === "") {
@@ -101,8 +100,8 @@ export const forgotPassword = async (req: Request, res: Response) => {
       return res.status(400).json({ error: "Nova senha é obrigatória" });
     }
 
-    if (String(senhaFinal).length > PASSWORD_MAX_LENGTH) {
-      return res.status(400).json({ error: "A nova senha deve ter no máximo 8 caracteres" });
+    if (validarForcaSenha(String(senhaFinal)).length > 0) {
+      return res.status(400).json({ error: PASSWORD_POLICY_MESSAGE });
     }
 
     const senhaHash = await bcrypt.hash(senhaFinal, 10);

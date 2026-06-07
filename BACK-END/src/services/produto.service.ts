@@ -1,5 +1,7 @@
 import prisma from "../models/client";
 
+type TipoVendaProduto = "KILO" | "SACA" | "UNIDADE";
+
 type ConfiguracaoTamanhosCadastro = {
   precoTamanhos: {
     grande: number;
@@ -52,6 +54,7 @@ export class ProdutoService {
     preco: number,
     disponivel: boolean = true,
     estoque: number,
+    tipoVenda: TipoVendaProduto = "UNIDADE",
     imagemUrl?: string,
     configuracaoTamanhos?: ConfiguracaoTamanhosCadastro,
   ) {
@@ -93,6 +96,7 @@ export class ProdutoService {
     return await prisma.produto.create({
       data: {
         nome: nomeNormalizado,
+        tipoVenda,
         preco: precoNormalizado,
         disponivel,
         estoque: estoqueFinal,
@@ -162,15 +166,24 @@ export class ProdutoService {
       throw new Error("Produto não encontrado");
     }
 
-    const totalPedidosVinculados = await prisma.pedido.count({
-      where: { produtoId: id },
-    });
+    const [totalPedidosVinculados, totalItensVinculados, totalMovimentacoesVinculadas] =
+      await Promise.all([
+        prisma.pedido.count({
+          where: { produtoId: id },
+        }),
+        prisma.itemPedido.count({
+          where: { produtoId: id },
+        }),
+        prisma.movimentacaoEstoque.count({
+          where: { produtoId: id },
+        }),
+      ]);
 
-    const totalItensVinculados = await prisma.itemPedido.count({
-      where: { produtoId: id },
-    });
-
-    if (totalPedidosVinculados > 0 || totalItensVinculados > 0) {
+    if (
+      totalPedidosVinculados > 0 ||
+      totalItensVinculados > 0 ||
+      totalMovimentacoesVinculadas > 0
+    ) {
       return await prisma.produto.update({
         where: { id },
         data: { excluido: true, disponivel: false },

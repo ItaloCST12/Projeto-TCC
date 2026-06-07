@@ -64,7 +64,7 @@ A **Plataforma Fazenda Bispo** é uma aplicação web fullstack desenvolvida com
 - **Gestão de estoque** — Movimentações, ajustes e resumo por produto (somente admin)
 - **Geração de PDF** — Exportação de relatórios e comprovantes via jsPDF
 - **Acessibilidade** — Integração com VLibras (Libras), design responsivo e mobile-first
-- **Segurança** — Helmet, CORS configurado, rate-limit, hash de senhas com bcryptjs
+- **Segurança** — Helmet, CORS configurado, rate-limit, hash de senhas com bcryptjs e política de senha forte (8 caracteres com maiúscula, minúscula, número e símbolo)
 
 ---
 
@@ -201,6 +201,7 @@ node BACK-END/scripts/seed-produtos.js
 ## Segurança
 
 - **Nunca versione credenciais.** Os arquivos `.env` estão no `.gitignore`; nunca os adicione ao repositório.
+- **Política de senha forte.** Cadastro e redefinição exigem senha com exatamente 8 caracteres, incluindo letra maiúscula, minúscula, número e caractere especial — validada também no servidor.
 - **Rotacione segredos regularmente.** `JWT_SECRET`, chaves VAPID e API keys de terceiros devem ser substituídas periodicamente e imediatamente em caso de exposição.
 - **Restrinja o CORS em produção.** Defina `CORS_ORIGIN` com o domínio exato do frontend; evite usar `*`.
 - **Use HTTPS em produção.** Tokens JWT e cookies de sessão nunca devem trafegar em texto plano.

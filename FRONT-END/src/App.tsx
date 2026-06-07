@@ -13,7 +13,10 @@ import MinhasEncomendas from "./pages/MinhasEncomendas";
 import Perfil from "./pages/Perfil";
 import Chat from "./pages/Chat";
 import PainelEntregas from "./pages/PainelEntregas";
+import Politicas from "./pages/Politicas";
 import MobileBottomNav from "./components/MobileBottomNav";
+import Footer from "./components/Footer";
+import RouteMeta from "./components/RouteMeta";
 
 const queryClient = new QueryClient();
 
@@ -23,6 +26,7 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
+        <RouteMeta />
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/login" element={<Login />} />
@@ -32,8 +36,10 @@ const App = () => (
           <Route path="/perfil" element={<Perfil />} />
           <Route path="/chat" element={<Chat />} />
           <Route path="/painel-entregas" element={<PainelEntregas />} />
+          <Route path="/politicas" element={<Politicas />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
+        <Footer />
         <WhatsAppFloatingButton />
         <MobileBottomNav />
       </BrowserRouter>

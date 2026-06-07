@@ -1,8 +1,40 @@
 import { Clock3, Mail, MapPin, Phone } from "lucide-react";
 import logoAbacaxi from "@/assets/abacaxi-logo.svg";
-import { Link } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 
 const Footer = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const handleHashLinkClick = (event: React.MouseEvent<HTMLAnchorElement>, target: string) => {
+    event.preventDefault();
+
+    const [targetPath, targetHashSegment] = target.split("#");
+    const finalPath = targetPath || "/";
+    const elementId = targetHashSegment ?? "";
+
+    const scrollToSection = (id: string) => {
+      const targetElement = document.getElementById(id);
+      if (targetElement) {
+        targetElement.scrollIntoView({ behavior: "smooth", block: "start" });
+        window.history.replaceState(null, "", `${finalPath}#${id}`);
+      }
+    };
+
+    // Já está na página de destino: apenas rola até a seção.
+    if (location.pathname === finalPath) {
+      if (elementId) {
+        scrollToSection(elementId);
+      } else {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
+      return;
+    }
+
+    // Navega via SPA; a página de destino rola até a seção ao montar (ver Index.tsx).
+    navigate(`${finalPath}${elementId ? `#${elementId}` : ""}`);
+  };
+
   return (
     <footer className="site-footer bg-foreground text-white dark:bg-background pt-12 pb-7">
       <div className="container mx-auto px-4">
@@ -23,26 +55,35 @@ const Footer = () => {
                 Produção local de frutas com qualidade e cuidado em cada etapa. Faça sua encomenda
                 com praticidade e receba atendimento rápido pelo WhatsApp.
               </p>
-              <Link
-                to="/login"
-                className="inline-flex items-center mt-4 rounded-xl border border-white/30 px-4 py-2 text-sm font-semibold text-white hover:bg-white/10 transition-colors"
-              >
-                Fazer pedido agora
-              </Link>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Link
+                  to="/login"
+                  className="inline-flex items-center rounded-xl border border-white/30 px-4 py-2 text-sm font-semibold text-white hover:bg-white/10 transition-colors"
+                >
+                  Fazer pedido agora
+                </Link>
+                <Link
+                  to="/politicas"
+                  className="inline-flex items-center rounded-xl border border-primary/70 bg-primary/20 px-4 py-2 text-sm font-semibold text-white hover:bg-primary/30 transition-colors"
+                >
+                  Politicas de pagamento e entrega
+                </Link>
+              </div>
             </div>
 
             <div>
               <h3 className="text-xs uppercase tracking-[0.18em] text-white/70">Navegação</h3>
               <ul className="mt-3 space-y-2">
                 {[
-                  { label: "Início", href: "#inicio" },
-                  { label: "Nossa História", href: "#historia" },
-                  { label: "Produtos", href: "#produtos" },
-                  { label: "Contato", href: "#contato" },
+                  { label: "Início", to: "/#inicio" },
+                  { label: "Nossa História", to: "/#historia" },
+                  { label: "Produtos", to: "/#produtos" },
+                  { label: "Contato", to: "/#contato" },
                 ].map((item) => (
-                  <li key={item.href}>
+                  <li key={item.to}>
                     <a
-                      href={item.href}
+                      href={item.to}
+                      onClick={(event) => handleHashLinkClick(event, item.to)}
                       className="text-sm text-white/85 hover:text-white transition-colors"
                     >
                       {item.label}
@@ -93,7 +134,8 @@ const Footer = () => {
             © 2026 Fazenda Bispo. Todos os direitos reservados.
           </p>
           <a
-            href="#inicio"
+            href="/#inicio"
+            onClick={(event) => handleHashLinkClick(event, "/#inicio")}
             className="text-white/80 text-xs sm:text-sm hover:text-white transition-colors"
           >
             Voltar ao topo

@@ -637,12 +637,15 @@ const Chat = () => {
         containerClassName="max-w-5xl px-2 sm:px-4 [&_h1]:flex-wrap [&_h1]:text-2xl sm:[&_h1]:text-4xl"
       >
 
-        <div className="grid min-w-0 gap-3 md:grid-cols-[280px_1fr] md:gap-4">
+        <div
+          className={`grid min-w-0 gap-3 ${
+            isAdmin ? "md:grid-cols-[280px_1fr] md:gap-4" : "max-w-4xl mx-auto"
+          }`}
+        >
+          {isAdmin ? (
           <div className="min-w-0 bg-card border border-border rounded-xl p-3 sm:p-4">
             <h2 className="font-semibold text-foreground mb-3">Conversas</h2>
-            {!isAdmin ? (
-              <p className="text-sm text-muted-foreground">Conversa com suporte</p>
-            ) : conversas.length === 0 ? (
+            {conversas.length === 0 ? (
               <p className="text-sm text-muted-foreground">Nenhuma conversa iniciada.</p>
             ) : (
               <>
@@ -696,6 +699,7 @@ const Chat = () => {
               </>
             )}
           </div>
+          ) : null}
 
           <div className="min-w-0 bg-card border border-border rounded-xl p-3 sm:p-4 flex min-h-[420px] flex-col overflow-y-auto md:max-h-[78vh] md:overflow-y-auto">
             <h2 className="font-semibold text-foreground mb-3">Mensagens</h2>
@@ -712,7 +716,7 @@ const Chat = () => {
               </div>
             ) : (
               <div className="flex min-h-0 flex-1 flex-col">
-                <div className="mb-4 min-h-[250px] max-h-[52vh] flex-1 overflow-y-auto rounded-lg border border-border p-3 space-y-2 scroll-smooth">
+                <div className="mb-4 min-h-[360px] max-h-[62vh] flex-1 overflow-y-auto rounded-lg border border-border p-3 space-y-2 scroll-smooth">
                   {mensagens.length === 0 ? (
                     <p className="text-sm text-muted-foreground">Nenhuma mensagem ainda.</p>
                   ) : (

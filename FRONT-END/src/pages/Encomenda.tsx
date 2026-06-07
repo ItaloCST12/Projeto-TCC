@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { Navigate, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Package } from "lucide-react";
 import abacaxiImg from "@/assets/abacaxi.jpg";
 import laranjaImg from "@/assets/laranja.jpg";
@@ -7,15 +7,18 @@ import tangerinaImg from "@/assets/tangerina.jpg";
 import limaoImg from "@/assets/limao.jpg";
 import { apiRequest } from "@/lib/api";
 import { addToCart } from "@/lib/cart";
-import { getAuthUser, isAuthenticated } from "@/lib/auth";
+import { getAuthUser } from "@/lib/auth";
 import Navbar from "@/components/Navbar";
 import PageShell from "@/components/PageShell";
 import { toast } from "@/components/ui/sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 
+type TipoVendaProduto = "KILO" | "SACA" | "UNIDADE";
+
 type Produto = {
   id: number;
   nome: string;
+  tipoVenda?: TipoVendaProduto | string | null;
   preco: number;
   precoAbacaxiGrande?: number | null;
   precoAbacaxiMedio?: number | null;
@@ -38,12 +41,6 @@ type ProdutoVisual = {
     unit: string;
   }[];
 };
-
-const OPCOES_VENDA_TAMANHOS: ProdutoVisual["opcoesVenda"] = [
-  { value: "unidade (grande)", label: "Grande", price: "", unit: "unidade" },
-  { value: "unidade (médio)", label: "Médio", price: "", unit: "unidade" },
-  { value: "unidade (pequeno)", label: "Pequeno", price: "", unit: "unidade" },
-];
 
 const MAX_QUANTIDADE_POR_ITEM = 1000;
 
@@ -186,6 +183,56 @@ const resolverPrecoFallbackPorNome = (nomeProduto: string) => {
   return PRECO_PADRAO_PRODUTO[nomeNormalizado] ?? 0;
 };
 
+const resolverTipoVendaFallbackPorNome = (nomeProduto: string): TipoVendaProduto => {
+  const nomeNormalizado = normalizarTexto(nomeProduto);
+
+  if (nomeNormalizado.includes("laranja") || nomeNormalizado.includes("limao")) {
+    return "SACA";
+  }
+
+  if (nomeNormalizado.includes("tangerina")) {
+    return "KILO";
+  }
+
+  return "UNIDADE";
+};
+
+const resolverTipoVendaProduto = (produto: Produto): TipoVendaProduto => {
+  const tipoVendaNormalizado = String(produto.tipoVenda ?? "").trim().toUpperCase();
+
+  if (
+    tipoVendaNormalizado === "KILO" ||
+    tipoVendaNormalizado === "SACA" ||
+    tipoVendaNormalizado === "UNIDADE"
+  ) {
+    return tipoVendaNormalizado as TipoVendaProduto;
+  }
+
+  return resolverTipoVendaFallbackPorNome(produto.nome);
+};
+
+const construirOpcaoVendaPorTipo = (tipoVenda: TipoVendaProduto) => {
+  if (tipoVenda === "KILO") {
+    return { value: "kilo", label: "Kilo", price: "", unit: "kilo" };
+  }
+
+  if (tipoVenda === "SACA") {
+    return { value: "saca", label: "Saca", price: "", unit: "saca" };
+  }
+
+  return { value: "unidade", label: "Unidade", price: "", unit: "unidade" };
+};
+
+const construirOpcoesVendaPorTipoComTamanhos = (tipoVenda: TipoVendaProduto) => {
+  const opcaoBase = construirOpcaoVendaPorTipo(tipoVenda);
+
+  return [
+    { value: `${opcaoBase.value} (grande)`, label: "Grande", price: "", unit: opcaoBase.unit },
+    { value: `${opcaoBase.value} (médio)`, label: "Médio", price: "", unit: opcaoBase.unit },
+    { value: `${opcaoBase.value} (pequeno)`, label: "Pequeno", price: "", unit: opcaoBase.unit },
+  ];
+};
+
 const resolverImagemProduto = (imagemUrl: string | null | undefined, fallback: string) => {
   if (!imagemUrl?.trim()) {
     return fallback;
@@ -209,7 +256,6 @@ const resolverImagemProduto = (imagemUrl: string | null | undefined, fallback: s
 };
 
 const Encomenda = () => {
-  const authenticated = isAuthenticated();
   const user = getAuthUser();
   const isAdmin = user?.role === "ADMIN";
   const navigate = useNavigate();
@@ -244,10 +290,6 @@ const Encomenda = () => {
     void load();
   }, []);
 
-  if (!authenticated) {
-    return <Navigate to="/#produtos" replace />;
-  }
-
   const hasProdutos = produtos.length > 0;
 
   const getProdutoVisual = (nomeProduto: string): ProdutoVisual => {
@@ -261,12 +303,12 @@ const Encomenda = () => {
     );
   };
 
-  const getOpcoesVendaProduto = (produto: Produto, visual: ProdutoVisual) => {
+  const getOpcoesVendaProduto = (produto: Produto) => {
     if (produtoTemTamanhos(produto)) {
-      return OPCOES_VENDA_TAMANHOS;
+      return construirOpcoesVendaPorTipoComTamanhos(resolverTipoVendaProduto(produto));
     }
 
-    return visual.opcoesVenda;
+    return [construirOpcaoVendaPorTipo(resolverTipoVendaProduto(produto))];
   };
 
   const getQuantidadeSelecionada = (produtoId: number) => {
@@ -309,8 +351,8 @@ const Encomenda = () => {
   const isOpcaoDisponivel = (produto: Produto, opcaoValue: string) =>
     produto.disponivel && getEstoquePorOpcao(produto, opcaoValue) > 0;
 
-  const getOpcaoSelecionada = (produto: Produto, produtoId: number, visual: ProdutoVisual) => {
-    const opcoesVenda = getOpcoesVendaProduto(produto, visual);
+  const getOpcaoSelecionada = (produto: Produto, produtoId: number) => {
+    const opcoesVenda = getOpcoesVendaProduto(produto);
     const opcaoPadrao = opcoesVenda[0];
     if (!opcaoPadrao) {
       return { value: "unidade", label: "Unidade", price: "Consulte", unit: "unidade" };
@@ -376,8 +418,7 @@ const Encomenda = () => {
     }
 
     const quantidadeSelecionada = getQuantidadeSelecionada(produto.id);
-    const visual = getProdutoVisual(produto.nome);
-    const opcaoSelecionada = getOpcaoSelecionada(produto, produto.id, visual);
+    const opcaoSelecionada = getOpcaoSelecionada(produto, produto.id);
     const estoqueOpcaoSelecionada = getEstoquePorOpcao(produto, opcaoSelecionada.value);
 
     if (estoqueOpcaoSelecionada <= 0) {
@@ -422,7 +463,11 @@ const Encomenda = () => {
       <PageShell
         title="Produtos"
         titleIcon={<Package className="h-5 w-5" />}
-        subtitle={`${user?.nome ? `Olá, ${user.nome}.` : "Você está logado."} ${isAdmin ? "Você está em modo de visualização de catálogo." : "Escolha os produtos nos cards e adicione ao carrinho."}`}
+        subtitle={
+          isAdmin
+            ? "Você está em modo de visualização de catálogo."
+            : `${user?.nome ? `Olá, ${user.nome}. ` : ""}Escolha os produtos nos cards e adicione ao carrinho.`
+        }
         containerClassName="max-w-6xl"
       >
         <div className="bg-card border border-border rounded-xl p-6 mb-6">
@@ -461,12 +506,12 @@ const Encomenda = () => {
                 <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
                   {produtos.map((produto) => {
                     const visual = getProdutoVisual(produto.nome);
-                    const opcoesVenda = getOpcoesVendaProduto(produto, visual);
+                    const opcoesVenda = getOpcoesVendaProduto(produto);
                     const imagemCard = resolverImagemProduto(produto.imagemUrl, visual.image);
                     const produtoComTamanhos = produtoTemTamanhos(produto);
                     const quantidadeSelecionada = getQuantidadeSelecionada(produto.id);
                     const opcaoPadrao = opcoesVenda[0];
-                    const opcaoSelecionada = getOpcaoSelecionada(produto, produto.id, visual);
+                    const opcaoSelecionada = getOpcaoSelecionada(produto, produto.id);
                     const unidadeSelecionada = opcaoSelecionada.value ?? opcaoPadrao?.value ?? "unidade";
                     const precoOpcaoSelecionada = getPrecoPorOpcao(
                       produto,

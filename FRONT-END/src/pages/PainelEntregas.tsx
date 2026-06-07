@@ -1,6 +1,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, useSearchParams } from "react-router-dom";
-import { BarChart3, Ban, CalendarDays, Receipt, Trash2, TrendingUp, Wallet } from "lucide-react";
+import {
+  ArrowDownLeft,
+  ArrowUpRight,
+  BarChart3,
+  Ban,
+  CalendarDays,
+  History,
+  Receipt,
+  SlidersHorizontal,
+  Trash2,
+  TrendingUp,
+  Wallet,
+  X,
+} from "lucide-react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import Navbar from "@/components/Navbar";
@@ -23,6 +36,8 @@ import PainelProdutos from "@/components/painel-entregas/PainelProdutos";
 import PainelPedidos from "@/components/painel-entregas/PainelPedidos";
 import PainelUsuarios from "@/components/painel-entregas/PainelUsuarios";
 import PainelRelatorios from "@/components/painel-entregas/PainelRelatorios";
+
+type TipoVendaProduto = "KILO" | "SACA" | "UNIDADE";
 
 type PedidoAdmin = {
   id: number;
@@ -52,6 +67,7 @@ type PedidoAdmin = {
 type ProdutoAdmin = {
   id: number;
   nome: string;
+  tipoVenda?: TipoVendaProduto;
   preco: number | string | null;
   precoAbacaxiGrande?: number | string | null;
   precoAbacaxiMedio?: number | string | null;
@@ -94,6 +110,12 @@ type MovimentacaoEstoque = {
   pedido?: { id: number } | null;
   produto?: { id: number; nome: string };
 };
+
+type FiltroTipoMovimentacaoEstoque =
+  | "todos"
+  | "ENTRADA"
+  | "SAIDA"
+  | "AJUSTE";
 
 type UsuarioAdmin = {
   id: number;
@@ -218,6 +240,55 @@ const formatarTipoEntrega = (tipoEntrega?: string) => {
   return tipoEntrega || "-";
 };
 
+const formatarTipoMovimentacaoEstoque = (tipo?: string) => {
+  const tipoNormalizado = (tipo ?? "").trim().toUpperCase();
+
+  if (tipoNormalizado === "ENTRADA") {
+    return "Entrada";
+  }
+
+  if (tipoNormalizado === "SAIDA") {
+    return "Saída";
+  }
+
+  if (tipoNormalizado === "AJUSTE") {
+    return "Ajuste";
+  }
+
+  if (tipoNormalizado === "DEVOLUCAO") {
+    return "Entrada por cancelamento";
+  }
+
+  return tipo || "-";
+};
+
+const isMovimentacaoEntrada = (tipo?: string) => {
+  const t = (tipo ?? "").trim().toUpperCase();
+  return t === "ENTRADA" || t === "DEVOLUCAO";
+};
+
+const isMovimentacaoSaida = (tipo?: string) => (tipo ?? "").trim().toUpperCase() === "SAIDA";
+
+const classBadgeMovimentacaoEstoque = (tipo?: string) => {
+  if (isMovimentacaoEntrada(tipo)) {
+    return "border-emerald-300 bg-emerald-500/15 text-emerald-700";
+  }
+  if (isMovimentacaoSaida(tipo)) {
+    return "border-destructive/40 bg-destructive/15 text-destructive";
+  }
+  return "border-sky-300 bg-sky-500/15 text-sky-700";
+};
+
+const descreverQuantidadeMovimentacao = (tipo?: string, quantidade = 0) => {
+  if (isMovimentacaoEntrada(tipo)) {
+    return `+${quantidade}`;
+  }
+  if (isMovimentacaoSaida(tipo)) {
+    return `−${quantidade}`;
+  }
+  return `Ajustado para ${quantidade}`;
+};
+
 const formatarStatusPedido = (status?: string) => {
   const statusNormalizado = (status ?? "").trim().toUpperCase();
 
@@ -300,6 +371,18 @@ const labelStatusEstoque = (estoque: number) => {
     return "Atenção";
   }
   return "Ok";
+};
+
+type CategoriaStatusEstoque = "critico" | "baixo" | "ok";
+
+const categoriaStatusEstoque = (estoque: number): CategoriaStatusEstoque => {
+  if (estoque <= 0) {
+    return "critico";
+  }
+  if (estoque <= 5) {
+    return "baixo";
+  }
+  return "ok";
 };
 
 const PRECO_PADRAO_PRODUTO: Record<string, number> = {
@@ -414,6 +497,27 @@ const resolverPrecoAtualProduto = (produto: ProdutoAdmin) => {
   }
 
   return PRECO_PADRAO_PRODUTO[nomeNormalizado] ?? 0;
+};
+
+const resolverFaixaPrecoProduto = (produto: ProdutoAdmin) => {
+  const precosPorTamanho = [
+    parsePrecoParaExibicao(produto.precoAbacaxiPequeno, 0),
+    parsePrecoParaExibicao(produto.precoAbacaxiMedio, 0),
+    parsePrecoParaExibicao(produto.precoAbacaxiGrande, 0),
+  ].filter((valor) => valor > 0);
+
+  if (precosPorTamanho.length === 0) {
+    return null;
+  }
+
+  const menor = Math.min(...precosPorTamanho);
+  const maior = Math.max(...precosPorTamanho);
+
+  if (menor === maior) {
+    return formatarMoeda(menor);
+  }
+
+  return `${formatarMoeda(menor)} a ${formatarMoeda(maior)}`;
 };
 
 const obterItensPedido = (pedido: PedidoAdmin) => {
@@ -545,6 +649,7 @@ const PainelEntregas = () => {
   const [abaAtiva, setAbaAtiva] = useState<"entregas" | "produtos" | "usuarios" | "vendas">("produtos");
 
   const [novoProdutoNome, setNovoProdutoNome] = useState("");
+  const [novoProdutoTipoVenda, setNovoProdutoTipoVenda] = useState<TipoVendaProduto>("UNIDADE");
   const [novoProdutoPreco, setNovoProdutoPreco] = useState("");
   const [novoProdutoControlaTamanhos, setNovoProdutoControlaTamanhos] = useState(false);
   const [novoProdutoPrecosTamanho, setNovoProdutoPrecosTamanho] = useState({
@@ -600,9 +705,18 @@ const PainelEntregas = () => {
   const [resumoEstoque, setResumoEstoque] = useState<RespostaResumoEstoque | null>(null);
   const [movimentacoesEstoque, setMovimentacoesEstoque] = useState<MovimentacaoEstoque[]>([]);
   const [produtoMovimentacaoId, setProdutoMovimentacaoId] = useState<number | null>(null);
+  const [filtroTipoMovimentacaoEstoque, setFiltroTipoMovimentacaoEstoque] =
+    useState<FiltroTipoMovimentacaoEstoque>("todos");
+  const [paginaMovimentacoesEstoque, setPaginaMovimentacoesEstoque] = useState(1);
+  const [totalPaginasMovimentacoesEstoque, setTotalPaginasMovimentacoesEstoque] = useState(1);
+  const [loadingMovimentacoes, setLoadingMovimentacoes] = useState(false);
   const [loadingEstoque, setLoadingEstoque] = useState(false);
   const [errorEstoque, setErrorEstoque] = useState("");
   const [updatingEstoqueId, setUpdatingEstoqueId] = useState<number | null>(null);
+  const [buscaEstoque, setBuscaEstoque] = useState("");
+  const [filtroStatusEstoque, setFiltroStatusEstoque] = useState<
+    "todos" | CategoriaStatusEstoque
+  >("todos");
   const inputImagemRef = useRef<HTMLInputElement | null>(null);
   const socketPedidosRef = useRef<WebSocket | null>(null);
   const reconnectSocketPedidosTimeoutRef = useRef<number | null>(null);
@@ -706,15 +820,27 @@ const PainelEntregas = () => {
     }
   };
 
-  const loadMovimentacoesEstoque = async (produtoId: number) => {
+  const loadMovimentacoesEstoque = async (
+    produtoId: number,
+    page = 1,
+    tipoFiltro: FiltroTipoMovimentacaoEstoque = filtroTipoMovimentacaoEstoque,
+  ) => {
     setErrorEstoque("");
+    setLoadingMovimentacoes(true);
 
     try {
+      const params = new URLSearchParams({ page: String(page) });
+      if (tipoFiltro !== "todos") {
+        params.set("tipo", tipoFiltro);
+      }
+
       const response = await apiRequest<RespostaPaginada<MovimentacaoEstoque>>(
-        `/produtos/${produtoId}/estoque/movimentacoes?page=1`,
+        `/produtos/${produtoId}/estoque/movimentacoes?${params.toString()}`,
       );
       setMovimentacoesEstoque(response.data);
       setProdutoMovimentacaoId(produtoId);
+      setPaginaMovimentacoesEstoque(response.pagination.page);
+      setTotalPaginasMovimentacoesEstoque(response.pagination.totalPages);
     } catch (loadError) {
       setErrorEstoque(
         loadError instanceof Error
@@ -722,6 +848,10 @@ const PainelEntregas = () => {
           : "Não foi possível carregar movimentações de estoque.",
       );
       setMovimentacoesEstoque([]);
+      setPaginaMovimentacoesEstoque(1);
+      setTotalPaginasMovimentacoesEstoque(1);
+    } finally {
+      setLoadingMovimentacoes(false);
     }
   };
 
@@ -983,6 +1113,78 @@ const PainelEntregas = () => {
     [produtos],
   );
 
+  const produtosEstoqueExibidos = useMemo(() => {
+    if (!resumoEstoque) {
+      return [];
+    }
+
+    const termo = normalizarTexto(buscaEstoque);
+
+    return resumoEstoque.data
+      .filter((produto) => {
+        if (
+          filtroStatusEstoque !== "todos" &&
+          categoriaStatusEstoque(produto.estoque) !== filtroStatusEstoque
+        ) {
+          return false;
+        }
+
+        if (termo && !normalizarTexto(produto.nome).includes(termo)) {
+          return false;
+        }
+
+        return true;
+      })
+      .sort((a, b) => a.estoque - b.estoque);
+  }, [resumoEstoque, buscaEstoque, filtroStatusEstoque]);
+
+  const contagemStatusEstoque = useMemo(() => {
+    const dados = resumoEstoque?.data ?? [];
+
+    return {
+      todos: dados.length,
+      critico: dados.filter((p) => categoriaStatusEstoque(p.estoque) === "critico").length,
+      baixo: dados.filter((p) => categoriaStatusEstoque(p.estoque) === "baixo").length,
+      ok: dados.filter((p) => categoriaStatusEstoque(p.estoque) === "ok").length,
+    };
+  }, [resumoEstoque]);
+
+  const nomeProdutoMovimentacao = useMemo(() => {
+    if (!produtoMovimentacaoId) {
+      return "";
+    }
+
+    const noResumo = resumoEstoque?.data.find((p) => p.id === produtoMovimentacaoId)?.nome;
+    const naMovimentacao = movimentacoesEstoque.find(
+      (mov) => mov.produto?.id === produtoMovimentacaoId,
+    )?.produto?.nome;
+
+    return noResumo ?? naMovimentacao ?? `Produto #${produtoMovimentacaoId}`;
+  }, [produtoMovimentacaoId, resumoEstoque, movimentacoesEstoque]);
+
+  const fecharHistoricoEstoque = useCallback(() => {
+    setProdutoMovimentacaoId(null);
+    setMovimentacoesEstoque([]);
+    setFiltroTipoMovimentacaoEstoque("todos");
+    setPaginaMovimentacoesEstoque(1);
+    setTotalPaginasMovimentacoesEstoque(1);
+  }, []);
+
+  useEffect(() => {
+    if (!produtoMovimentacaoId) {
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        fecharHistoricoEstoque();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [produtoMovimentacaoId, fecharHistoricoEstoque]);
+
   const usuariosFiltrados = useMemo(() => {
     const termo = buscaUsuario.trim().toLowerCase();
 
@@ -1230,6 +1432,7 @@ const PainelEntregas = () => {
       const formData = new FormData();
       formData.append("nome", novoProdutoNome.trim());
       formData.append("disponivel", String(novoProdutoDisponivel));
+      formData.append("tipoVenda", novoProdutoTipoVenda);
 
       if (novoProdutoControlaTamanhos) {
         const precoGrande = parseDecimalInput(
@@ -1299,6 +1502,7 @@ const PainelEntregas = () => {
       setFiltroDisponibilidade("todos");
 
       setNovoProdutoNome("");
+      setNovoProdutoTipoVenda("UNIDADE");
       setNovoProdutoPreco("");
       setNovoProdutoControlaTamanhos(false);
       setNovoProdutoPrecosTamanho({
@@ -1415,7 +1619,16 @@ const PainelEntregas = () => {
         },
       });
 
-      await Promise.all([loadResumoEstoque(), loadProdutos(), loadMovimentacoesEstoque(produto.id)]);
+      const paginaHistorico =
+        produtoMovimentacaoId === produto.id ? paginaMovimentacoesEstoque : 1;
+      const filtroHistorico =
+        produtoMovimentacaoId === produto.id ? filtroTipoMovimentacaoEstoque : "todos";
+
+      await Promise.all([
+        loadResumoEstoque(),
+        loadProdutos(),
+        loadMovimentacoesEstoque(produto.id, paginaHistorico, filtroHistorico),
+      ]);
       setEstoqueEditadoPorProduto((current) => {
         const next = { ...current };
         delete next[produto.id];
@@ -1472,7 +1685,16 @@ const PainelEntregas = () => {
         },
       });
 
-      await Promise.all([loadResumoEstoque(), loadProdutos(), loadMovimentacoesEstoque(produto.id)]);
+      const paginaHistorico =
+        produtoMovimentacaoId === produto.id ? paginaMovimentacoesEstoque : 1;
+      const filtroHistorico =
+        produtoMovimentacaoId === produto.id ? filtroTipoMovimentacaoEstoque : "todos";
+
+      await Promise.all([
+        loadResumoEstoque(),
+        loadProdutos(),
+        loadMovimentacoesEstoque(produto.id, paginaHistorico, filtroHistorico),
+      ]);
       setEstoqueAbacaxiEditadoPorProduto((current) => {
         const next = { ...current };
         delete next[produto.id];
@@ -1937,7 +2159,11 @@ const PainelEntregas = () => {
                       </div>
 
                       {pedidosEntregaDomicilio.length === 0 ? (
-                        <p className="text-sm text-muted-foreground">Nenhum pedido de entrega em domicílio.</p>
+                        <p className="text-sm text-muted-foreground">
+                          {filtroTipoEntrega === "cancelados"
+                            ? "Nenhum pedido de entrega em domicílio cancelado."
+                            : "Nenhum pedido de entrega em domicílio."}
+                        </p>
                       ) : (
                         <div className="space-y-3">
                           {pedidosEntregaDomicilio.map((pedido) => (
@@ -2519,6 +2745,25 @@ const PainelEntregas = () => {
                   />
                 </div>
 
+                <div>
+                  <label
+                    htmlFor="novo-produto-tipo-venda"
+                    className="block text-sm font-medium text-foreground mb-1"
+                  >
+                    Tipo de venda
+                  </label>
+                  <select
+                    id="novo-produto-tipo-venda"
+                    value={novoProdutoTipoVenda}
+                    onChange={(event) => setNovoProdutoTipoVenda(event.target.value as TipoVendaProduto)}
+                    className="w-full rounded-lg border border-border bg-background px-4 py-3 text-foreground"
+                  >
+                    <option value="UNIDADE">Unidade</option>
+                    <option value="KILO">Kilo</option>
+                    <option value="SACA">Saca</option>
+                  </select>
+                </div>
+
                 <label className="inline-flex items-center gap-2 text-sm text-foreground">
                   <input
                     type="checkbox"
@@ -2796,8 +3041,57 @@ const PainelEntregas = () => {
                     {!resumoEstoque || resumoEstoque.data.length === 0 ? (
                       <p className="text-muted-foreground">Nenhum produto com controle de estoque configurado.</p>
                     ) : (
-                      <div className="space-y-3 max-h-[680px] overflow-y-auto pr-1">
-                        {resumoEstoque.data.map((produto) => {
+                      <>
+                        <div className="mb-4 space-y-3">
+                          <input
+                            type="search"
+                            value={buscaEstoque}
+                            onChange={(event) => setBuscaEstoque(event.target.value)}
+                            placeholder="Buscar produto pelo nome..."
+                            className="w-full rounded-lg border border-border bg-background px-4 py-2.5 text-sm text-foreground"
+                          />
+
+                          <div className="flex flex-wrap gap-2">
+                            {([
+                              { valor: "todos", label: "Todos" },
+                              { valor: "critico", label: "Crítico" },
+                              { valor: "baixo", label: "Baixo" },
+                              { valor: "ok", label: "OK" },
+                            ] as const).map((opcao) => {
+                              const ativo = filtroStatusEstoque === opcao.valor;
+
+                              return (
+                                <button
+                                  key={opcao.valor}
+                                  type="button"
+                                  onClick={() => setFiltroStatusEstoque(opcao.valor)}
+                                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-sm font-semibold transition-colors ${
+                                    ativo
+                                      ? "border-primary bg-primary text-primary-foreground"
+                                      : "border-border text-foreground hover:bg-muted"
+                                  }`}
+                                >
+                                  {opcao.label}
+                                  <span
+                                    className={`text-xs font-bold ${
+                                      ativo ? "text-primary-foreground/80" : "text-muted-foreground"
+                                    }`}
+                                  >
+                                    {contagemStatusEstoque[opcao.valor]}
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        {produtosEstoqueExibidos.length === 0 ? (
+                          <p className="text-muted-foreground">
+                            Nenhum produto encontrado para esta busca ou filtro.
+                          </p>
+                        ) : (
+                          <div className="space-y-3 max-h-[680px] overflow-y-auto pr-1">
+                            {produtosEstoqueExibidos.map((produto) => {
                           const produtoComTamanhos = produtoTemTamanhos(produto);
                           const estoquesAbacaxi = getEstoquesAbacaxiGestaoEditados(produto);
 
@@ -2955,7 +3249,8 @@ const PainelEntregas = () => {
                                     <button
                                       type="button"
                                       onClick={() => {
-                                        void loadMovimentacoesEstoque(produto.id);
+                                        setFiltroTipoMovimentacaoEstoque("todos");
+                                        void loadMovimentacoesEstoque(produto.id, 1, "todos");
                                       }}
                                       className="inline-flex items-center justify-center px-3 py-2.5 rounded-md border border-border text-sm font-semibold hover:bg-muted"
                                     >
@@ -2997,7 +3292,8 @@ const PainelEntregas = () => {
                                     <button
                                       type="button"
                                       onClick={() => {
-                                        void loadMovimentacoesEstoque(produto.id);
+                                        setFiltroTipoMovimentacaoEstoque("todos");
+                                        void loadMovimentacoesEstoque(produto.id, 1, "todos");
                                       }}
                                       className="inline-flex items-center justify-center px-3 py-2.5 rounded-md border border-border text-sm font-semibold hover:bg-muted"
                                     >
@@ -3008,47 +3304,170 @@ const PainelEntregas = () => {
                               )}
                             </article>
                           );
-                        })}
-                      </div>
+                            })}
+                          </div>
+                        )}
+                      </>
                     )}
 
                     {produtoMovimentacaoId && (
-                      <div className="mt-5 rounded-lg border border-border p-4">
-                        <div className="flex items-center justify-between gap-2 mb-2">
-                          <h3 className="text-sm font-semibold text-foreground">
-                            Últimas movimentações do produto #{produtoMovimentacaoId}
-                          </h3>
-                          <button
-                            type="button"
-                            onClick={() => setProdutoMovimentacaoId(null)}
-                            className="text-xs text-muted-foreground hover:text-foreground"
-                          >
-                            Fechar
-                          </button>
-                        </div>
+                      <div
+                        className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4"
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="titulo-historico-estoque"
+                        onClick={fecharHistoricoEstoque}
+                      >
+                        <div
+                          className="flex max-h-[85vh] w-full flex-col rounded-t-2xl border border-border bg-card shadow-xl sm:max-w-lg sm:rounded-2xl"
+                          onClick={(event) => event.stopPropagation()}
+                        >
+                          <div className="flex items-start justify-between gap-3 border-b border-border p-5">
+                            <div className="flex items-center gap-3">
+                              <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-primary/15 text-primary">
+                                <History className="h-5 w-5" />
+                              </span>
+                              <div>
+                                <h3
+                                  id="titulo-historico-estoque"
+                                  className="text-base font-bold text-foreground"
+                                >
+                                  Histórico de estoque
+                                </h3>
+                                <p className="text-sm text-muted-foreground">{nomeProdutoMovimentacao}</p>
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={fecharHistoricoEstoque}
+                              aria-label="Fechar histórico"
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                          </div>
 
-                        {movimentacoesEstoque.length === 0 ? (
-                          <p className="text-sm text-muted-foreground">Sem movimentações registradas.</p>
-                        ) : (
-                          <ul className="space-y-2">
-                            {movimentacoesEstoque.map((mov) => (
-                              <li key={mov.id} className="rounded-md border border-border px-3 py-3 text-sm">
-                                <div className="flex flex-wrap items-center justify-between gap-2">
-                                  <span className="font-semibold text-foreground">
-                                    {mov.tipo} • {mov.quantidade}
-                                  </span>
-                                  <span className="text-xs text-muted-foreground">
-                                    {formatarData(mov.createdAt)}
-                                  </span>
-                                </div>
-                                <p className="text-xs text-muted-foreground mt-1">
-                                  {mov.motivo || "Sem motivo informado"}
-                                  {mov.pedido?.id ? ` • Pedido #${mov.pedido.id}` : ""}
+                          <div className="px-5 pt-4">
+                            <label className="mb-1 block text-xs font-medium text-muted-foreground">
+                              Filtrar por tipo
+                            </label>
+                            <select
+                              value={filtroTipoMovimentacaoEstoque}
+                              onChange={(event) => {
+                                const proximoFiltro =
+                                  event.target.value as FiltroTipoMovimentacaoEstoque;
+                                setFiltroTipoMovimentacaoEstoque(proximoFiltro);
+                                void loadMovimentacoesEstoque(produtoMovimentacaoId, 1, proximoFiltro);
+                              }}
+                              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground"
+                            >
+                              <option value="todos">Todos os tipos</option>
+                              <option value="ENTRADA">Somente entradas</option>
+                              <option value="SAIDA">Somente saídas</option>
+                              <option value="AJUSTE">Somente ajustes</option>
+                            </select>
+                          </div>
+
+                          <div className="flex-1 overflow-y-auto px-5 py-4">
+                            {loadingMovimentacoes ? (
+                              <p className="py-8 text-center text-sm text-muted-foreground">
+                                Carregando histórico...
+                              </p>
+                            ) : movimentacoesEstoque.length === 0 ? (
+                              <div className="py-8 text-center">
+                                <p className="text-sm font-medium text-foreground">
+                                  Nenhuma movimentação encontrada
                                 </p>
-                              </li>
-                            ))}
-                          </ul>
-                        )}
+                                <p className="mt-1 text-xs text-muted-foreground">
+                                  Entradas, saídas e ajustes deste produto aparecerão aqui.
+                                </p>
+                              </div>
+                            ) : (
+                              <ul className="space-y-2.5">
+                                {movimentacoesEstoque.map((mov) => {
+                                  const entrada = isMovimentacaoEntrada(mov.tipo);
+                                  const saida = isMovimentacaoSaida(mov.tipo);
+
+                                  return (
+                                    <li key={mov.id} className="rounded-lg border border-border p-3">
+                                      <div className="flex items-center justify-between gap-2">
+                                        <span
+                                          className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-semibold ${classBadgeMovimentacaoEstoque(mov.tipo)}`}
+                                        >
+                                          {entrada ? (
+                                            <ArrowDownLeft className="h-3.5 w-3.5" />
+                                          ) : saida ? (
+                                            <ArrowUpRight className="h-3.5 w-3.5" />
+                                          ) : (
+                                            <SlidersHorizontal className="h-3.5 w-3.5" />
+                                          )}
+                                          {formatarTipoMovimentacaoEstoque(mov.tipo)}
+                                        </span>
+                                        <span
+                                          className={`text-sm font-bold ${
+                                            entrada
+                                              ? "text-emerald-600"
+                                              : saida
+                                                ? "text-destructive"
+                                                : "text-sky-600"
+                                          }`}
+                                        >
+                                          {descreverQuantidadeMovimentacao(mov.tipo, mov.quantidade)}
+                                        </span>
+                                      </div>
+                                      <div className="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                                        <p className="text-xs text-muted-foreground">
+                                          {mov.motivo || "Sem motivo informado"}
+                                          {mov.pedido?.id ? ` • Pedido #${mov.pedido.id}` : ""}
+                                        </p>
+                                        <span className="whitespace-nowrap text-xs text-muted-foreground">
+                                          {formatarData(mov.createdAt)}
+                                        </span>
+                                      </div>
+                                    </li>
+                                  );
+                                })}
+                              </ul>
+                            )}
+                          </div>
+
+                          {totalPaginasMovimentacoesEstoque > 1 && (
+                            <div className="flex items-center justify-between gap-2 border-t border-border p-4">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  void loadMovimentacoesEstoque(
+                                    produtoMovimentacaoId,
+                                    paginaMovimentacoesEstoque - 1,
+                                  )
+                                }
+                                disabled={paginaMovimentacoesEstoque <= 1 || loadingMovimentacoes}
+                                className="inline-flex items-center px-3 py-2 rounded-lg border border-border text-sm font-semibold text-foreground hover:bg-muted disabled:opacity-50"
+                              >
+                                Anterior
+                              </button>
+                              <span className="text-xs text-muted-foreground">
+                                Página {paginaMovimentacoesEstoque} de {totalPaginasMovimentacoesEstoque}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  void loadMovimentacoesEstoque(
+                                    produtoMovimentacaoId,
+                                    paginaMovimentacoesEstoque + 1,
+                                  )
+                                }
+                                disabled={
+                                  paginaMovimentacoesEstoque >= totalPaginasMovimentacoesEstoque ||
+                                  loadingMovimentacoes
+                                }
+                                className="inline-flex items-center px-3 py-2 rounded-lg border border-border text-sm font-semibold text-foreground hover:bg-muted disabled:opacity-50"
+                              >
+                                Próxima
+                              </button>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     )}
                   </>
@@ -3122,7 +3541,9 @@ const PainelEntregas = () => {
                         <div>
                           <p className="font-semibold text-foreground">{produto.nome}</p>
                           <p className="text-sm text-muted-foreground mt-1">
-                            Preço atual: {formatarMoeda(resolverPrecoAtualProduto(produto))}
+                            {produtoTemTamanhos(produto)
+                              ? `Preço por tamanho: ${resolverFaixaPrecoProduto(produto) ?? "Não informado"}`
+                              : `Preço atual: ${formatarMoeda(resolverPrecoAtualProduto(produto))}`}
                           </p>
                           <div className="mt-1 flex items-center gap-2">
                             <span className="text-xs text-muted-foreground">ID: {produto.id}</span>
@@ -3142,32 +3563,34 @@ const PainelEntregas = () => {
                             </span>
                           </div>
 
-                          <div className="mt-3 flex flex-wrap items-center gap-3">
-                            <label className="text-sm text-muted-foreground">Preço (R$)</label>
-                            <input
-                              type="number"
-                              min="0"
-                              step="0.01"
-                              value={getPrecoEditado(produto)}
-                              onChange={(event) =>
-                                setPrecoEditadoPorProduto((current) => ({
-                                  ...current,
-                                  [produto.id]: event.target.value,
-                                }))
-                              }
-                              className="w-32 rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground"
-                            />
-                            <button
-                              type="button"
-                              disabled={updatingProdutoId === produto.id}
-                              onClick={() => {
-                                void atualizarPrecoProduto(produto);
-                              }}
-                              className="inline-flex items-center px-3 py-2 rounded-md border border-border text-sm font-semibold hover:bg-muted disabled:opacity-50"
-                            >
-                              {updatingProdutoId === produto.id ? "Salvando..." : "Salvar preço"}
-                            </button>
-                          </div>
+                          {!produtoTemTamanhos(produto) && (
+                            <div className="mt-3 flex flex-wrap items-center gap-3">
+                              <label className="text-sm text-muted-foreground">Preço (R$)</label>
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={getPrecoEditado(produto)}
+                                onChange={(event) =>
+                                  setPrecoEditadoPorProduto((current) => ({
+                                    ...current,
+                                    [produto.id]: event.target.value,
+                                  }))
+                                }
+                                className="w-32 rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground"
+                              />
+                              <button
+                                type="button"
+                                disabled={updatingProdutoId === produto.id}
+                                onClick={() => {
+                                  void atualizarPrecoProduto(produto);
+                                }}
+                                className="inline-flex items-center px-3 py-2 rounded-md border border-border text-sm font-semibold hover:bg-muted disabled:opacity-50"
+                              >
+                                {updatingProdutoId === produto.id ? "Salvando..." : "Salvar preço"}
+                              </button>
+                            </div>
+                          )}
 
                           {produtoTemTamanhos(produto) && (
                             <div className="mt-3 rounded-lg border border-border p-3 bg-muted/30">

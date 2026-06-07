@@ -29,6 +29,12 @@ type Pedido = {
   produto?: {
     nome: string;
   };
+  endereco?: {
+    rua: string;
+    numero?: string | null;
+    cidade: string;
+    cep: string;
+  } | null;
   items?: {
     id: number;
     quantidade: number;
@@ -131,6 +137,17 @@ const formatarTipoEntrega = (tipoEntrega?: string) => {
   return tipoEntrega || "-";
 };
 
+const formatarEnderecoEntrega = (pedido: Pedido) => {
+  const endereco = pedido.endereco;
+
+  if (!endereco) {
+    return "Endereço não informado";
+  }
+
+  const numero = endereco.numero?.trim() ? `, ${endereco.numero.trim()}` : "";
+  return `${endereco.rua}${numero} - ${endereco.cidade} - CEP ${endereco.cep}`;
+};
+
 const formatarStatusPedido = (status?: string) => {
   const statusNormalizado = (status ?? "").trim().toUpperCase();
 
@@ -161,26 +178,26 @@ const classStatusPedido = (status?: string) => {
   const statusNormalizado = (status ?? "").trim().toUpperCase();
 
   if (statusNormalizado === "PENDENTE") {
-    return "border-yellow-300 bg-yellow-500/15 text-yellow-800";
+    return "border-orange-400 bg-orange-50 text-orange-900";
   }
 
   if (statusNormalizado === "PRONTO_PARA_RETIRADA") {
-    return "border-sky-300 bg-sky-500/15 text-sky-800";
+    return "border-cyan-400 bg-cyan-50 text-cyan-900";
   }
 
   if (statusNormalizado === "SAIU_PARA_ENTREGA") {
-    return "border-indigo-300 bg-indigo-500/15 text-indigo-800";
+    return "border-violet-400 bg-violet-50 text-violet-900";
   }
 
   if (statusNormalizado === "COMPLETADO") {
-    return "border-emerald-300 bg-emerald-500/15 text-emerald-800";
+    return "border-emerald-400 bg-emerald-50 text-emerald-900";
   }
 
   if (statusNormalizado === "CANCELADO") {
-    return "border-destructive/40 bg-destructive/15 text-destructive";
+    return "border-rose-400 bg-rose-50 text-rose-900";
   }
 
-  return "border-border bg-muted text-foreground";
+  return "border-slate-300 bg-slate-100 text-slate-800";
 };
 
 const ETAPAS_STATUS_ENTREGA = [
@@ -471,6 +488,19 @@ const MinhasEncomendas = () => {
             </button>
           </div>
 
+          <div className="mb-4 relative overflow-hidden flex items-center gap-3.5 rounded-xl border border-emerald-300/70 bg-gradient-to-r from-emerald-50 to-teal-100/40 p-3.5 shadow-sm dark:border-emerald-700/50 dark:from-emerald-950/30 dark:to-teal-900/10">
+            <span className="pointer-events-none absolute inset-y-0 left-0 w-1.5 bg-emerald-500 dark:bg-emerald-500" aria-hidden="true" />
+            <span className="ml-1 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-100 ring-1 ring-emerald-300/70 dark:bg-emerald-900/40 dark:ring-emerald-700/50">
+              <Truck className="h-5 w-5 text-emerald-700 dark:text-emerald-400" />
+            </span>
+            <div>
+              <p className="text-sm font-semibold text-emerald-900 dark:text-emerald-200">Dias de entrega</p>
+              <p className="text-sm leading-relaxed text-emerald-800/90 dark:text-emerald-200/80">
+                As entregas são realizadas apenas aos domingos e segundas-feiras.
+              </p>
+            </div>
+          </div>
+
           <form
             onSubmit={(event) => {
               void aplicarFiltroData(event);
@@ -689,30 +719,37 @@ const MinhasEncomendas = () => {
                       </ul>
                     </div>
 
-                    {isRetirada(pedido) && (
-                      <div className="mt-3 rounded-md bg-muted/70 p-3">
-                        <p className="text-xs text-muted-foreground">Local de retirada</p>
-                        <p className="text-sm text-foreground">{ENDERECO_LOJA_RETIRADA}</p>
-                      </div>
-                    )}
-
                     {isRetirada(pedido) && isProntoParaRetirada(pedido) && !isConcluido(pedido) && (
-                      <div className="mt-3 rounded-md border border-emerald-300 bg-emerald-50 p-3">
-                        <p className="text-sm font-semibold text-emerald-800">
+                      <div className="mt-3 rounded-md border-2 border-primary/40 bg-muted/30 p-3">
+                        <p className="text-sm font-semibold text-foreground">
                           Pedido pronto para retirada.
                         </p>
-                        <p className="text-sm text-emerald-900 mt-1">
+                        <p className="text-sm text-muted-foreground mt-1">
                           Sua encomenda já está disponível. Dirija-se ao local de retirada para buscar o pedido.
                         </p>
                       </div>
                     )}
 
+                    {isRetirada(pedido) && (
+                      <div className="mt-3 rounded-md border-2 border-primary/40 bg-muted/30 p-3">
+                        <p className="text-sm font-semibold text-foreground">Local de retirada.</p>
+                        <p className="text-sm text-muted-foreground mt-1 break-words">{ENDERECO_LOJA_RETIRADA}</p>
+                      </div>
+                    )}
+
+                    {!isRetirada(pedido) && (
+                      <div className="mt-3 rounded-md bg-muted/70 p-3">
+                        <p className="text-xs text-muted-foreground">Endereço de entrega</p>
+                        <p className="text-sm text-foreground">{formatarEnderecoEntrega(pedido)}</p>
+                      </div>
+                    )}
+
                     {isSaiuParaEntrega(pedido) && !isConcluido(pedido) && (
-                      <div className="mt-3 rounded-md border border-emerald-300 bg-emerald-50 p-3">
-                        <p className="text-sm font-semibold text-emerald-800">
+                      <div className="mt-3 rounded-md border-2 border-primary/40 bg-muted/30 p-3">
+                        <p className="text-sm font-semibold text-foreground">
                           Pedido saiu para entrega.
                         </p>
-                        <p className="text-sm text-emerald-900 mt-1">
+                        <p className="text-sm text-muted-foreground mt-1">
                           Sua encomenda está a caminho. Aguarde no endereço informado para recebimento.
                         </p>
                       </div>

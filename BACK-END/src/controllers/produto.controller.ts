@@ -21,6 +21,27 @@ const parseBoolean = (value: unknown, defaultValue: boolean) => {
   return defaultValue;
 };
 
+type TipoVendaProduto = "KILO" | "SACA" | "UNIDADE";
+
+const parseTipoVenda = (value: unknown): TipoVendaProduto => {
+  if (value === undefined || value === null || String(value).trim() === "") {
+    return "UNIDADE";
+  }
+
+  const normalized = String(value).trim().toUpperCase();
+  if (normalized === "KILO" || normalized === "QUILO" || normalized === "KG") {
+    return "KILO";
+  }
+  if (normalized === "SACA") {
+    return "SACA";
+  }
+  if (normalized === "UNIDADE" || normalized === "UN") {
+    return "UNIDADE";
+  }
+
+  throw new Error("Tipo de venda inválido. Use kilo, saca ou unidade.");
+};
+
 const getImagemUrlFromFile = (req: Request) => {
   if (!req.file) {
     return undefined;
@@ -112,6 +133,8 @@ export const cadastrarProduto = async (req: Request, res: Response) => {
       throw new Error("Nome do produto é obrigatório");
     }
 
+    const tipoVenda = parseTipoVenda(req.body.tipoVenda);
+
     const possuiCamposTamanho = [
       req.body.precoAbacaxiGrande,
       req.body.precoAbacaxiMedio,
@@ -155,6 +178,7 @@ export const cadastrarProduto = async (req: Request, res: Response) => {
         precoBase,
         parseBoolean(disponivel, true),
         estoqueTotal,
+        tipoVenda,
         imagemUrl,
         {
           precoTamanhos: {
@@ -181,6 +205,7 @@ export const cadastrarProduto = async (req: Request, res: Response) => {
       precoNumber,
       parseBoolean(disponivel, true),
       estoqueNumber,
+      tipoVenda,
       imagemUrl,
     );
     res.status(201).json(produto);

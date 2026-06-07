@@ -9,6 +9,7 @@ export type CartItem = {
 
 const CART_STORAGE_KEY_LEGACY = "fazenda-verde:cart";
 const CART_STORAGE_KEY_PREFIX = "fazenda-verde:cart:user";
+const CART_STORAGE_KEY_GUEST = `${CART_STORAGE_KEY_PREFIX}:guest`;
 const CART_UPDATED_EVENT = "fazenda-verde:cart-updated";
 const MAX_QUANTIDADE_POR_ITEM = 1000;
 
@@ -58,7 +59,7 @@ const getCartStorageKeyForCurrentUser = () => {
     return `${CART_STORAGE_KEY_PREFIX}:${userId}`;
   }
 
-  return `${CART_STORAGE_KEY_PREFIX}:guest`;
+  return CART_STORAGE_KEY_GUEST;
 };
 
 const cleanupLegacySharedCart = () => {
@@ -221,6 +222,60 @@ export const updateCartItemQuantidade = (
 
 export const clearCart = () => {
   writeCart([]);
+};
+
+/**
+ * Mescla o carrinho de visitante no carrinho do usuario atualmente logado.
+ * Deve ser chamada logo apos o login. Combina quantidades de itens iguais
+ * (mesmo produto + unidade) e sempre limpa o carrinho de visitante ao final.
+ */
+export const mergeGuestCartIntoCurrentUser = () => {
+  if (!isBrowser()) {
+    return;
+  }
+
+  // Sem usuario logado nao ha destino para mesclar.
+  if (getCartStorageKeyForCurrentUser() === CART_STORAGE_KEY_GUEST) {
+    return;
+  }
+
+  const guestRaw = readStorage(CART_STORAGE_KEY_GUEST);
+  removeStorage(CART_STORAGE_KEY_GUEST);
+
+  if (!guestRaw) {
+    return;
+  }
+
+  let guestItems: CartItem[] = [];
+  try {
+    guestItems = normalizeCart(JSON.parse(guestRaw));
+  } catch {
+    guestItems = [];
+  }
+
+  if (guestItems.length === 0) {
+    return;
+  }
+
+  const userCart = getCartItems();
+
+  guestItems.forEach((guestItem) => {
+    const existingIndex = userCart.findIndex(
+      (item) => item.produtoId === guestItem.produtoId && item.unidade === guestItem.unidade,
+    );
+
+    if (existingIndex >= 0) {
+      const existing = userCart[existingIndex];
+      userCart[existingIndex] = {
+        ...existing,
+        quantidade: normalizeQuantidade(existing.quantidade + guestItem.quantidade),
+      };
+    } else {
+      userCart.push(guestItem);
+    }
+  });
+
+  writeCart(userCart);
 };
 
 export const getCartTotalItems = () => {

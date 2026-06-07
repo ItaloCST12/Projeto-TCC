@@ -10,10 +10,12 @@ import {
   UserCircle2,
 } from "lucide-react";
 import {
+  AuthUser,
   getAuthUser,
   isAuthenticated,
   subscribeAuthSessionChange,
 } from "@/lib/auth";
+import { apiRequest } from "@/lib/api";
 
 type BottomLink = {
   label: string;
@@ -41,7 +43,7 @@ const MobileBottomNav = () => {
   const { pathname, hash } = useLocation();
   const [loggedIn, setLoggedIn] = useState(() => isAuthenticated());
   const [user, setUser] = useState(() => getAuthUser());
-  const isAdmin = user?.role === "ADMIN";
+  const isAdmin = (user?.role ?? "").trim().toUpperCase() === "ADMIN";
 
   const handleHashLinkClick = (event: React.MouseEvent<HTMLAnchorElement>, target: string) => {
     event.preventDefault();
@@ -71,6 +73,36 @@ const MobileBottomNav = () => {
     return subscribeAuthSessionChange(syncAuth);
   }, []);
 
+  useEffect(() => {
+    if (!loggedIn) {
+      return;
+    }
+
+    const roleAtual = (user?.role ?? "").trim();
+    if (roleAtual) {
+      return;
+    }
+
+    let ativo = true;
+
+    const carregarPerfil = async () => {
+      try {
+        const perfil = await apiRequest<AuthUser>("/usuarios/perfil");
+        if (ativo) {
+          setUser(perfil);
+        }
+      } catch {
+        // Mantem comportamento atual quando nao for possivel carregar perfil.
+      }
+    };
+
+    void carregarPerfil();
+
+    return () => {
+      ativo = false;
+    };
+  }, [loggedIn, user?.role]);
+
   const links: BottomLink[] = loggedIn
     ? [
         { label: "Início", to: "/", icon: Home },
@@ -83,7 +115,7 @@ const MobileBottomNav = () => {
       ]
     : [
         { label: "Início", to: "/", icon: Home },
-        { label: "Produtos", to: "/#produtos", icon: Package },
+        { label: "Produtos", to: "/encomenda", icon: Package },
         { label: "Entrar", to: "/login", icon: LogIn },
       ];
 

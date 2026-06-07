@@ -8,6 +8,12 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum TipoVendaProduto {
+  KILO
+  SACA
+  UNIDADE
+}
+
 model Usuario {
   nome                 String?
   id                   Int                   @id @default(autoincrement())
@@ -49,6 +55,7 @@ model Endereco {
 model Produto {
   id                    Int                   @id @default(autoincrement())
   nome                  String
+  tipoVenda             TipoVendaProduto      @default(UNIDADE)
   preco                 Decimal               @default(0) @db.Decimal(10, 2)
   precoAbacaxiGrande    Decimal?              @db.Decimal(10, 2)
   precoAbacaxiMedio     Decimal?              @db.Decimal(10, 2)
