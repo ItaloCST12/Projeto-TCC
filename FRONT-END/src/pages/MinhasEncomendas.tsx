@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, Navigate, useSearchParams } from "react-router-dom";
-import { CalendarDays, CheckCircle2, Clock3, PackageCheck, Truck } from "lucide-react";
+import { CalendarDays, CheckCircle2, Clock3, PackageCheck, Search, Truck } from "lucide-react";
 import { apiRequest } from "@/lib/api";
 import { getAuthToken, getAuthUser, isAuthenticated } from "@/lib/auth";
 import Navbar from "@/components/Navbar";
@@ -91,6 +91,7 @@ const buildWsUrl = (token: string) => {
 };
 
 const ENDERECO_LOJA_RETIRADA = "R. Pastor Sozinho, 3071 - Provedor, Santana - AP, 68927-078";
+const HORARIO_RETIRADA = "Seg a sáb, das 8h às 18h";
 
 const formatarData = (data?: string) => {
   if (!data) {
@@ -250,11 +251,13 @@ const MinhasEncomendas = () => {
   const [totalPaginas, setTotalPaginas] = useState(1);
   const [totalPedidos, setTotalPedidos] = useState(0);
   const [dataFiltro, setDataFiltro] = useState("");
+  const [buscaPedido, setBuscaPedido] = useState("");
   const socketPedidosRef = useRef<WebSocket | null>(null);
   const reconnectSocketPedidosTimeoutRef = useRef<number | null>(null);
   const refreshPedidosTimeoutRef = useRef<number | null>(null);
   const paginaAtualRef = useRef(1);
   const carregarPedidosRef = useRef<(page?: number) => Promise<void>>(async () => {});
+  const primeiraRenderFiltrosRef = useRef(true);
 
   const pedidoIdAlvo = useMemo(() => {
     const valor = searchParams.get("pedidoId");
@@ -282,6 +285,11 @@ const MinhasEncomendas = () => {
         params.set("dataFim", dataFiltro);
       }
 
+      const prefixoPedido = buscaPedido.replace(/\D/g, "").slice(0, 9);
+      if (prefixoPedido) {
+        params.set("pedidoPrefixo", prefixoPedido);
+      }
+
       const response = await apiRequest<RespostaPaginada<Pedido>>(
         `/pedidos/minhas-encomendas?${params.toString()}`,
       );
@@ -299,7 +307,7 @@ const MinhasEncomendas = () => {
     } finally {
       setLoading(false);
     }
-  }, [dataFiltro, paginaAtual]);
+  }, [dataFiltro, buscaPedido, paginaAtual]);
 
   useEffect(() => {
     paginaAtualRef.current = paginaAtual;
@@ -308,6 +316,21 @@ const MinhasEncomendas = () => {
   useEffect(() => {
     carregarPedidosRef.current = carregarPedidos;
   }, [carregarPedidos]);
+
+  // Busca automática: número com pequeno atraso (debounce) para não disparar a
+  // cada tecla; a data aplica praticamente na hora ao ser selecionada.
+  useEffect(() => {
+    if (primeiraRenderFiltrosRef.current) {
+      primeiraRenderFiltrosRef.current = false;
+      return;
+    }
+
+    const handler = window.setTimeout(() => {
+      void carregarPedidosRef.current(1);
+    }, 400);
+
+    return () => window.clearTimeout(handler);
+  }, [dataFiltro, buscaPedido]);
 
   useEffect(() => {
     void carregarPedidos(1);
@@ -405,35 +428,10 @@ const MinhasEncomendas = () => {
     };
   }, [authToken, authenticated, isAdmin, user?.id]);
 
-  const aplicarFiltroData = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setPaginaAtual(1);
-    await carregarPedidos(1);
-  };
-
-  const limparFiltroData = async () => {
+  const limparFiltroData = () => {
     setDataFiltro("");
+    setBuscaPedido("");
     setPaginaAtual(1);
-    setLoading(true);
-    setError("");
-
-    try {
-      const response = await apiRequest<RespostaPaginada<Pedido>>(
-        "/pedidos/minhas-encomendas?page=1",
-      );
-      setPedidos(ordenarPedidosMaisRecentes(response.data));
-      setPaginaAtual(response.pagination.page);
-      setTotalPaginas(response.pagination.totalPages);
-      setTotalPedidos(response.pagination.total);
-    } catch (loadError) {
-      setError(
-        loadError instanceof Error
-          ? loadError.message
-          : "Não foi possível carregar suas encomendas.",
-      );
-    } finally {
-      setLoading(false);
-    }
   };
 
   const cancelarPedido = async (pedidoId: number) => {
@@ -502,10 +500,8 @@ const MinhasEncomendas = () => {
           </div>
 
           <form
-            onSubmit={(event) => {
-              void aplicarFiltroData(event);
-            }}
-            className="grid sm:grid-cols-[1fr_auto_auto] gap-2 mb-4"
+            onSubmit={(event) => event.preventDefault()}
+            className="grid sm:grid-cols-[1fr_1fr_auto] gap-2 mb-4"
           >
             <label className="inline-flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground">
               <CalendarDays className="h-4 w-4 text-muted-foreground" />
@@ -517,12 +513,19 @@ const MinhasEncomendas = () => {
                 aria-label="Data do pedido"
               />
             </label>
-            <button
-              type="submit"
-              className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90"
-            >
-              Filtrar
-            </button>
+            <label className="inline-flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground">
+              <Search className="h-4 w-4 text-muted-foreground" />
+              <input
+                type="number"
+                inputMode="numeric"
+                min={1}
+                value={buscaPedido}
+                onChange={(event) => setBuscaPedido(event.target.value)}
+                placeholder="Nº do pedido"
+                className="w-full bg-transparent text-sm text-foreground outline-none"
+                aria-label="Número do pedido"
+              />
+            </label>
             <button
               type="button"
               onClick={() => void limparFiltroData()}
@@ -547,15 +550,27 @@ const MinhasEncomendas = () => {
             <p className="text-destructive text-sm">{error}</p>
           ) : pedidos.length === 0 ? (
             <div className="rounded-lg border border-dashed border-border p-4">
-              <p className="text-sm text-muted-foreground">
-                Você ainda não possui encomendas.
-              </p>
-              <Link
-                to="/encomenda"
-                className="inline-flex items-center mt-3 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity"
-              >
-                Ver produtos
-              </Link>
+              {buscaPedido.trim() ? (
+                <p className="text-sm text-muted-foreground">
+                  Você não tem nenhum pedido com o número #{buscaPedido.trim()}.
+                </p>
+              ) : dataFiltro ? (
+                <p className="text-sm text-muted-foreground">
+                  Você não tem pedidos nessa data.
+                </p>
+              ) : (
+                <>
+                  <p className="text-sm text-muted-foreground">
+                    Você ainda não possui encomendas.
+                  </p>
+                  <Link
+                    to="/encomenda"
+                    className="inline-flex items-center mt-3 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity"
+                  >
+                    Ver produtos
+                  </Link>
+                </>
+              )}
             </div>
           ) : (
             <ul className="space-y-3">
@@ -734,6 +749,10 @@ const MinhasEncomendas = () => {
                       <div className="mt-3 rounded-md border-2 border-primary/40 bg-muted/30 p-3">
                         <p className="text-sm font-semibold text-foreground">Local de retirada.</p>
                         <p className="text-sm text-muted-foreground mt-1 break-words">{ENDERECO_LOJA_RETIRADA}</p>
+                        <p className="mt-2 flex items-center gap-1.5 text-sm text-muted-foreground">
+                          <Clock3 className="h-4 w-4 shrink-0 text-primary" />
+                          <span>Horário para retirada: {HORARIO_RETIRADA}</span>
+                        </p>
                       </div>
                     )}
 

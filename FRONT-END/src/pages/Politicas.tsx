@@ -34,22 +34,22 @@ const Politicas = () => {
             </div>
             <ul className="mt-4 space-y-2 text-base sm:text-[1.02rem] text-muted-foreground leading-relaxed">
               <li>Aceitamos apenas PIX e dinheiro.</li>
-              <li>Pagamento em PIX e dinheiro é realizado na entrega ou na retirada do pedido.</li>
+              <li>O pagamento é feito na entrega ou na retirada do pedido.</li>
               <li>Nenhum pagamento é processado pela plataforma.</li>
-              <li>O cliente combina a forma de pagamento no momento da confirmação do pedido.</li>
+              <li>A forma de pagamento é combinada ao confirmar o pedido.</li>
             </ul>
           </article>
 
           <article className="rounded-2xl border border-border bg-card p-5 sm:p-6 shadow-sm">
             <div className="flex items-center gap-2 text-primary">
               <Truck className="h-5 w-5" />
-              <h2 className="text-xl font-semibold text-foreground">Entregas</h2>
+              <h2 className="text-xl font-semibold text-foreground">Entregas e retiradas</h2>
             </div>
             <ul className="mt-4 space-y-2 text-base sm:text-[1.02rem] text-muted-foreground leading-relaxed">
-              <li>Entregamos em Santana, Macapá e Porto Grande.</li>
-              <li>Não cobramos taxa de entrega.</li>
-              <li>Você pode verificar as atualizações do seu pedido pela plataforma.</li>
-              <li>Dias de entrega: Domingo e Segunda-Feira.</li>
+              <li>Entregamos em Santana, Macapá e Porto Grande, sem taxa.</li>
+              <li>Dias de entrega: domingo e segunda-feira.</li>
+              <li>Retirada no ponto fixo (Santana - AP), de seg a sáb, das 8h às 18h.</li>
+              <li>Pedidos prontos para retirada devem ser retirados em até 2 dias úteis; após esse prazo, poderão ser cancelados.</li>
             </ul>
           </article>
 
@@ -59,9 +59,9 @@ const Politicas = () => {
               <h2 className="text-xl font-semibold text-foreground">Garantias e suporte</h2>
             </div>
             <ul className="mt-4 space-y-2 text-base sm:text-[1.02rem] text-muted-foreground leading-relaxed">
-              <li>Se houver problema de qualidade, analisamos e resolvemos em até 24 horas.</li>
-              <li>Produtos com avaria podem ser trocados com registro por foto no recebimento.</li>
-              <li>Canal de suporte ativo pelo WhatsApp durante todo o horário de atendimento e também pelo chat interno da plataforma.</li>
+              <li>Problemas de qualidade são analisados e resolvidos em até 24 horas.</li>
+              <li>Itens com avaria podem ser trocados com registro por foto no recebimento.</li>
+              <li>Suporte pelo WhatsApp e pelo chat interno da plataforma.</li>
             </ul>
           </article>
         </section>

@@ -137,6 +137,10 @@ export const getMinhasEncomendas = async (req: Request, res: Response) => {
 
     const page = parsePagina(req.query.page);
     const pedidoId = parsePedidoId(req.query.pedidoId);
+    const pedidoPrefixo =
+      typeof req.query.pedidoPrefixo === "string"
+        ? req.query.pedidoPrefixo.replace(/\D/g, "").slice(0, 9)
+        : undefined;
     const dataInicio = parseData(req.query.dataInicio, "inicio");
     const dataFim = parseData(req.query.dataFim, "fim");
 
@@ -147,6 +151,7 @@ export const getMinhasEncomendas = async (req: Request, res: Response) => {
     const encomendas = await pedidoService.getMinhasEncomendas(usuarioId, {
       page,
       pageSize: 15,
+      ...(pedidoPrefixo ? { pedidoPrefixo } : {}),
       ...(pedidoId ? { pedidoId } : {}),
       ...(dataInicio ? { dataInicio } : {}),
       ...(dataFim ? { dataFim } : {}),

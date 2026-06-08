@@ -21,8 +21,38 @@ type FiltroPedidos = {
   page: number;
   pageSize: number;
   pedidoId?: number;
+  pedidoPrefixo?: string;
   dataInicio?: Date;
   dataFim?: Date;
+};
+
+// Número máximo de dígitos que um id de pedido pode ter. Mantém as faixas
+// geradas abaixo dentro do limite do tipo Int do PostgreSQL.
+const MAX_DIGITOS_ID_PEDIDO = 9;
+
+// Converte um prefixo de dígitos (ex.: "2") nas faixas de id que começam por
+// ele (ex.: 2, 20-29, 200-299, ...), permitindo busca "começa com" sobre o id.
+const construirFaixasPorPrefixo = (
+  prefixo: string,
+): { gte: number; lte: number }[] => {
+  const apenasDigitos = prefixo.replace(/\D/g, "").replace(/^0+/, "");
+  if (!apenasDigitos) {
+    return [];
+  }
+
+  const base = Number.parseInt(apenasDigitos, 10);
+  if (!Number.isFinite(base) || base <= 0) {
+    return [];
+  }
+
+  const faixas: { gte: number; lte: number }[] = [];
+  const digitosExtras = Math.max(0, MAX_DIGITOS_ID_PEDIDO - apenasDigitos.length);
+  for (let k = 0; k <= digitosExtras; k++) {
+    const fator = 10 ** k;
+    faixas.push({ gte: base * fator, lte: base * fator + (fator - 1) });
+  }
+
+  return faixas;
 };
 
 type FiltroVendas = {
@@ -518,7 +548,7 @@ export class PedidoService {
   }
 
   async getMinhasEncomendas(usuarioId: number, filtros: FiltroPedidos) {
-    const { page, pageSize, pedidoId, dataInicio, dataFim } = filtros;
+    const { page, pageSize, pedidoId, pedidoPrefixo, dataInicio, dataFim } = filtros;
     const skip = (page - 1) * pageSize;
 
     const createdAt: Prisma.DateTimeFilter = {};
@@ -529,9 +559,19 @@ export class PedidoService {
       createdAt.lte = dataFim;
     }
 
+    const faixasPrefixo = pedidoPrefixo
+      ? construirFaixasPorPrefixo(pedidoPrefixo)
+      : [];
+
     const where: Prisma.PedidoWhereInput = {
       usuarioId,
-      ...(pedidoId ? { id: pedidoId } : {}),
+      // Busca "começa com" pelo número: o id deve cair em uma das faixas. Quando
+      // não há prefixo, mantém o filtro por id exato (compatibilidade).
+      ...(faixasPrefixo.length > 0
+        ? { OR: faixasPrefixo.map((faixa) => ({ id: faixa })) }
+        : pedidoId
+          ? { id: pedidoId }
+          : {}),
       ...(Object.keys(createdAt).length > 0 ? { createdAt } : {}),
     };
 

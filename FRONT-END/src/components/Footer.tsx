@@ -66,7 +66,7 @@ const Footer = () => {
                   to="/politicas"
                   className="inline-flex items-center rounded-xl border border-primary/70 bg-primary/20 px-4 py-2 text-sm font-semibold text-white hover:bg-primary/30 transition-colors"
                 >
-                  Politicas de pagamento e entrega
+                  Políticas de pagamento e entrega
                 </Link>
               </div>
             </div>
@@ -122,7 +122,7 @@ const Footer = () => {
                 </li>
                 <li className="flex items-start gap-2.5">
                   <Clock3 className="h-4 w-4 mt-0.5 shrink-0 text-primary" />
-                  <span>Atendimento: seg a sab, das 8h às 18h</span>
+                  <span>Atendimento: seg a sáb, das 8h às 18h</span>
                 </li>
               </ul>
             </div>

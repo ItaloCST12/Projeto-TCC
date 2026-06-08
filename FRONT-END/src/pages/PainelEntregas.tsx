@@ -3145,7 +3145,7 @@ const PainelEntregas = () => {
                                     Digite o estoque final de cada tamanho e clique em salvar.
                                   </p>
 
-                                  <div className="mt-3 grid lg:grid-cols-5 gap-3">
+                                  <div className="mt-3 grid sm:grid-cols-3 gap-3">
                                     <div>
                                       <label className="block text-xs text-muted-foreground mb-1">Grande</label>
                                       <input
@@ -3232,14 +3232,16 @@ const PainelEntregas = () => {
                                         placeholder="Estoque pequeno"
                                       />
                                     </div>
+                                  </div>
 
+                                  <div className="mt-3 grid grid-cols-2 gap-3">
                                     <button
                                       type="button"
                                       disabled={updatingEstoqueId === produto.id}
                                       onClick={() => {
                                         void salvarEstoquesAbacaxiProdutoGestao(produto);
                                       }}
-                                      className="inline-flex justify-self-start items-center justify-center px-3 py-2.5 rounded-md bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-50"
+                                      className="inline-flex w-full items-center justify-center px-3 py-2.5 rounded-md bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-50"
                                     >
                                       {updatingEstoqueId === produto.id
                                         ? "Salvando..."
@@ -3252,7 +3254,7 @@ const PainelEntregas = () => {
                                         setFiltroTipoMovimentacaoEstoque("todos");
                                         void loadMovimentacoesEstoque(produto.id, 1, "todos");
                                       }}
-                                      className="inline-flex items-center justify-center px-3 py-2.5 rounded-md border border-border text-sm font-semibold hover:bg-muted"
+                                      className="inline-flex w-full items-center justify-center px-3 py-2.5 rounded-md border border-border text-sm font-semibold hover:bg-muted"
                                     >
                                       Histórico
                                     </button>
