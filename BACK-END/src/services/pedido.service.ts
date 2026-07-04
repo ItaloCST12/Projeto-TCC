@@ -22,6 +22,7 @@ type FiltroPedidos = {
   pageSize: number;
   pedidoId?: number;
   pedidoPrefixo?: string;
+  cliente?: string;
   dataInicio?: Date;
   dataFim?: Date;
 };
@@ -602,7 +603,7 @@ export class PedidoService {
   }
 
   async getTodosPedidos(filtros: FiltroPedidos) {
-    const { page, pageSize, pedidoId, dataInicio, dataFim } = filtros;
+    const { page, pageSize, pedidoId, pedidoPrefixo, cliente, dataInicio, dataFim } = filtros;
     const skip = (page - 1) * pageSize;
 
     const createdAt: Prisma.DateTimeFilter = {};
@@ -613,13 +614,29 @@ export class PedidoService {
       createdAt.lte = dataFim;
     }
 
+    const faixasPrefixo = pedidoPrefixo
+      ? construirFaixasPorPrefixo(pedidoPrefixo)
+      : [];
+
     const where: Prisma.PedidoWhereInput = {
-      ...(pedidoId ? { id: pedidoId } : {}),
+      ...(faixasPrefixo.length > 0
+        ? { OR: faixasPrefixo.map((faixa) => ({ id: faixa })) }
+        : pedidoId
+          ? { id: pedidoId }
+          : {}),
+      ...(cliente
+        ? { usuario: { nome: { contains: cliente, mode: "insensitive" } } }
+        : {}),
       ...(Object.keys(createdAt).length > 0 ? { createdAt } : {}),
     };
 
-    const [total, pedidos] = await Promise.all([
+    const [total, contagemPorStatus, pedidos] = await Promise.all([
       prisma.pedido.count({ where }),
+      prisma.pedido.groupBy({
+        by: ["status"],
+        where,
+        _count: { _all: true },
+      }),
       prisma.pedido.findMany({
         where,
         orderBy: { id: "desc" },
@@ -650,6 +667,14 @@ export class PedidoService {
       }),
     ]);
 
+    const resumoStatus = contagemPorStatus.reduce<Record<string, number>>(
+      (acumulado, item) => {
+        acumulado[item.status] = item._count._all;
+        return acumulado;
+      },
+      {},
+    );
+
     return {
       data: pedidos,
       pagination: {
@@ -658,6 +683,7 @@ export class PedidoService {
         total,
         totalPages: Math.max(1, Math.ceil(total / pageSize)),
       },
+      resumoStatus,
     };
   }
 
@@ -791,10 +817,48 @@ export class PedidoService {
   }
 
   async finalizarPedido(id: number) {
-    return prisma.pedido.update({
+    const pedido = await prisma.pedido.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        status: true,
+      },
+    });
+
+    if (!pedido) {
+      throw new Error("Pedido não encontrado");
+    }
+
+    if (pedido.status === "CANCELADO") {
+      throw new Error("Não é possível finalizar um pedido cancelado");
+    }
+
+    if (pedido.status === "COMPLETADO") {
+      throw new Error("Pedido já foi finalizado");
+    }
+
+    const pedidoAtualizado = await prisma.pedido.update({
       where: { id },
       data: { status: "COMPLETADO" },
     });
+
+    await executarNotificacaoSemFalhar(() =>
+      notificacaoService.criarParaCliente(pedidoAtualizado.usuarioId, {
+        tipo: "PEDIDO_COMPLETADO",
+        titulo: "Seu pedido foi entregue",
+        mensagem: `O pedido #${pedidoAtualizado.id} foi marcado como entregue.`,
+        pedidoId: pedidoAtualizado.id,
+      }),
+    );
+
+    emitPedidoAtualizado({
+      pedidoId: pedidoAtualizado.id,
+      usuarioId: pedidoAtualizado.usuarioId,
+      status: pedidoAtualizado.status,
+      origem: "STATUS_ATUALIZADO",
+    });
+
+    return pedidoAtualizado;
   }
 
   async marcarPedidoProntoParaRetirada(id: number) {
@@ -903,6 +967,62 @@ export class PedidoService {
     });
 
     return pedidoAtualizado;
+  }
+
+  async cancelarPedidoAdmin(id: number, motivo?: string) {
+    const pedido = await prisma.pedido.findUnique({
+      where: { id },
+    });
+
+    if (!pedido) {
+      throw new Error("Pedido não encontrado");
+    }
+
+    if (pedido.status === "COMPLETADO") {
+      throw new Error("Não é possível cancelar um pedido finalizado");
+    }
+
+    if (pedido.status === "CANCELADO") {
+      throw new Error("Este pedido já foi cancelado");
+    }
+
+    const motivoNormalizado = motivo?.trim() || null;
+
+    const pedidoCancelado = await prisma.$transaction(async (tx) => {
+      const atualizado = await tx.pedido.update({
+        where: { id },
+        data: { status: "CANCELADO" },
+      });
+
+      await estoqueService.reprocessarEstoquePedido(
+        tx,
+        id,
+        "DEVOLUCAO",
+        `Cancelamento pela loja • pedido #${id}`,
+      );
+
+      return atualizado;
+    });
+
+    await executarNotificacaoSemFalhar(() =>
+      notificacaoService.criarParaCliente(pedidoCancelado.usuarioId, {
+        tipo: "PEDIDO_CANCELADO",
+        titulo: "Seu pedido foi cancelado",
+        mensagem: motivoNormalizado
+          ? `O pedido #${pedidoCancelado.id} foi cancelado pela loja. Motivo: ${motivoNormalizado}`
+          : `O pedido #${pedidoCancelado.id} foi cancelado pela loja. Em caso de dúvidas, fale com o suporte.`,
+        pedidoId: pedidoCancelado.id,
+      }),
+    );
+
+    emitPedidoAtualizado({
+      pedidoId: pedidoCancelado.id,
+      usuarioId: pedidoCancelado.usuarioId,
+      status: pedidoCancelado.status,
+      origem: "STATUS_ATUALIZADO",
+    });
+
+    return pedidoCancelado;
   }
 
   async cancelarPedidoUsuario(usuarioId: number, id: number) {

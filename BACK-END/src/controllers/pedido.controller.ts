@@ -166,6 +166,14 @@ export const getTodosPedidos = async (req: Request, res: Response) => {
   try {
     const page = parsePagina(req.query.page);
     const pedidoId = parsePedidoId(req.query.pedidoId);
+    const pedidoPrefixo =
+      typeof req.query.pedidoPrefixo === "string"
+        ? req.query.pedidoPrefixo.replace(/\D/g, "").slice(0, 9)
+        : undefined;
+    const cliente =
+      typeof req.query.cliente === "string"
+        ? req.query.cliente.trim().slice(0, 120)
+        : undefined;
     const dataInicio = parseData(req.query.dataInicio, "inicio");
     const dataFim = parseData(req.query.dataFim, "fim");
 
@@ -176,7 +184,9 @@ export const getTodosPedidos = async (req: Request, res: Response) => {
     const pedidos = await pedidoService.getTodosPedidos({
       page,
       pageSize: 15,
+      ...(pedidoPrefixo ? { pedidoPrefixo } : {}),
       ...(pedidoId ? { pedidoId } : {}),
+      ...(cliente ? { cliente } : {}),
       ...(dataInicio ? { dataInicio } : {}),
       ...(dataFim ? { dataFim } : {}),
     });
@@ -273,6 +283,28 @@ export const marcarPedidoSaiuParaEntrega = async (req: Request, res: Response) =
       throw new Error("ID inválido");
     }
     const pedido = await pedidoService.marcarPedidoSaiuParaEntrega(id);
+    res.json(pedido);
+  } catch (error) {
+    res.status(400).json({ error: (error as Error).message });
+  }
+};
+
+export const cancelarPedidoAdmin = async (req: Request, res: Response) => {
+  try {
+    const idParam = req.params.id;
+    if (!idParam) {
+      throw new Error("ID do pedido não fornecido");
+    }
+
+    const id = parseInt(idParam, 10);
+    if (isNaN(id)) {
+      throw new Error("ID inválido");
+    }
+
+    const motivo =
+      typeof req.body?.motivo === "string" ? req.body.motivo.slice(0, 200) : undefined;
+
+    const pedido = await pedidoService.cancelarPedidoAdmin(id, motivo);
     res.json(pedido);
   } catch (error) {
     res.status(400).json({ error: (error as Error).message });

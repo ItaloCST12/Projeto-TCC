@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, Navigate, useSearchParams } from "react-router-dom";
-import { CalendarDays, CheckCircle2, Clock3, PackageCheck, Search, Truck } from "lucide-react";
+import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
+import { CalendarDays, CheckCircle2, Clock3, PackageCheck, RotateCcw, Search, Truck } from "lucide-react";
 import { apiRequest } from "@/lib/api";
 import { getAuthToken, getAuthUser, isAuthenticated } from "@/lib/auth";
+import { addToCart } from "@/lib/cart";
 import Navbar from "@/components/Navbar";
 import PageShell from "@/components/PageShell";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -20,6 +21,7 @@ import {
 type Pedido = {
   id: number;
   status: string;
+  produtoId?: number;
   quantidade: number;
   unidade: string;
   tipoEntrega: string;
@@ -27,6 +29,7 @@ type Pedido = {
   createdAt?: string;
   created_at?: string;
   produto?: {
+    id?: number;
     nome: string;
   };
   endereco?: {
@@ -37,9 +40,11 @@ type Pedido = {
   } | null;
   items?: {
     id: number;
+    produtoId?: number;
     quantidade: number;
     unidade?: string;
     produto?: {
+      id?: number;
       nome: string;
     };
   }[];
@@ -242,6 +247,7 @@ const MinhasEncomendas = () => {
   const authToken = getAuthToken();
   const isAdmin = user?.role === "ADMIN";
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
   const [loading, setLoading] = useState(true);
   const [cancelandoPedidoId, setCancelandoPedidoId] = useState<number | null>(null);
@@ -432,6 +438,40 @@ const MinhasEncomendas = () => {
     setDataFiltro("");
     setBuscaPedido("");
     setPaginaAtual(1);
+  };
+
+  const pedirNovamente = (pedido: Pedido) => {
+    const itens =
+      pedido.items && pedido.items.length > 0
+        ? pedido.items.map((item) => ({
+            produtoId: item.produtoId ?? item.produto?.id,
+            nome: item.produto?.nome ?? "Produto",
+            quantidade: item.quantidade,
+            unidade: item.unidade ?? pedido.unidade,
+          }))
+        : [
+            {
+              produtoId: pedido.produtoId ?? pedido.produto?.id,
+              nome: pedido.produto?.nome ?? "Produto",
+              quantidade: pedido.quantidade,
+              unidade: pedido.unidade,
+            },
+          ];
+
+    let adicionados = 0;
+    itens.forEach((item) => {
+      if (Number.isInteger(item.produtoId) && (item.produtoId as number) > 0) {
+        addToCart(item.produtoId as number, item.nome, item.quantidade, item.unidade);
+        adicionados += 1;
+      }
+    });
+
+    if (adicionados === 0) {
+      setError("Não foi possível adicionar os itens deste pedido ao carrinho.");
+      return;
+    }
+
+    navigate("/carrinho");
   };
 
   const cancelarPedido = async (pedidoId: number) => {
@@ -774,7 +814,7 @@ const MinhasEncomendas = () => {
                       </div>
                     )}
 
-                    {pedido.status !== "COMPLETADO" && pedido.status !== "CANCELADO" && (
+                    {pedido.status !== "COMPLETADO" && pedido.status !== "CANCELADO" ? (
                       <div className="mt-3">
                         <button
                           type="button"
@@ -785,6 +825,17 @@ const MinhasEncomendas = () => {
                           {cancelandoPedidoId === pedido.id
                             ? "Cancelando..."
                             : "Cancelar pedido"}
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="mt-3">
+                        <button
+                          type="button"
+                          onClick={() => pedirNovamente(pedido)}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-primary/40 text-sm font-semibold text-primary hover:bg-primary/10"
+                        >
+                          <RotateCcw className="h-3.5 w-3.5" />
+                          Pedir novamente
                         </button>
                       </div>
                     )}

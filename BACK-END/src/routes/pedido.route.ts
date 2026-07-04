@@ -1,5 +1,6 @@
 import { Router } from "express";
 import {
+  cancelarPedidoAdmin,
   cancelarPedidoUsuario,
   criarPedido,
   getHistoricoUsuario,
@@ -37,6 +38,12 @@ router.patch(
   authMiddleware,
   adminMiddleware,
   marcarPedidoSaiuParaEntrega,
+);
+router.patch(
+  "/:id/cancelar-admin",
+  authMiddleware,
+  adminMiddleware,
+  cancelarPedidoAdmin,
 );
 
 export default router;

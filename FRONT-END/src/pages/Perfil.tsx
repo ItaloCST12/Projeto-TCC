@@ -257,7 +257,7 @@ const Perfil = () => {
         const [perfilResponse, pedidosResponse, enderecosResponse, mensagensResponse] =
           await Promise.all([
             apiRequest<PerfilResponse>("/usuarios/perfil"),
-            apiRequest<Pedido[] | RespostaPaginada<Pedido>>("/pedidos/minhas-encomendas"),
+            apiRequest<Pedido[] | RespostaPaginada<Pedido>>("/pedidos/historico"),
             apiRequest<Endereco[] | RespostaPaginada<Endereco>>("/enderecos/me"),
             apiRequest<Mensagem[] | RespostaPaginada<Mensagem>>("/atendimentos/me"),
           ]);

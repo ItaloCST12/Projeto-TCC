@@ -56,11 +56,12 @@ A **Plataforma Fazenda Bispo** é uma aplicação web fullstack desenvolvida com
 
 - **Autenticação segura** — Registro, login com JWT, recuperação de senha por e-mail (Resend)
 - **Catálogo de produtos** — CRUD completo com upload de imagens, soft delete e preços por tamanho/unidade
-- **Carrinho & Pedidos** — Múltiplos itens por pedido, seleção de endereço e acompanhamento de status
+- **Carrinho & Pedidos** — Múltiplos itens por pedido, seleção de endereço e acompanhamento de status em tempo real
+- **Recompra rápida** — Botão "Pedir novamente" que recria o pedido no carrinho a partir do histórico
 - **Pagamento manual** — Opções PIX ou dinheiro, sem processamento automático de pagamentos
 - **Chat em tempo real** — Atendimento via WebSocket com autenticação JWT e envio de imagens
 - **Notificações Push** — Web Push VAPID para alertas fora do site
-- **Painel administrativo** — Gestão de entregas, pedidos e visão geral da plataforma
+- **Painel administrativo** — Gestão de entregas com cards de resumo por status, busca de pedidos por número ou cliente e cancelamento com devolução automática de estoque
 - **Gestão de estoque** — Movimentações, ajustes e resumo por produto (somente admin)
 - **Geração de PDF** — Exportação de relatórios e comprovantes via jsPDF
 - **Acessibilidade** — Integração com VLibras (Libras), design responsivo e mobile-first
@@ -306,11 +307,14 @@ Endpoints marcados com **(admin)** também requerem o papel `ADMIN`.
 
 ### Usuários — `/usuarios`
 
-| Método  | Rota                 | Autenticação | Descrição                     |
-| ------- | -------------------- | :----------: | ----------------------------- |
-| `GET`   | `/usuarios/me`       |      ✅      | Perfil do usuário autenticado |
-| `PUT`   | `/usuarios/me`       |      ✅      | Atualizar nome e telefone     |
-| `PATCH` | `/usuarios/me/senha` |      ✅      | Alterar senha                 |
+| Método   | Rota                    | Autenticação | Descrição                          |
+| -------- | ----------------------- | :----------: | ---------------------------------- |
+| `GET`    | `/usuarios/perfil`      |      ✅      | Perfil do usuário autenticado      |
+| `PATCH`  | `/usuarios/perfil`      |      ✅      | Atualizar telefone                 |
+| `GET`    | `/usuarios/:id/perfil`  |  ✅ (admin)  | Perfil detalhado de um usuário     |
+| `GET`    | `/usuarios`             |  ✅ (admin)  | Listar usuários                    |
+| `PATCH`  | `/usuarios/:id`         |  ✅ (admin)  | Atualizar usuário                  |
+| `DELETE` | `/usuarios/:id`         |  ✅ (admin)  | Remover usuário                    |
 
 ### Produtos — `/produtos`
 
@@ -324,21 +328,29 @@ Endpoints marcados com **(admin)** também requerem o papel `ADMIN`.
 
 ### Pedidos — `/pedidos`
 
-| Método  | Rota                  | Autenticação | Descrição                      |
-| ------- | --------------------- | :----------: | ------------------------------ |
-| `POST`  | `/pedidos`            |      ✅      | Criar pedido                   |
-| `GET`   | `/pedidos/me`         |      ✅      | Pedidos do usuário autenticado |
-| `GET`   | `/pedidos`            |  ✅ (admin)  | Listar todos os pedidos        |
-| `PATCH` | `/pedidos/:id/status` |  ✅ (admin)  | Atualizar status do pedido     |
+| Método  | Rota                            | Autenticação | Descrição                                       |
+| ------- | ------------------------------- | :----------: | ----------------------------------------------- |
+| `POST`  | `/pedidos`                      |      ✅      | Criar pedido                                    |
+| `GET`   | `/pedidos/minhas-encomendas`    |      ✅      | Pedidos do usuário (paginado, com busca/filtro) |
+| `GET`   | `/pedidos/historico`            |      ✅      | Histórico completo do usuário                   |
+| `PATCH` | `/pedidos/:id/cancelar`         |      ✅      | Cancelar o próprio pedido                       |
+| `GET`   | `/pedidos`                      |  ✅ (admin)  | Listar pedidos (busca por número/cliente)       |
+| `GET`   | `/pedidos/controle-vendas`      |  ✅ (admin)  | Controle de vendas por período                  |
+| `PATCH` | `/pedidos/:id/pronto-retirada`  |  ✅ (admin)  | Marcar pedido pronto para retirada              |
+| `PATCH` | `/pedidos/:id/saiu-entrega`     |  ✅ (admin)  | Marcar pedido como saiu para entrega            |
+| `PATCH` | `/pedidos/:id/finalizar`        |  ✅ (admin)  | Finalizar pedido (entregue)                     |
+| `PATCH` | `/pedidos/:id/cancelar-admin`   |  ✅ (admin)  | Cancelar pedido com devolução de estoque        |
 
 ### Endereços — `/enderecos`
 
-| Método   | Rota             | Autenticação | Descrição            |
-| -------- | ---------------- | :----------: | -------------------- |
-| `POST`   | `/enderecos`     |      ✅      | Cadastrar endereço   |
-| `GET`    | `/enderecos/me`  |      ✅      | Endereços do usuário |
-| `PUT`    | `/enderecos/:id` |      ✅      | Atualizar endereço   |
-| `DELETE` | `/enderecos/:id` |      ✅      | Remover endereço     |
+| Método   | Rota                  | Autenticação | Descrição                        |
+| -------- | --------------------- | :----------: | -------------------------------- |
+| `POST`   | `/enderecos`          |      ✅      | Cadastrar endereço               |
+| `GET`    | `/enderecos/me`       |      ✅      | Endereços do usuário             |
+| `GET`    | `/enderecos/cep/:cep` |      ✅      | Consultar CEP via ViaCEP         |
+| `PATCH`  | `/enderecos/:id`      |      ✅      | Atualizar endereço               |
+| `DELETE` | `/enderecos/:id`      |      ✅      | Remover endereço                 |
+| `GET`    | `/enderecos`          |  ✅ (admin)  | Listar todos os endereços        |
 
 ### Atendimento — `/atendimentos`
 

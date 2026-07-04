@@ -145,6 +145,10 @@ type RespostaPaginada<T> = {
   };
 };
 
+type RespostaPedidosAdmin = RespostaPaginada<PedidoAdmin> & {
+  resumoStatus?: Record<string, number>;
+};
+
 type VendaControle = {
   id: number;
   createdAt?: string;
@@ -686,6 +690,9 @@ const PainelEntregas = () => {
   const [totalPedidos, setTotalPedidos] = useState(0);
   const [dataFiltroPedidos, setDataFiltroPedidos] = useState("");
   const [buscaClientePedidos, setBuscaClientePedidos] = useState("");
+  const [resumoStatusPedidos, setResumoStatusPedidos] = useState<Record<string, number> | null>(null);
+  const [pedidoParaCancelarAdmin, setPedidoParaCancelarAdmin] = useState<PedidoAdmin | null>(null);
+  const [cancelandoPedidoAdminId, setCancelandoPedidoAdminId] = useState<number | null>(null);
   const [filtroTipoEntrega, setFiltroTipoEntrega] = useState<
     "todos" | "entrega" | "retirada" | "cancelados"
   >("todos");
@@ -755,13 +762,24 @@ const PainelEntregas = () => {
         params.set("dataFim", dataFiltroPedidos);
       }
 
-      const response = await apiRequest<RespostaPaginada<PedidoAdmin>>(
+      const termoBusca = buscaClientePedidos.trim();
+      if (termoBusca) {
+        // Só dígitos: busca por número do pedido (prefixo); caso contrário, por nome do cliente.
+        if (/^\d+$/.test(termoBusca)) {
+          params.set("pedidoPrefixo", termoBusca);
+        } else {
+          params.set("cliente", termoBusca);
+        }
+      }
+
+      const response = await apiRequest<RespostaPedidosAdmin>(
         `/pedidos?${params.toString()}`,
       );
       setPedidos(ordenarPedidosMaisRecentes(response.data));
       setPaginaPedidos(response.pagination.page);
       setTotalPaginasPedidos(response.pagination.totalPages);
       setTotalPedidos(response.pagination.total);
+      setResumoStatusPedidos(response.resumoStatus ?? null);
     } catch (loadError) {
       setErrorPedidos(
         loadError instanceof Error
@@ -771,7 +789,7 @@ const PainelEntregas = () => {
     } finally {
       setLoadingPedidos(false);
     }
-  }, [dataFiltroPedidos, paginaPedidos]);
+  }, [dataFiltroPedidos, paginaPedidos, buscaClientePedidos]);
 
   useEffect(() => {
     paginaPedidosRef.current = paginaPedidos;
@@ -784,6 +802,22 @@ const PainelEntregas = () => {
   useEffect(() => {
     loadPedidosRef.current = loadPedidos;
   }, [loadPedidos]);
+
+  const primeiraBuscaPedidosRef = useRef(true);
+
+  // Busca no servidor (todas as páginas) com debounce ao digitar no campo de busca.
+  useEffect(() => {
+    if (primeiraBuscaPedidosRef.current) {
+      primeiraBuscaPedidosRef.current = false;
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      void loadPedidosRef.current(1);
+    }, 450);
+
+    return () => window.clearTimeout(timer);
+  }, [buscaClientePedidos]);
 
   const loadProdutos = async () => {
     setLoadingProdutos(true);
@@ -1251,6 +1285,18 @@ const PainelEntregas = () => {
     [pedidosFiltrados],
   );
 
+  const resumoPedidosCards = useMemo(() => {
+    const resumo = resumoStatusPedidos ?? {};
+    const pegar = (chave: string) => resumo[chave] ?? 0;
+
+    return {
+      pendentes: pegar("PENDENTE"),
+      emAndamento: pegar("PRONTO_PARA_RETIRADA") + pegar("SAIU_PARA_ENTREGA"),
+      concluidos: pegar("COMPLETADO"),
+      cancelados: pegar("CANCELADO"),
+    };
+  }, [resumoStatusPedidos]);
+
   const mostrarRetiradaAntesEntrega = useMemo(() => {
     if (filtroTipoEntrega !== "todos") {
       return false;
@@ -1390,6 +1436,25 @@ const PainelEntregas = () => {
       );
     } finally {
       setUpdatingSaidaEntregaId(null);
+    }
+  };
+
+  const cancelarPedidoAdmin = async (id: number) => {
+    setCancelandoPedidoAdminId(id);
+    setErrorPedidos("");
+    try {
+      await apiRequest(`/pedidos/${id}/cancelar-admin`, { method: "PATCH" });
+      setPedidoParaCancelarAdmin(null);
+      await loadPedidos(paginaPedidos);
+    } catch (updateError) {
+      setErrorPedidos(
+        updateError instanceof Error
+          ? updateError.message
+          : "Não foi possível cancelar o pedido.",
+      );
+      setPedidoParaCancelarAdmin(null);
+    } finally {
+      setCancelandoPedidoAdminId(null);
     }
   };
 
@@ -2063,6 +2128,27 @@ const PainelEntregas = () => {
               Gestão de Entregas ({totalPedidos})
             </h2>
 
+            {resumoStatusPedidos && (
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 mb-4">
+                <div className="rounded-lg border border-border bg-background p-3">
+                  <p className="text-xs text-muted-foreground">Pendentes</p>
+                  <p className="text-2xl font-bold text-foreground">{resumoPedidosCards.pendentes}</p>
+                </div>
+                <div className="rounded-lg border border-border bg-background p-3">
+                  <p className="text-xs text-muted-foreground">Em andamento</p>
+                  <p className="text-2xl font-bold text-foreground">{resumoPedidosCards.emAndamento}</p>
+                </div>
+                <div className="rounded-lg border border-border bg-background p-3">
+                  <p className="text-xs text-muted-foreground">Concluídos</p>
+                  <p className="text-2xl font-bold text-primary">{resumoPedidosCards.concluidos}</p>
+                </div>
+                <div className="rounded-lg border border-border bg-background p-3">
+                  <p className="text-xs text-muted-foreground">Cancelados</p>
+                  <p className="text-2xl font-bold text-destructive">{resumoPedidosCards.cancelados}</p>
+                </div>
+              </div>
+            )}
+
             <form
               onSubmit={(event) => {
                 void aplicarFiltroPedidos(event);
@@ -2099,9 +2185,9 @@ const PainelEntregas = () => {
                 type="text"
                 value={buscaClientePedidos}
                 onChange={(event) => setBuscaClientePedidos(event.target.value)}
-                placeholder="Buscar por nome do cliente ou ID do pedido"
+                placeholder="Buscar por nome do cliente ou número do pedido (em todas as páginas)"
                 className="w-full rounded-lg border border-border bg-background px-3 py-2 text-foreground placeholder:text-muted-foreground"
-                aria-label="Buscar por nome do cliente ou ID do pedido"
+                aria-label="Buscar por nome do cliente ou número do pedido"
               />
             </div>
 
@@ -2229,7 +2315,7 @@ const PainelEntregas = () => {
                                 <p className="text-xs text-muted-foreground">
                                   {formatarTipoEntrega(pedido.tipoEntrega)} • {totalQuantidadePedido(pedido)} item(ns)
                                 </p>
-                                <div className="flex w-full sm:w-auto gap-2">
+                                <div className="flex w-full sm:w-auto flex-wrap gap-2">
                                   <button
                                     type="button"
                                     disabled={
@@ -2256,6 +2342,19 @@ const PainelEntregas = () => {
                                   >
                                     {updatingId === pedido.id ? "Finalizando..." : "Finalizar entrega"}
                                   </button>
+                                  {!["COMPLETADO", "CANCELADO"].includes(pedido.status) && (
+                                    <button
+                                      type="button"
+                                      disabled={cancelandoPedidoAdminId === pedido.id}
+                                      onClick={() => setPedidoParaCancelarAdmin(pedido)}
+                                      className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-md border border-destructive/40 text-destructive text-sm font-semibold hover:bg-destructive/10 disabled:opacity-50"
+                                    >
+                                      <Ban className="h-3.5 w-3.5" />
+                                      {cancelandoPedidoAdminId === pedido.id
+                                        ? "Cancelando..."
+                                        : "Cancelar pedido"}
+                                    </button>
+                                  )}
                                 </div>
                               </div>
                             </article>
@@ -2351,7 +2450,7 @@ const PainelEntregas = () => {
                                 <p className="text-xs text-muted-foreground">
                                   {formatarTipoEntrega(pedido.tipoEntrega)} • {totalQuantidadePedido(pedido)} item(ns)
                                 </p>
-                                <div className="flex w-full sm:w-auto gap-2">
+                                <div className="flex w-full sm:w-auto flex-wrap gap-2">
                                   <button
                                     type="button"
                                     disabled={
@@ -2378,6 +2477,19 @@ const PainelEntregas = () => {
                                   >
                                     {updatingId === pedido.id ? "Finalizando..." : "Finalizar retirada"}
                                   </button>
+                                  {!["COMPLETADO", "CANCELADO"].includes(pedido.status) && (
+                                    <button
+                                      type="button"
+                                      disabled={cancelandoPedidoAdminId === pedido.id}
+                                      onClick={() => setPedidoParaCancelarAdmin(pedido)}
+                                      className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-md border border-destructive/40 text-destructive text-sm font-semibold hover:bg-destructive/10 disabled:opacity-50"
+                                    >
+                                      <Ban className="h-3.5 w-3.5" />
+                                      {cancelandoPedidoAdminId === pedido.id
+                                        ? "Cancelando..."
+                                        : "Cancelar pedido"}
+                                    </button>
+                                  )}
                                 </div>
                               </div>
                             </article>
@@ -3875,6 +3987,39 @@ const PainelEntregas = () => {
                 }}
               >
                 {updatingProdutoId !== null ? "Excluindo..." : "Confirmar"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <AlertDialog
+          open={pedidoParaCancelarAdmin !== null}
+          onOpenChange={(open) => {
+            if (!open && cancelandoPedidoAdminId === null) {
+              setPedidoParaCancelarAdmin(null);
+            }
+          }}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Cancelar este pedido?</AlertDialogTitle>
+              <AlertDialogDescription>
+                {pedidoParaCancelarAdmin
+                  ? `O pedido #${pedidoParaCancelarAdmin.id} será cancelado, o estoque dos itens será devolvido e o cliente receberá uma notificação.`
+                  : "Esta ação não pode ser desfeita."}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={cancelandoPedidoAdminId !== null}>Voltar</AlertDialogCancel>
+              <AlertDialogAction
+                disabled={cancelandoPedidoAdminId !== null || pedidoParaCancelarAdmin === null}
+                onClick={() => {
+                  if (pedidoParaCancelarAdmin) {
+                    void cancelarPedidoAdmin(pedidoParaCancelarAdmin.id);
+                  }
+                }}
+              >
+                {cancelandoPedidoAdminId !== null ? "Cancelando..." : "Confirmar cancelamento"}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

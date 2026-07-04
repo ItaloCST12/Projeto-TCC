@@ -181,26 +181,20 @@ export class EstoqueService {
         },
       });
 
+      // Aumento de estoque de um tamanho é registrado como ENTRADA (reposição),
+      // com a quantidade adicionada; caso contrário, mantém AJUSTE.
+      const montarMovimentacaoTamanho = (label: string, novo: number, atual: number) => ({
+        produtoId,
+        tipo: novo > atual ? "ENTRADA" : "AJUSTE",
+        quantidade: novo > atual ? novo - atual : novo,
+        motivo: `${motivoBase} • Tamanho: ${label}`,
+      });
+
       await tx.movimentacaoEstoque.createMany({
         data: [
-          {
-            produtoId,
-            tipo: "AJUSTE",
-            quantidade: estoqueGrande,
-            motivo: `${motivoBase} • Tamanho: Grande`,
-          },
-          {
-            produtoId,
-            tipo: "AJUSTE",
-            quantidade: estoqueMedio,
-            motivo: `${motivoBase} • Tamanho: Médio`,
-          },
-          {
-            produtoId,
-            tipo: "AJUSTE",
-            quantidade: estoquePequeno,
-            motivo: `${motivoBase} • Tamanho: Pequeno`,
-          },
+          montarMovimentacaoTamanho("Grande", estoqueGrande, produto.estoqueAbacaxiGrande),
+          montarMovimentacaoTamanho("Médio", estoqueMedio, produto.estoqueAbacaxiMedio),
+          montarMovimentacaoTamanho("Pequeno", estoquePequeno, produto.estoqueAbacaxiPequeno),
         ],
       });
 
@@ -319,11 +313,20 @@ export class EstoqueService {
           },
         });
 
+        const tipoRegistroTamanho =
+          tipoMovimentacao === "AJUSTE" && novoEstoqueTamanho > estoqueAtualTamanho
+            ? "ENTRADA"
+            : tipoMovimentacao;
+        const quantidadeRegistroTamanho =
+          tipoMovimentacao === "AJUSTE" && novoEstoqueTamanho > estoqueAtualTamanho
+            ? novoEstoqueTamanho - estoqueAtualTamanho
+            : Math.trunc(quantidade);
+
         await tx.movimentacaoEstoque.create({
           data: {
             produtoId,
-            tipo: tipoMovimentacao,
-            quantidade: Math.trunc(quantidade),
+            tipo: tipoRegistroTamanho,
+            quantidade: quantidadeRegistroTamanho,
             motivo: motivoFinal,
             pedidoId: pedidoId ?? null,
           },
@@ -357,11 +360,20 @@ export class EstoqueService {
         },
       });
 
+      const tipoRegistro =
+        tipoMovimentacao === "AJUSTE" && novoEstoque > produto.estoque
+          ? "ENTRADA"
+          : tipoMovimentacao;
+      const quantidadeRegistro =
+        tipoMovimentacao === "AJUSTE" && novoEstoque > produto.estoque
+          ? novoEstoque - produto.estoque
+          : Math.trunc(quantidade);
+
       await tx.movimentacaoEstoque.create({
         data: {
           produtoId,
-          tipo: tipoMovimentacao,
-          quantidade: Math.trunc(quantidade),
+          tipo: tipoRegistro,
+          quantidade: quantidadeRegistro,
           motivo: motivoFinal,
           pedidoId: pedidoId ?? null,
         },
